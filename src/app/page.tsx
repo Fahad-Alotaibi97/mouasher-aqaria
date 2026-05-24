@@ -1,6 +1,5 @@
 'use client';
-import dynamic from 'next/dynamic';
-const MapComponent = dynamic(() => import('./components/Map'), { ssr: false });
+
 import { useEffect, useRef, useState } from 'react';
 
 // SVG Icons — بدل الإيموجي
@@ -406,7 +405,16 @@ export default function Home() {
             {['الكل', 'شقق', 'فلل', 'استوديو'].map(f => (
               <button key={f} className="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-2xl text-sm text-blue-700 font-medium hover:bg-blue-100 transition-all">{f}</button>
             ))}
-          <MapComponent />
+          </div>
+          {/* الخريطة — سيتم ربطها لاحقاً */}
+          <div className="bg-gradient-to-br from-[#E6F1FB] to-[#b5d4f4] flex items-center justify-center" style={{ height: '380px' }}>
+            <div className="text-center bg-white/80 rounded-2xl p-8 shadow-md border border-blue-100">
+              <div className="flex justify-center mb-3 text-blue-600">{Icons.map}</div>
+              <div className="font-bold text-[#0A3D62] text-base mb-2">الخريطة التفاعلية</div>
+              <div className="text-sm text-gray-600 max-w-xs">سيتم تفعيل الخريطة التفاعلية في المرحلة القادمة عند الربط مع قاعدة البيانات</div>
+            </div>
+          </div>
+          <div className="p-4 space-y-3">
             <div className="font-bold text-gray-900 mb-2">كل الإعلانات ({listings.length})</div>
             {listings.map(l => {
               const fair = getFair(l); const st = getSt(l.adv, fair);
@@ -541,36 +549,7 @@ export default function Home() {
 
       {/* ═══ OFFICE DASHBOARD ═══ */}
       {page === 'office' && (
-        <div className="p-4">
-          <div className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] rounded-2xl p-5 text-white mb-4 shadow-lg">
-            <div className="flex items-center gap-3 mb-1">
-              <div className="text-white">{Icons.building}</div>
-              <h2 className="font-bold text-lg">لوحة تحكم المكتب</h2>
-            </div>
-            <p className="text-sm opacity-85">مرحباً — إدارة إعلاناتك ومتابعة الأداء</p>
-          </div>
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            {[
-              { label: 'إعلانات نشطة', val: '0', sub: 'أضف أول إعلان' },
-              { label: 'زوار هذا الأسبوع', val: '0', sub: 'قريباً' },
-              { label: 'استفسارات', val: '0', sub: 'لا توجد بعد' },
-            ].map(s => (
-              <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-3 text-center shadow-sm">
-                <div className="text-xl font-bold text-[#0A3D62]">{s.val}</div>
-                <div className="text-xs text-gray-700 font-medium mt-0.5">{s.label}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{s.sub}</div>
-              </div>
-            ))}
-          </div>
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 text-center shadow-sm">
-            <div className="flex justify-center mb-3 text-blue-600">{Icons.building}</div>
-            <div className="font-bold text-gray-900 mb-2">ابدأ بإضافة أول إعلان</div>
-            <div className="text-sm text-gray-600 mb-4">أضف عقاراتك وابدأ في استقبال الاستفسارات من الباحثين</div>
-            <button className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md">
-              إضافة إعلان جديد
-            </button>
-          </div>
-        </div>
+        <OfficeDashboard />
       )}
 
       {/* Footer */}
@@ -580,6 +559,478 @@ export default function Home() {
         <button className="text-blue-600 font-medium hover:underline">شروط الاستخدام</button>
         <span className="mx-3 text-gray-300">·</span>
         <span>© 2026 مؤشر العقارية</span>
+      </div>
+    </div>
+  );
+}
+
+// ═══ لوحة تحكم المكتب الكاملة ═══
+function OfficeDashboard() {
+  const [offPage, setOffPage] = useState<'dashboard'|'listings'|'add'|'calc'|'inquiries'|'profile'|'settings'>('dashboard');
+  const [addStep, setAddStep] = useState(1);
+  const [falNum, setFalNum] = useState('');
+  const [falStatus, setFalStatus] = useState<'idle'|'loading'|'success'|'error'>('idle');
+  const [cHood, setCHood] = useState('65000');
+  const [cType, setCType] = useState('1');
+  const [cArea, setCArea] = useState('130');
+  const [cCost, setCCost] = useState('600000');
+  const [cReno, setCReno] = useState('40000');
+  const [cMargin, setCMargin] = useState('10');
+  const [cFee, setCFee] = useState('2.5');
+
+  const calcFair = () => {
+    const avg = parseInt(cHood);
+    const mul = parseFloat(cType);
+    const area = parseInt(cArea)||130;
+    return Math.round(avg * mul * (area/130));
+  };
+  const calcMin = () => {
+    const cost = parseInt(cCost)||0;
+    const reno = parseInt(cReno)||0;
+    return Math.round((cost+reno)*((parseFloat(cMargin)+parseFloat(cFee))/100));
+  };
+  const fair = calcFair();
+  const minSafe = calcMin();
+  const profit = fair - minSafe;
+
+  const verifyFal = () => {
+    if (!falNum) { setFalStatus('error'); return; }
+    setFalStatus('loading');
+    setTimeout(() => { setFalStatus('success'); setTimeout(() => setAddStep(2), 800); }, 1500);
+  };
+
+  const inputCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+  const selectCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+
+  const officeListings = [
+    { id:1, title:'شقة 3 غرف — حي النرجس', price:68000, fair:65000, views:142, inquiries:4, st:'ok' },
+    { id:2, title:'فيلا 5 غرف — حي حطين', price:145000, fair:127600, views:89, inquiries:2, st:'hi' },
+    { id:3, title:'استوديو — حي العليا', price:28000, fair:28600, views:76, inquiries:3, st:'lo' },
+    { id:4, title:'شقة 2 غرف — الياسمين', price:48000, fair:54000, views:54, inquiries:1, st:'ok' },
+  ];
+
+  const stBadge: Record<string,string> = {
+    ok:'bg-blue-100 text-blue-800 border border-blue-200',
+    hi:'bg-orange-100 text-orange-800 border border-orange-200',
+    lo:'bg-green-100 text-green-800 border border-green-200',
+  };
+  const stLabel: Record<string,string> = { ok:'مناسب', hi:'مرتفع', lo:'فرصة' };
+
+  const sideItems = [
+    { id:'dashboard', label:'لوحة التحكم' },
+    { id:'listings', label:'إعلاناتي' },
+    { id:'add', label:'إضافة إعلان' },
+    { id:'calc', label:'الحاسبة الذكية' },
+    { id:'inquiries', label:'الاستفسارات' },
+    { id:'profile', label:'ملف المكتب' },
+    { id:'settings', label:'الإعدادات' },
+  ];
+
+  return (
+    <div className="flex min-h-screen">
+      {/* Sidebar */}
+      <div className="w-48 bg-white border-l border-gray-200 flex-shrink-0 py-4 px-3">
+        <div className="text-xs text-gray-400 font-bold px-2 mb-2 tracking-wide">القائمة</div>
+        {sideItems.map(s => (
+          <button key={s.id} onClick={() => { setOffPage(s.id as typeof offPage); if(s.id==='add') setAddStep(1); }}
+            className={`w-full text-right px-3 py-2.5 rounded-xl text-sm mb-1 font-medium transition-all ${offPage===s.id ? 'bg-blue-50 text-[#0A3D62] font-bold' : 'text-gray-600 hover:bg-gray-50'}`}>
+            {s.label}
+            {s.id==='inquiries' && <span className="float-left bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">5</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 p-5 bg-[#F5F8FB] overflow-auto">
+
+        {/* Dashboard */}
+        {offPage === 'dashboard' && (
+          <div>
+            <div className="mb-5">
+              <div className="text-xl font-bold text-gray-900 mb-1">مرحباً، مكتب الأرض المباركة</div>
+              <div className="text-sm text-gray-500">ملخص نشاطك خلال آخر 7 أيام</div>
+            </div>
+            <div className="grid grid-cols-3 gap-4 mb-5">
+              {[
+                { label:'إعلانات نشطة', val:'24', trend:'+3 هذا الأسبوع', color:'text-green-600' },
+                { label:'زوار الإعلانات', val:'847', trend:'+18%', color:'text-green-600' },
+                { label:'استفسارات جديدة', val:'12', trend:'5 تحتاج رد', color:'text-orange-600' },
+              ].map(s => (
+                <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                  <div className="text-xs text-gray-500 mb-2 font-medium">{s.label}</div>
+                  <div className="text-2xl font-bold text-[#0A3D62]">{s.val}</div>
+                  <div className={`text-xs mt-1 font-medium ${s.color}`}>{s.trend}</div>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <button onClick={() => { setOffPage('add'); setAddStep(1); }}
+                className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white rounded-xl p-4 text-center shadow-md hover:opacity-95 transition-all">
+                <div className="text-lg font-bold mb-1">إعلان جديد</div>
+                <div className="text-xs opacity-80">أضف عقار للنشر</div>
+              </button>
+              <button onClick={() => setOffPage('calc')}
+                className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm hover:border-blue-300 transition-all">
+                <div className="text-lg font-bold text-gray-900 mb-1">الحاسبة</div>
+                <div className="text-xs text-gray-500">احسب السعر العادل</div>
+              </button>
+              <button onClick={() => setOffPage('inquiries')}
+                className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm hover:border-blue-300 transition-all">
+                <div className="text-lg font-bold text-gray-900 mb-1">الردود</div>
+                <div className="text-xs text-gray-500">5 استفسارات بانتظارك</div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Listings */}
+        {offPage === 'listings' && (
+          <div>
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <div className="text-xl font-bold text-gray-900 mb-1">إعلاناتي</div>
+                <div className="text-sm text-gray-500">24 إعلان نشط · 3 موقوفة</div>
+              </div>
+              <button onClick={() => { setOffPage('add'); setAddStep(1); }}
+                className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-4 py-2 rounded-xl font-bold text-sm shadow">
+                + إعلان جديد
+              </button>
+            </div>
+            <div className="space-y-3">
+              {officeListings.map(l => (
+                <div key={l.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-all">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="font-bold text-gray-900 mb-1">{l.title}</div>
+                      <div className="text-sm text-gray-600">{l.price.toLocaleString('ar-SA')} ريال/سنة</div>
+                      <div className="text-xs text-blue-600 mt-0.5">السعر العادل: {l.fair.toLocaleString('ar-SA')}</div>
+                    </div>
+                    <span className={`text-xs px-2.5 py-1 rounded-xl font-bold ${stBadge[l.st]}`}>{stLabel[l.st]}</span>
+                  </div>
+                  <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
+                    <span><strong className="text-gray-900">{l.views}</strong> زائر</span>
+                    <span><strong className="text-gray-900">{l.inquiries}</strong> استفسار</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Add Listing */}
+        {offPage === 'add' && (
+          <div>
+            <div className="text-xl font-bold text-gray-900 mb-1">إضافة إعلان جديد</div>
+            <div className="text-sm text-gray-500 mb-5">أضف بيانات عقارك بدقة لضمان أفضل ظهور</div>
+
+            {/* Steps */}
+            <div className="flex items-center gap-2 mb-5 bg-white rounded-xl p-3 border border-gray-200">
+              {[
+                { n:1, label:'التحقق من فال' },
+                { n:2, label:'بيانات العقار' },
+                { n:3, label:'الحاسبة (اختياري)' },
+                { n:4, label:'الصور والوصف' },
+              ].map((s, i) => (
+                <div key={s.n} className="flex items-center gap-2 flex-1">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${addStep > s.n ? 'bg-green-500 text-white' : addStep === s.n ? 'bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] text-white' : 'bg-gray-100 text-gray-400'}`}>
+                    {addStep > s.n ? '✓' : s.n}
+                  </div>
+                  <div className={`text-xs font-medium ${addStep === s.n ? 'text-gray-900' : 'text-gray-400'}`}>{s.label}</div>
+                  {i < 3 && <div className={`flex-1 h-0.5 ${addStep > s.n ? 'bg-green-400' : 'bg-gray-200'}`} />}
+                </div>
+              ))}
+            </div>
+
+            {/* Step 1: FAL */}
+            {addStep === 1 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                <div className="font-bold text-gray-900 mb-1">التحقق من رخصة فال</div>
+                <div className="text-sm text-gray-500 mb-4">التحقق إلزامي لجميع الإعلانات</div>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label className="text-xs text-gray-700 font-semibold block mb-1">رقم رخصة فال</label>
+                    <input value={falNum} onChange={e => setFalNum(e.target.value)} placeholder="مثال: 1100123456" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-700 font-semibold block mb-1">اسم المكتب</label>
+                    <input defaultValue="مكتب الأرض المباركة" className={inputCls} />
+                  </div>
+                </div>
+                {falStatus === 'loading' && <div className="text-sm text-blue-600 bg-blue-50 rounded-xl p-3 mb-3 border border-blue-100">جاري التحقق من منصة فال...</div>}
+                {falStatus === 'success' && <div className="text-sm text-green-700 bg-green-50 rounded-xl p-3 mb-3 border border-green-200">تم التحقق بنجاح — رخصة فال {falNum} سارية</div>}
+                {falStatus === 'error' && <div className="text-sm text-red-700 bg-red-50 rounded-xl p-3 mb-3 border border-red-200">أدخل رقم الرخصة</div>}
+                <button onClick={verifyFal} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
+                  تحقق من الرخصة
+                </button>
+              </div>
+            )}
+
+            {/* Step 2: Property Data */}
+            {addStep === 2 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                <div className="font-bold text-gray-900 mb-4">بيانات العقار</div>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">نوع العقار</label>
+                    <select className={selectCls}><option>شقة</option><option>فيلا</option><option>دور</option><option>استوديو</option></select></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحي</label>
+                    <select className={selectCls}><option>النرجس</option><option>العليا</option><option>الملقا</option><option>حطين</option><option>الياسمين</option></select></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">الإيجار السنوي (ريال)</label>
+                    <input type="number" placeholder="65000" className={inputCls} /></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">المساحة م²</label>
+                    <input type="number" placeholder="120" className={inputCls} /></div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">الغرف</label>
+                    <select className={selectCls}><option>1</option><option>2</option><option>3</option><option>4</option><option>5+</option></select></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">حالة العقار</label>
+                    <select className={selectCls}><option>جديد</option><option>حالة جيدة</option><option>يحتاج ترميم</option></select></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">عمر العقار</label>
+                    <select className={selectCls}><option>أقل من سنة</option><option>1-3 سنوات</option><option>3-7 سنوات</option></select></div>
+                </div>
+                <div className="flex gap-3 mt-4">
+                  <button onClick={() => setAddStep(3)} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">التالي: الحاسبة</button>
+                  <button onClick={() => setAddStep(4)} className="bg-white border border-dashed border-gray-300 text-gray-500 px-5 py-2.5 rounded-xl font-medium text-sm hover:border-gray-400 transition-all">تخطي الحاسبة</button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Calculator */}
+            {addStep === 3 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                <div className="font-bold text-gray-900 mb-1">الحاسبة الذكية</div>
+                <div className="text-sm text-gray-500 mb-4">احسب السعر العادل والربح المتوقع (اختياري)</div>
+                <div className="grid grid-cols-2 gap-12">
+                  <div className="space-y-3">
+                    <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحي</label>
+                      <select value={cHood} onChange={e => setCHood(e.target.value)} className={selectCls}>
+                        <option value="65000">النرجس</option><option value="52000">العليا</option><option value="60000">الملقا</option><option value="58000">حطين</option><option value="54000">الياسمين</option>
+                      </select></div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">النوع</label>
+                        <select value={cType} onChange={e => setCType(e.target.value)} className={selectCls}>
+                          <option value="1">شقة</option><option value="2.2">فيلا</option><option value="0.55">استوديو</option>
+                        </select></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">المساحة م²</label>
+                        <input type="number" value={cArea} onChange={e => setCArea(e.target.value)} className={inputCls} /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">تكلفة العقار</label>
+                        <input type="number" value={cCost} onChange={e => setCCost(e.target.value)} className={inputCls} /></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">تكاليف التشطيب</label>
+                        <input type="number" value={cReno} onChange={e => setCReno(e.target.value)} className={inputCls} /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">نسبة الإيراد %</label>
+                        <input type="number" value={cMargin} onChange={e => setCMargin(e.target.value)} className={inputCls} /></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">عمولتك %</label>
+                        <input type="number" value={cFee} onChange={e => setCFee(e.target.value)} className={inputCls} /></div>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl border border-blue-100 p-4">
+                    <div className="text-sm font-bold text-gray-700 mb-3">النتيجة الذكية</div>
+                    <div className="space-y-2">
+                      {[
+                        { label:'السعر العادل', val:`${fair.toLocaleString('ar-SA')} ريال`, color:'text-[#0A3D62]', big:true },
+                        { label:'السعر التنافسي (-5%)', val:`${Math.round(fair*0.95).toLocaleString('ar-SA')} ريال`, color:'text-gray-700' },
+                        { label:'الحد الأدنى الآمن', val:`${minSafe.toLocaleString('ar-SA')} ريال`, color:'text-orange-600' },
+                        { label:'ربحك المتوقع', val:`${profit > 0 ? '+' : ''}${profit.toLocaleString('ar-SA')} ريال`, color: profit > 0 ? 'text-green-600' : 'text-red-600', big:true },
+                      ].map(r => (
+                        <div key={r.label} className="flex justify-between items-center py-2 border-b border-blue-100 last:border-0">
+                          <span className="text-xs text-gray-500">{r.label}</span>
+                          <span className={`font-bold text-sm ${r.color} ${r.big ? 'text-base' : ''}`}>{r.val}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className={`mt-3 p-3 rounded-xl text-xs leading-relaxed ${profit < 0 ? 'bg-red-50 text-red-700 border border-red-200' : profit/fair < 0.1 ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'bg-blue-50 text-blue-800 border border-blue-200'}`}>
+                      {profit < 0 ? 'تحذير: ربحك سلبي — راجع التكاليف أو ارفع السعر' : profit/fair < 0.1 ? 'هامش الربح ضيق — أنصح بتثبيت السعر العادل' : 'السوق نشط — تقدر تثبت السعر العادل بثقة'}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-4">
+                  <button onClick={() => setAddStep(2)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-medium text-sm">السابق</button>
+                  <button onClick={() => setAddStep(4)} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">التالي: الصور</button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Images & Description */}
+            {addStep === 4 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                <div className="font-bold text-gray-900 mb-4">الصور والوصف</div>
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center mb-4 hover:border-blue-400 transition-all cursor-pointer">
+                  <div className="text-3xl mb-2 text-gray-400">📷</div>
+                  <div className="font-medium text-gray-700 mb-1">اضغط لرفع الصور</div>
+                  <div className="text-xs text-gray-400">يفضل 5 صور على الأقل</div>
+                </div>
+                <div className="mb-4">
+                  <label className="text-xs text-gray-700 font-semibold block mb-1">وصف العقار</label>
+                  <textarea rows={3} placeholder="صف العقار ومميزاته..." className={`${inputCls} resize-none`} />
+                </div>
+                <div className="mb-4">
+                  <label className="text-xs text-gray-700 font-semibold block mb-1">رقم التواصل</label>
+                  <input type="tel" placeholder="05XXXXXXXX" className={inputCls} />
+                </div>
+                <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-800 border border-blue-100 mb-4">
+                  بعد النشر، يقيّم المؤشر سعرك تلقائياً مقارنة بمتوسط حيّك
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setAddStep(3)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-medium text-sm">السابق</button>
+                  <button onClick={() => {
+                    setOffPage('listings');
+                    setAddStep(1);
+                    setFalStatus('idle');
+                    setFalNum('');
+                  }} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow flex-1">
+                    نشر الإعلان
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Calculator */}
+        {offPage === 'calc' && (
+          <div>
+            <div className="text-xl font-bold text-gray-900 mb-1">الحاسبة الذكية</div>
+            <div className="text-sm text-gray-500 mb-5">احسب السعر العادل والربح المتوقع لأي عقار</div>
+            <div className="grid grid-cols-2 gap-5">
+              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحي</label>
+                    <select value={cHood} onChange={e => setCHood(e.target.value)} className={selectCls}>
+                      <option value="65000">النرجس</option><option value="52000">العليا</option><option value="60000">الملقا</option><option value="58000">حطين</option><option value="54000">الياسمين</option>
+                    </select></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">نوع العقار</label>
+                    <select value={cType} onChange={e => setCType(e.target.value)} className={selectCls}>
+                      <option value="1">شقة</option><option value="2.2">فيلا</option><option value="0.55">استوديو</option>
+                    </select></div>
+                </div>
+                <div><label className="text-xs text-gray-700 font-semibold block mb-1">المساحة م²</label>
+                  <input type="number" value={cArea} onChange={e => setCArea(e.target.value)} className={inputCls} /></div>
+                <div className="pt-2 border-t border-gray-100 text-xs font-bold text-gray-700">التكاليف (للربحية)</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">تكلفة العقار</label>
+                    <input type="number" value={cCost} onChange={e => setCCost(e.target.value)} className={inputCls} /></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">تكاليف التشطيب</label>
+                    <input type="number" value={cReno} onChange={e => setCReno(e.target.value)} className={inputCls} /></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">نسبة الإيراد %</label>
+                    <input type="number" value={cMargin} onChange={e => setCMargin(e.target.value)} className={inputCls} /></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">عمولتك %</label>
+                    <input type="number" value={cFee} onChange={e => setCFee(e.target.value)} className={inputCls} /></div>
+                </div>
+              </div>
+              <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl border border-blue-100 p-5 shadow-sm">
+                <div className="font-bold text-gray-800 mb-4">النتيجة</div>
+                <div className="space-y-3">
+                  {[
+                    { label:'السعر العادل في السوق', val:`${fair.toLocaleString('ar-SA')} ريال`, color:'text-[#0A3D62]', big:true },
+                    { label:'السعر التنافسي (-5%)', val:`${Math.round(fair*0.95).toLocaleString('ar-SA')} ريال`, color:'text-gray-700' },
+                    { label:'الحد الأدنى الآمن', val:`${minSafe.toLocaleString('ar-SA')} ريال`, color:'text-orange-600' },
+                    { label:'الربح المتوقع سنوياً', val:`${profit > 0 ? '+' : ''}${profit.toLocaleString('ar-SA')} ريال`, color: profit > 0 ? 'text-green-600' : 'text-red-600', big:true },
+                  ].map(r => (
+                    <div key={r.label} className="flex justify-between items-center py-2.5 border-b border-blue-100 last:border-0">
+                      <span className="text-sm text-gray-500">{r.label}</span>
+                      <span className={`font-bold ${r.color} ${r.big ? 'text-lg' : 'text-sm'}`}>{r.val}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className={`mt-4 p-3 rounded-xl text-sm leading-relaxed ${profit < 0 ? 'bg-red-50 text-red-700 border border-red-200' : profit/fair < 0.1 ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'bg-blue-50 text-blue-800 border border-blue-200'}`}>
+                  <strong>نصيحة: </strong>
+                  {profit < 0 ? 'ربحك سلبي — راجع التكاليف أو ارفع السعر' : profit/fair < 0.1 ? 'هامش الربح ضيق — أنصح بتثبيت السعر العادل' : 'السوق نشط — تقدر تثبت السعر العادل بثقة'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Inquiries */}
+        {offPage === 'inquiries' && (
+          <div>
+            <div className="text-xl font-bold text-gray-900 mb-1">الاستفسارات</div>
+            <div className="text-sm text-gray-500 mb-5">5 استفسارات تحتاج رد</div>
+            <div className="space-y-3">
+              {[
+                { name:'أحمد المطيري', time:'قبل 25 دقيقة', property:'شقة 3 غرف — حي النرجس', msg:'السلام عليكم، الشقة لازالت متاحة؟ ممكن نسوي معاينة بكرة؟', unread:true },
+                { name:'سلطان القحطاني', time:'قبل ساعة', property:'فيلا 5 غرف — حي حطين', msg:'هل المسبح فيها مشترك أو خاص؟ وهل يوجد صور إضافية؟', unread:true },
+                { name:'نجلاء الحربي', time:'قبل 3 ساعات', property:'استوديو — حي العليا', msg:'السعر قابل للتفاوض؟ وهل يوجد عقد إيجار 6 أشهر؟', unread:false },
+              ].map((inq, i) => (
+                <div key={i} className={`bg-white rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all ${inq.unread ? 'border-r-4 border-blue-400 bg-blue-50/30' : 'border-gray-200'}`}>
+                  <div className="flex gap-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700 flex-shrink-0">
+                      {inq.name.slice(0,1)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between mb-1">
+                        <div className="font-bold text-sm text-gray-900">{inq.name}</div>
+                        <div className="text-xs text-gray-400">{inq.time}</div>
+                      </div>
+                      <div className="text-xs text-blue-600 font-medium mb-1">{inq.property}</div>
+                      <div className="text-sm text-gray-600">{inq.msg}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Profile */}
+        {offPage === 'profile' && (
+          <div>
+            <div className="text-xl font-bold text-gray-900 mb-5">ملف المكتب</div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+              <div className="flex items-center gap-4 mb-5">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] flex items-center justify-center text-white text-2xl font-bold">م</div>
+                <div>
+                  <div className="font-bold text-lg text-gray-900">مكتب الأرض المباركة العقاري</div>
+                  <div className="flex gap-2 mt-1">
+                    <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-lg border border-green-200 font-medium">موثّق بفال</span>
+                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-lg border border-gray-200">الرياض</span>
+                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-lg border border-gray-200">منذ 2018</span>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div><label className="text-xs text-gray-700 font-semibold block mb-1">اسم المكتب</label>
+                  <input defaultValue="مكتب الأرض المباركة العقاري" className={inputCls} /></div>
+                <div><label className="text-xs text-gray-700 font-semibold block mb-1">رقم رخصة فال</label>
+                  <input defaultValue="1234567" disabled className={`${inputCls} bg-gray-50 text-gray-400`} /></div>
+                <div><label className="text-xs text-gray-700 font-semibold block mb-1">رقم الجوال</label>
+                  <input defaultValue="0501234567" className={inputCls} /></div>
+                <div><label className="text-xs text-gray-700 font-semibold block mb-1">البريد الإلكتروني</label>
+                  <input defaultValue="info@mubaraka.sa" className={inputCls} /></div>
+              </div>
+              <div className="mb-4"><label className="text-xs text-gray-700 font-semibold block mb-1">نبذة عن المكتب</label>
+                <textarea rows={3} defaultValue="مكتب عقاري موثوق متخصص في تأجير الشقق والفلل في شمال الرياض منذ 2018." className={`${inputCls} resize-none`} /></div>
+              <button className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">حفظ التغييرات</button>
+            </div>
+          </div>
+        )}
+
+        {/* Settings */}
+        {offPage === 'settings' && (
+          <div>
+            <div className="text-xl font-bold text-gray-900 mb-5">الإعدادات</div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm mb-4">
+              <div className="font-bold text-gray-900 mb-4">الإشعارات</div>
+              <div className="space-y-3">
+                <div><label className="text-xs text-gray-700 font-semibold block mb-1">إشعارات الاستفسارات</label>
+                  <select className={selectCls}><option>فورياً</option><option>كل ساعة</option><option>يومياً</option><option>إيقاف</option></select></div>
+                <div><label className="text-xs text-gray-700 font-semibold block mb-1">تقارير الإحصائيات</label>
+                  <select className={selectCls}><option>أسبوعياً</option><option>شهرياً</option><option>إيقاف</option></select></div>
+              </div>
+            </div>
+            <div className="bg-gradient-to-l from-green-600 to-green-500 rounded-xl p-5 text-white">
+              <div className="text-sm opacity-85 mb-1">الباقة الحالية</div>
+              <div className="text-2xl font-bold mb-1">الأساسية</div>
+              <div className="text-sm opacity-85">مجاناً لفترة محدودة</div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
