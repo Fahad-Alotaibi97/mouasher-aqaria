@@ -1,5 +1,6 @@
 'use client';
-
+import dynamic from 'next/dynamic';
+const MapComponent = dynamic(() => import('./components/Map'), { ssr: false });
 import { useEffect, useRef, useState } from 'react';
 
 // SVG Icons — بدل الإيموجي
@@ -405,16 +406,7 @@ export default function Home() {
             {['الكل', 'شقق', 'فلل', 'استوديو'].map(f => (
               <button key={f} className="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-2xl text-sm text-blue-700 font-medium hover:bg-blue-100 transition-all">{f}</button>
             ))}
-          </div>
-          {/* الخريطة — سيتم ربطها لاحقاً */}
-          <div className="bg-gradient-to-br from-[#E6F1FB] to-[#b5d4f4] flex items-center justify-center" style={{ height: '380px' }}>
-            <div className="text-center bg-white/80 rounded-2xl p-8 shadow-md border border-blue-100">
-              <div className="flex justify-center mb-3 text-blue-600">{Icons.map}</div>
-              <div className="font-bold text-[#0A3D62] text-base mb-2">الخريطة التفاعلية</div>
-              <div className="text-sm text-gray-600 max-w-xs">سيتم تفعيل الخريطة التفاعلية في المرحلة القادمة عند الربط مع قاعدة البيانات</div>
-            </div>
-          </div>
-          <div className="p-4 space-y-3">
+          <MapComponent />
             <div className="font-bold text-gray-900 mb-2">كل الإعلانات ({listings.length})</div>
             {listings.map(l => {
               const fair = getFair(l); const st = getSt(l.adv, fair);
