@@ -1,0 +1,29 @@
+<!--
+  قالب إيميل "رابط الدخول السحري" — مؤشر العقارية
+  ────────────────────────────────────────────────────────────
+  أين يُلصق؟  Supabase Dashboard → Authentication → Emails → Templates
+             → اختر "Magic Link" → الصق هذا في حقل (Message body) → Save.
+
+  لماذا token_hash بدل ConfirmationURL الافتراضي؟
+   • لا يعتمد على PKCE verifier المخزَّن في كوكي المتصفح،
+     لذا يعمل حتى لو فُتح الرابط على متصفح/جهاز مختلف.
+   • أكثر أماناً: لا يمر "code" قابل للتبادل في مكان قد تستهلكه
+     فاحصات روابط البريد (مثل Outlook SafeLinks).
+
+  المتغيّرات:
+   • {{ .SiteURL }}   = الـ Site URL المضبوط في URL Configuration.
+   • {{ .TokenHash }} = رمز التحقق المعالَج بـ verifyOtp في /auth/callback.
+   • type=email       = نوع OTP لروابط الدخول عبر signInWithOtp (الواجهة الحديثة).
+-->
+<h2 style="font-family: Tajawal, Arial, sans-serif;">تسجيل الدخول إلى مؤشر العقارية</h2>
+<p style="font-family: Tajawal, Arial, sans-serif;">اضغط الزر لإكمال تسجيل الدخول:</p>
+<p>
+  <a
+    href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email"
+    style="display:inline-block;background:#0A3D62;color:#fff;text-decoration:none;
+           padding:12px 24px;border-radius:10px;font-family:Tajawal,Arial,sans-serif;font-weight:bold;"
+  >تسجيل الدخول</a>
+</p>
+<p style="color:#666;font-size:13px;font-family:Tajawal,Arial,sans-serif;">
+  إذا لم تطلب هذا الرابط، يمكنك تجاهل هذه الرسالة بأمان.
+</p>

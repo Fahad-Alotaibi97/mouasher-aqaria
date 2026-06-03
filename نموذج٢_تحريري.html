@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مؤشر العقارية — السعر العادل قبل التوقيع</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Tajawal:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F1ECE3;        /* عظمي دافئ */
+    --paper2:#E9E2D6;
+    --card:#FBF9F4;
+    --ink:#17140F;          /* حبر شبه أسود */
+    --ink2:#544D42;
+    --line:#15110B;         /* للخطوط الحادة */
+    --hair:#CFC6B5;         /* خط شعري */
+    --accent:#B86B14;       /* أوكر/طيني */
+    --hi:#A8392B;           /* مرتفع */
+    --ok:#1C6A57;           /* عادل */
+    --lo:#2C7A41;           /* فرصة */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--paper);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .display{font-family:'Tajawal',sans-serif;font-weight:900;line-height:1.05;letter-spacing:-1px}
+  .num{font-family:'IBM Plex Sans Arabic',monospace;font-feature-settings:"tnum"}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+  .rule{height:1px;background:var(--line);opacity:.85}
+  .hair{height:1px;background:var(--hair)}
+
+  /* header */
+  header{border-bottom:2px solid var(--line);background:var(--paper);position:sticky;top:0;z-index:40}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand .logo{font-family:'Tajawal';font-weight:900;font-size:23px;letter-spacing:-.5px}
+  .brand .logo i{color:var(--accent);font-style:normal}
+  .brand small{font-size:11px;letter-spacing:3px;color:var(--ink2);border-right:1px solid var(--hair);padding-right:10px}
+  .nav nav{display:flex;gap:26px}
+  .nav nav a{font-size:14px;color:var(--ink2);font-weight:500;padding:4px 0;border-bottom:2px solid transparent;transition:.2s}
+  .nav nav a:hover{color:var(--ink);border-color:var(--accent)}
+  .nav .cta{font-family:inherit;font-weight:700;font-size:14px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);padding:9px 18px;cursor:pointer;transition:.15s}
+  .nav .cta:hover{background:transparent;color:var(--ink)}
+  @media(max-width:760px){.nav nav{display:none}}
+
+  /* hero — asymmetric */
+  .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:0;border-bottom:2px solid var(--line)}
+  @media(max-width:880px){.hero{grid-template-columns:1fr}}
+  .hero-l{padding:60px 28px 48px;border-left:2px solid var(--line)}
+  @media(max-width:880px){.hero-l{border-left:0;border-bottom:2px solid var(--line);padding:44px 28px}}
+  .kicker{display:flex;align-items:center;gap:12px;font-size:13px;letter-spacing:2px;color:var(--accent);font-weight:700;margin-bottom:26px}
+  .kicker .sq{width:9px;height:9px;background:var(--accent)}
+  .hero-l h1{font-size:clamp(38px,6vw,72px)}
+  .hero-l h1 mark{background:none;color:var(--accent)}
+  .hero-l p{font-size:18px;color:var(--ink2);max-width:440px;margin-top:22px;font-weight:400}
+  .stat-row{display:flex;gap:0;margin-top:40px;border-top:1px solid var(--hair)}
+  .stat{flex:1;padding:18px 0 0;border-left:1px solid var(--hair)}
+  .stat:last-child{border-left:0}
+  .stat b{font-family:'Tajawal';font-weight:900;font-size:30px;display:block;line-height:1}
+  .stat span{font-size:12.5px;color:var(--ink2)}
+
+  /* hero right = tool */
+  .hero-r{padding:40px 28px;background:var(--paper2);display:flex;flex-direction:column;justify-content:center}
+  .tool-label{font-size:12px;letter-spacing:2px;color:var(--ink2);font-weight:700;margin-bottom:16px}
+  .tool-label b{color:var(--ink)}
+  .fld{margin-bottom:16px}
+  .fld label{display:block;font-size:13px;font-weight:700;margin-bottom:8px}
+  .fld select,.fld input{width:100%;padding:15px 14px;border:1.5px solid var(--ink);background:var(--card);font-family:inherit;font-size:16px;color:var(--ink);outline:none;border-radius:0}
+  .fld input::placeholder{color:#A89D89}
+  .fld select:focus,.fld input:focus{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .go{width:100%;font-family:'Tajawal';font-weight:900;font-size:17px;background:var(--accent);color:#fff;border:0;padding:16px;cursor:pointer;transition:.15s;letter-spacing:.3px}
+  .go:hover{background:var(--ink)}
+
+  /* verdict editorial */
+  .verdict{margin-top:24px;border-top:2px solid var(--ink);padding-top:20px;display:none}
+  .verdict.show{display:block;animation:fade .4s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .v-word{font-family:'Tajawal';font-weight:900;font-size:clamp(40px,8vw,64px);line-height:1;display:flex;align-items:baseline;gap:14px}
+  .v-word .sub{font-size:15px;font-weight:700;color:var(--ink2);font-family:'IBM Plex Sans Arabic'}
+  .v-line{margin:22px 0 8px;height:2px;background:var(--hair);position:relative}
+  .v-line .seg{position:absolute;top:-3px;height:8px}
+  .v-line .mk{position:absolute;top:-9px;width:2px;height:20px;background:var(--ink);transition:right .55s cubic-bezier(.2,.9,.3,1.3)}
+  .v-line .mk::after{content:attr(data-v);position:absolute;top:-22px;right:50%;transform:translateX(50%);font-size:11px;font-weight:700;white-space:nowrap;background:var(--ink);color:var(--paper);padding:2px 6px}
+  .v-ticks{display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);font-weight:700}
+  .v-msg{margin-top:14px;font-size:15px;color:var(--ink2)}
+
+  /* section scaffold */
+  .sec{padding:64px 0}
+  .sec-top{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid var(--line);padding-bottom:18px;margin-bottom:34px}
+  .sec-top .idx{font-family:'Tajawal';font-weight:900;font-size:15px;color:var(--accent);letter-spacing:1px}
+  .sec-top h2{font-family:'Tajawal';font-weight:900;font-size:clamp(26px,4vw,40px);letter-spacing:-1px;margin-top:6px}
+  .sec-top .desc{font-size:14px;color:var(--ink2);max-width:300px;text-align:left}
+
+  /* listings editorial rows */
+  .rows{border-top:1px solid var(--hair)}
+  .row{display:grid;grid-template-columns:88px 1fr auto auto;gap:20px;align-items:center;padding:20px 8px;border-bottom:1px solid var(--hair);cursor:pointer;transition:.15s}
+  .row:hover{background:var(--card);padding-right:16px}
+  .row .thumb{width:88px;height:64px;background-size:cover;position:relative}
+  .row .thumb b{position:absolute;inset:auto 0 0 auto;background:var(--ink);color:var(--paper);font-size:10px;padding:2px 6px;font-weight:700}
+  .row .meta h3{font-family:'Tajawal';font-weight:800;font-size:17px}
+  .row .meta p{font-size:13px;color:var(--ink2)}
+  .row .meta .tg{display:inline-block;font-size:11px;color:var(--ink2);border:1px solid var(--hair);padding:1px 7px;margin-left:5px;margin-top:6px}
+  .row .price{text-align:left}
+  .row .price b{font-family:'Tajawal';font-weight:900;font-size:21px;display:block;line-height:1}
+  .row .price span{font-size:12px;color:var(--ink2)}
+  .row .price em{font-style:normal;font-size:12px;color:var(--accent);font-weight:700}
+  .vtag{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:14px;white-space:nowrap}
+  .vtag .sq{width:11px;height:11px}
+  @media(max-width:720px){.row{grid-template-columns:64px 1fr;gap:14px}.row .thumb{width:64px;height:56px}.row .price,.row .vtag{grid-column:2;text-align:right}}
+
+  /* filters */
+  .fbar{display:flex;gap:0;border:1.5px solid var(--ink);width:max-content;margin-bottom:8px;flex-wrap:wrap}
+  .fbar button{font-family:inherit;font-weight:700;font-size:14px;background:transparent;border:0;border-left:1.5px solid var(--ink);padding:10px 18px;cursor:pointer;color:var(--ink2)}
+  .fbar button:last-child{border-left:0}
+  .fbar button.on{background:var(--ink);color:var(--paper)}
+
+  /* compare — editorial two-up */
+  .vs{display:grid;grid-template-columns:1fr 1fr;border:2px solid var(--ink)}
+  @media(max-width:720px){.vs{grid-template-columns:1fr}}
+  .vs .side{padding:30px}
+  .vs .side:first-child{border-left:2px solid var(--ink);background:var(--ink);color:var(--paper)}
+  @media(max-width:720px){.vs .side:first-child{border-left:0;border-bottom:2px solid var(--ink)}}
+  .vs h4{font-family:'Tajawal';font-weight:900;font-size:20px;margin-bottom:18px}
+  .vs .side:first-child h4 i{color:var(--accent);font-style:normal}
+  .vs ul{list-style:none;display:flex;flex-direction:column;gap:13px}
+  .vs li{font-size:14.5px;display:flex;gap:10px;align-items:flex-start}
+  .vs li .m{font-family:'Tajawal';font-weight:900;flex-shrink:0}
+  .vs .side:first-child .m{color:var(--accent)}
+  .vs .side:last-child{color:var(--ink2)}
+  .vs .side:last-child .m{color:#A89D89}
+
+  /* ai */
+  .ai{border:2px solid var(--ink);padding:8px 8px 8px 18px;display:flex;align-items:center;gap:10px;background:var(--card)}
+  .ai input{flex:1;border:0;background:transparent;font-family:inherit;font-size:16px;outline:none;color:var(--ink)}
+  .ai button{font-family:'Tajawal';font-weight:900;background:var(--ink);color:var(--paper);border:0;padding:13px 22px;cursor:pointer}
+  .ai-ex{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .ai-ex button{font-family:inherit;font-size:13px;font-weight:600;background:transparent;border:1px solid var(--hair);padding:8px 14px;cursor:pointer;color:var(--ink2)}
+  .ai-ex button:hover{border-color:var(--accent);color:var(--ink)}
+
+  footer{border-top:2px solid var(--line);margin-top:30px;padding:40px 0}
+  .foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+  .foot .links{display:flex;gap:22px;font-size:14px;color:var(--ink2)}
+  .foot small{font-size:12px;color:var(--ink2)}
+  .note{font-size:12.5px;color:var(--ink2);border-top:1px solid var(--hair);margin-top:24px;padding-top:16px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <div class="brand">
+      <span class="logo">مؤشر<i> العقارية</i></span>
+      <small>RIYADH · ٢٠٢٦</small>
+    </div>
+    <nav>
+      <a href="#tool">المؤشر</a>
+      <a href="#list">الإعلانات</a>
+      <a href="#ai">المساعد</a>
+    </nav>
+    <button class="cta">دخول — مجاني</button>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-l">
+    <div class="kicker"><span class="sq"></span> مؤشر عدالة الإيجار في الرياض</div>
+    <h1 class="display">السعر <mark>العادل</mark><br>قبل ما توقّع.</h1>
+    <p>ندخل الحي والإيجار، ونعطيك الحكم في ثوانٍ — مبنيّ على متوسطات السوق الفعلية. لا تخمين، لا رحلة طويلة.</p>
+    <div class="stat-row">
+      <div class="stat"><b class="num">١٤+</b><span>حي مغطّى</span></div>
+      <div class="stat"><b class="num">١٥ث</b><span>للحصول على الحكم</span></div>
+      <div class="stat"><b>فال</b><span>إعلانات موثّقة</span></div>
+    </div>
+  </div>
+  <div class="hero-r" id="tool">
+    <div class="tool-label"><b>المؤشر —</b> هل هذا الإيجار عادل؟</div>
+    <div class="fld">
+      <label>الحي</label>
+      <select id="hood"></select>
+    </div>
+    <div class="fld">
+      <label>الإيجار السنوي (ريال)</label>
+      <input id="price" type="number" inputmode="numeric" placeholder="٦٥٠٠٠">
+    </div>
+    <button class="go" onclick="checkPrice()">اعرف الحكم ←</button>
+    <div class="verdict" id="verdict"></div>
+  </div>
+</div>
+
+<!-- LISTINGS -->
+<section class="sec wrap" id="list">
+  <div class="sec-top">
+    <div>
+      <div class="idx">٠١ — الإعلانات</div>
+      <h2>كل إعلان ومعه حكمه.</h2>
+    </div>
+    <div class="desc">على كل إعلان نوضّح حكمه: مرتفع، عادل، أو فرصة — مقارنةً بمتوسط الحي.</div>
+  </div>
+  <div class="fbar" id="filters"></div>
+  <div class="rows" id="rows"></div>
+</section>
+
+
+<!-- AI -->
+<section class="sec wrap" id="ai">
+  <div class="sec-top">
+    <div>
+      <div class="idx">٠٢ — المساعد الذكي</div>
+      <h2>كلّمه بكلامك.</h2>
+    </div>
+    <div class="desc">"أبي شقة ٣ غرف بالنرجس بحدود ٧٠ ألف" — وخلّه يطلّع لك المناسب.</div>
+  </div>
+  <div class="ai">
+    <input placeholder="اكتب طلبك هنا...">
+    <button>أرسل ←</button>
+  </div>
+  <div class="ai-ex">
+    <button onclick="fillAI(this)">رب أسرة · ٦٥ ألف</button>
+    <button onclick="fillAI(this)">أعزب · استوديو قريب من العمل</button>
+    <button onclick="fillAI(this)">عائلة · فيلا بحوش</button>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div class="brand"><span class="logo" style="font-size:20px">مؤشر<i> العقارية</i></span></div>
+      <div class="links"><a href="#">الخصوصية</a><a href="#">الشروط</a><a href="#">تواصل</a></div>
+      <small class="num">© ٢٠٢٦ — سوق الإيجار بكل وضوح</small>
+    </div>
+    <div class="note">نموذج تصميمي. المتوسطات والإعلانات أرقام توضيحية، تُستبدل ببيانات المؤشر الإيجاري الرسمية.</div>
+  </div>
+</footer>
+
+<script>
+  const HOODS={'النرجس':65000,'العليا':52000,'الملقا':60000,'حطين':58000,'الياسمين':54000,'القيروان':58000,'النخيل':59000,'إشبيلية':38000,'الصحافة':57000,'الغدير':62000,'الورود':50000,'قرطبة':45000,'الرمال':40000,'المونسية':43000};
+  const COL={hi:'var(--hi)',ok:'var(--ok)',lo:'var(--lo)'};
+  const hoodSel=document.getElementById('hood');
+  Object.keys(HOODS).forEach(h=>{const o=document.createElement('option');o.value=h;o.textContent=h;hoodSel.appendChild(o)});
+  const fmt=n=>n.toLocaleString('ar-SA');
+
+  function judge(p,avg){const r=p/avg;
+    if(r>1.12)return{st:'hi',label:'مرتفع',pos:Math.min(90,58+(r-1)*110)};
+    if(r<0.85)return{st:'lo',label:'فرصة',pos:Math.max(10,42-(1-r)*110)};
+    return{st:'ok',label:'عادل',pos:50}}
+
+  function checkPrice(){
+    const h=hoodSel.value,p=parseInt(document.getElementById('price').value)||0,avg=HOODS[h],v=document.getElementById('verdict');
+    if(!p){v.className='verdict';return}
+    const j=judge(p,avg),d=Math.abs(p-avg),c=COL[j.st];
+    const msg=j.st==='hi'?('أعلى بـ '+fmt(d)+' ريال عن متوسط '+h+' ('+fmt(avg)+').'):
+              j.st==='lo'?('أقل بـ '+fmt(d)+' ريال — فرصة في '+h+'.'):
+              ('قريب من متوسط '+h+' ('+fmt(avg)+' ريال).');
+    v.innerHTML=
+      '<div class="v-word" style="color:'+c+'">'+j.label+'<span class="sub">السعر</span></div>'+
+      '<div class="v-line"><span class="mk" data-v="سعرك" style="right:'+j.pos+'%;background:'+c+'"></span></div>'+
+      '<div class="v-ticks"><span>فرصة</span><span>عادل</span><span>مرتفع</span></div>'+
+      '<div class="v-msg">'+msg+'</div>';
+    v.className='verdict show';
+  }
+
+  const PH=['#7a5a2b,#b8741a','#1c4a3e,#2C7A41','#5a2a24,#A8392B','#2b3a5a,#557','#4a3a24,#8a6a3a','#1c4a44,#1C6A57'];
+  const LISTINGS=[
+    {h:'النرجس',t:'شقة ٣ غرف · حديثة',type:'شقة',p:90000,tags:['٣ غرف','موقف']},
+    {h:'الملقا',t:'شقة ٣ غرف · ١٢٠م²',type:'شقة',p:48000,tags:['٣ غرف','سنة']},
+    {h:'حطين',t:'استوديو مؤثث · البوليفارد',type:'استوديو',p:50400,tags:['مؤثث']},
+    {h:'العليا',t:'شقة غرفتين · موقع مميز',type:'شقة',p:52000,tags:['غرفتين']},
+    {h:'القيروان',t:'شقة ٣ غرف · عائلية',type:'شقة',p:38000,tags:['١٣٠م²']},
+    {h:'النخيل',t:'فيلا ٥ غرف · مع مسبح',type:'فيلا',p:140000,tags:['مسبح','٤٥٠م²']},
+    {h:'الياسمين',t:'شقة غرفتين · ٩٠م²',type:'شقة',p:48000,tags:['٩٠م²']},
+    {h:'إشبيلية',t:'شقة غرفتين · هادئة',type:'شقة',p:36000,tags:['٨٠م²']},
+  ];
+  const MUL={'فيلا':2.2,'استوديو':.55,'دور':1.4,'شقة':1};
+
+  function render(f){
+    const box=document.getElementById('rows');box.innerHTML='';
+    LISTINGS.filter(l=>!f||f==='الكل'||l.type===f).forEach((l,i)=>{
+      const fair=Math.round(HOODS[l.h]*(MUL[l.type]||1)),j=judge(l.p,fair),c=COL[j.st],ph=PH[i%PH.length].split(',');
+      const r=document.createElement('div');r.className='row';
+      r.innerHTML=
+        '<div class="thumb" style="background:linear-gradient(135deg,'+ph[0]+','+ph[1]+')"><b class="num">'+(l.p/1000).toFixed(0)+'K</b></div>'+
+        '<div class="meta"><h3>'+l.t+'</h3><p>'+l.h+'</p>'+l.tags.map(t=>'<span class="tg">'+t+'</span>').join('')+'</div>'+
+        '<div class="price"><b class="num">'+fmt(l.p)+'</b><span>ريال/سنة</span><br><em>عادل ≈ '+fmt(fair)+'</em></div>'+
+        '<div class="vtag" style="color:'+c+'"><span class="sq" style="background:'+c+'"></span>'+j.label+'</div>';
+      box.appendChild(r);
+    });
+  }
+  const types=['الكل','شقة','فيلا','استوديو'];
+  const fb=document.getElementById('filters');
+  types.forEach((t,i)=>{const b=document.createElement('button');b.textContent=t;if(i===0)b.className='on';
+    b.onclick=()=>{document.querySelectorAll('.fbar button').forEach(x=>x.classList.remove('on'));b.classList.add('on');render(t)};fb.appendChild(b)});
+  function fillAI(b){const i=document.querySelector('.ai input');i.value=b.textContent;i.focus()}
+  render('الكل');
+</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مؤشر العقارية — داكن</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0D1014;--surf:#161B22;--surf2:#1C2230;--ink:#EAEEF3;--mut:#8B95A3;--line:#252C37;--acc:#39E0AE;--hi:#FF6B5E;--ok:#43B6F0;--lo:#52D98A}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--ink);line-height:1.6}
+.wrap{max-width:1100px;margin:0 auto;padding:0 22px}
+header{position:sticky;top:0;z-index:30;background:rgba(13,16,20,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:62px}
+.logo{font-weight:900;font-size:20px}.logo i{color:var(--acc);font-style:normal}
+.nav .links{display:flex;gap:22px}.nav .links a{color:var(--mut);font-size:14px;font-weight:600;text-decoration:none}.nav .links a:hover{color:var(--ink)}
+.btn{font-family:inherit;font-weight:700;border-radius:10px;cursor:pointer;border:0}
+.cta{background:var(--acc);color:#06231a;padding:9px 18px}
+@media(max-width:700px){.links{display:none}}
+.hero{padding:54px 0 30px;text-align:center}
+.hero .tagline{color:var(--acc);font-weight:700;font-size:13px;letter-spacing:3px;margin-bottom:14px}
+.hero h1{font-size:clamp(30px,5vw,50px);font-weight:900;line-height:1.15}
+.hero h1 span{color:var(--acc)}
+.hero p{color:var(--mut);max-width:520px;margin:14px auto 0}
+.panel{background:linear-gradient(180deg,var(--surf2),var(--surf));border:1px solid var(--line);border-radius:24px;padding:30px;margin-top:34px;display:grid;grid-template-columns:1fr 1.1fr;gap:34px;align-items:center}
+@media(max-width:760px){.panel{grid-template-columns:1fr;gap:24px}}
+.controls .lbl{font-size:13px;color:var(--mut);font-weight:600;margin-bottom:8px;display:block}
+.controls .grp{margin-bottom:16px}
+.controls select,.controls input{width:100%;padding:15px;background:var(--bg);border:1px solid var(--line);border-radius:12px;color:var(--ink);font-family:inherit;font-size:16px;outline:none}
+.controls select:focus,.controls input:focus{border-color:var(--acc)}
+.controls .go{width:100%;background:var(--acc);color:#06231a;padding:16px;border-radius:12px;font-size:16px;font-weight:900}
+/* gauge */
+.gauge{text-align:center}
+.gauge svg{width:100%;max-width:320px}
+.gauge .needle{transition:transform 1s cubic-bezier(.2,.9,.3,1.3);transform-origin:160px 150px}
+.gauge .verdict{font-size:40px;font-weight:900;margin-top:6px}
+.gauge .sub{color:var(--mut);font-size:14px}
+.gauge .empty{color:var(--mut);padding:40px 0;font-size:15px}
+.sec{padding:46px 0}
+.sec h2{font-size:24px;font-weight:900;margin-bottom:4px}
+.sec .d{color:var(--mut);font-size:14px;margin-bottom:22px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:18px;padding:18px;transition:.2s;cursor:pointer}
+.card:hover{border-color:var(--acc);transform:translateY(-3px)}
+.card .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.card .price{font-size:24px;font-weight:900}.card .price s{font-size:12px;color:var(--mut);text-decoration:none;font-weight:600}
+.chip{font-size:12px;font-weight:700;padding:5px 11px;border-radius:20px}
+.card .ttl{color:var(--mut);font-size:13px;margin-bottom:12px}
+.spark{height:6px;border-radius:6px;background:var(--surf2);overflow:hidden;margin-bottom:10px}
+.spark i{display:block;height:100%}
+.card .fair{font-size:12px;color:var(--acc);font-weight:700}
+footer{border-top:1px solid var(--line);padding:30px 0;color:var(--mut);text-align:center;font-size:13px;margin-top:20px}
+.note{background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:12px;color:var(--mut);margin-top:18px}
+</style></head>
+<body>
+<header><div class="wrap nav">
+  <div class="logo">مؤشر<i> العقارية</i></div>
+  <div class="links"><a href="#">المؤشر</a><a href="#list">الإعلانات</a><a href="#">الخريطة</a></div>
+  <button class="btn cta">دخول</button>
+</div></header>
+
+<div class="wrap hero">
+  <div class="tagline">RIYADH RENT INDEX</div>
+  <h1>اعرف <span>السعر العادل</span> فوراً</h1>
+  <p>اختر الحي وأدخل الإيجار — يطلع لك الحكم على المؤشر خلال ثوانٍ.</p>
+
+  <div class="panel">
+    <div class="controls">
+      <div class="grp"><label class="lbl">الحي</label><select id="hood"></select></div>
+      <div class="grp"><label class="lbl">الإيجار السنوي (ريال)</label><input id="price" type="number" placeholder="65000"></div>
+      <button class="go btn" onclick="run()">اعرض المؤشر</button>
+    </div>
+    <div class="gauge" id="gauge"><div class="empty">المؤشر بانتظار بياناتك…</div></div>
+  </div>
+</div>
+
+<section class="wrap sec" id="list">
+  <h2>إعلانات مع حكمها</h2>
+  <div class="d">كل بطاقة تبيّن السعر، السعر العادل، والحكم — مباشرة.</div>
+  <div class="cards" id="cards"></div>
+</section>
+
+<footer><div class="wrap">© ٢٠٢٦ مؤشر العقارية — سوق الإيجار بكل وضوح
+<div class="note">نموذج تصميمي. الأرقام توضيحية وتُستبدل ببيانات المؤشر الإيجاري الرسمية.</div></div></footer>
+
+<script>
+const HOODS={'النرجس':65000,'العليا':52000,'الملقا':60000,'حطين':58000,'الياسمين':54000,'القيروان':58000,'النخيل':59000,'إشبيلية':38000,'الصحافة':57000,'الغدير':62000};
+const C={hi:'#FF6B5E',ok:'#43B6F0',lo:'#52D98A'},L={hi:'مرتفع',ok:'عادل',lo:'فرصة'};
+const sel=document.getElementById('hood');Object.keys(HOODS).forEach(h=>sel.add(new Option(h,h)));
+const fmt=n=>n.toLocaleString('ar-SA');
+function judge(p,a){const r=p/a;if(r>1.12)return{st:'hi',pos:Math.min(95,60+(r-1)*120)};if(r<.85)return{st:'lo',pos:Math.max(5,40-(1-r)*120)};return{st:'ok',pos:50}}
+function run(){
+  const h=sel.value,p=parseInt(document.getElementById('price').value)||0,a=HOODS[h],g=document.getElementById('gauge');
+  if(!p){g.innerHTML='<div class="empty">المؤشر بانتظار بياناتك…</div>';return}
+  const j=judge(p,a),c=C[j.st],ang=-90+(j.pos/100)*180,d=Math.abs(p-a);
+  const msg=j.st==='hi'?('أعلى بـ '+fmt(d)+' ريال عن متوسط '+h):j.st==='lo'?('أقل بـ '+fmt(d)+' ريال — فرصة'):('قريب من متوسط '+h);
+  g.innerHTML=
+   '<svg viewBox="0 0 320 175"><g fill="none" stroke-width="22" stroke-linecap="round">'+
+   '<path d="M30 150 A130 130 0 0 1 110 35" stroke="#52D98A"/>'+
+   '<path d="M120 30 A130 130 0 0 1 200 30" stroke="#43B6F0"/>'+
+   '<path d="M210 35 A130 130 0 0 1 290 150" stroke="#FF6B5E"/>'+
+   '</g><g class="needle" style="transform:rotate('+ang+'deg)"><line x1="160" y1="150" x2="160" y2="55" stroke="'+c+'" stroke-width="5" stroke-linecap="round"/><circle cx="160" cy="150" r="10" fill="'+c+'"/></g></svg>'+
+   '<div class="verdict" style="color:'+c+'">'+L[j.st]+'</div>'+
+   '<div class="sub">متوسط '+h+': '+fmt(a)+' ريال · '+msg+'</div>';
+}
+const LST=[{h:'النرجس',t:'شقة ٣ غرف',ty:'شقة',p:90000},{h:'الملقا',t:'شقة ٣ غرف ١٢٠م²',ty:'شقة',p:48000},{h:'حطين',t:'استوديو مؤثث',ty:'استوديو',p:50400},{h:'العليا',t:'شقة غرفتين',ty:'شقة',p:52000},{h:'القيروان',t:'شقة ٣ غرف عائلية',ty:'شقة',p:38000},{h:'النخيل',t:'فيلا ٥ غرف + مسبح',ty:'فيلا',p:140000},{h:'الياسمين',t:'شقة غرفتين ٩٠م²',ty:'شقة',p:48000},{h:'إشبيلية',t:'شقة غرفتين هادئة',ty:'شقة',p:36000}];
+const MUL={'فيلا':2.2,'استوديو':.55,'شقة':1};
+const cards=document.getElementById('cards');
+LST.forEach(l=>{const f=Math.round(HOODS[l.h]*(MUL[l.ty]||1)),j=judge(l.p,f),c=C[j.st];
+ const el=document.createElement('div');el.className='card';
+ el.innerHTML='<div class="top"><div class="price">'+fmt(l.p)+' <s>ريال/سنة</s></div><span class="chip" style="background:'+c+'22;color:'+c+'">'+L[j.st]+'</span></div>'+
+ '<div class="ttl">'+l.t+' · '+l.h+'</div>'+
+ '<div class="spark"><i style="width:'+j.pos+'%;background:'+c+'"></i></div>'+
+ '<div class="fair">السعر العادل ≈ '+fmt(f)+' ريال</div>';
+ cards.appendChild(el)});
+</script>
+</body></html>

@@ -1,7 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { isSupabaseConfigured } from '@/lib/supabase/config';
 import dynamic from 'next/dynamic';
+import { useAppData, type UIListing, type MktAvg } from '@/lib/useAppData';
+import { useAuth } from '@/lib/useAuth';
 const MapComponent = dynamic(() => import('./components/Map'), { ssr: false });
 
 // SVG Icons — بدل الإيموجي
@@ -21,89 +25,120 @@ const Icons = {
   news: (<svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8M10 10h8"/></svg>),
 };
 
-const mktAvg: Record<string, { avg: number }> = {
+// المتوسطات الافتراضية (تُستبدل بالبيانات الحقيقية من قاعدة البيانات إن توفّرت)
+const DEFAULT_MKT_AVG: MktAvg = {
   'العليا': { avg: 52000 }, 'النرجس': { avg: 65000 }, 'الملقا': { avg: 60000 },
   'حطين': { avg: 58000 }, 'الياسمين': { avg: 54000 }, 'القيروان': { avg: 58000 },
   'النخيل': { avg: 59000 }, 'إشبيلية': { avg: 38000 },
 };
 
-const listings = [
-  { id: 1, hood: 'النرجس', title: 'شقة 3 غرف — حي النرجس', type: 'شقة', adv: 90000, cond: 'good', condLabel: 'حالة جيدة', tags: ['3 غرف', 'موقف', 'دخول ذكي'], fal: '1234567' },
-  { id: 2, hood: 'النرجس', title: 'شقة 2 غرف — حي النرجس', type: 'شقة', adv: 42000, cond: 'new', condLabel: 'جديد', tags: ['2 غرفة', 'مجلس', 'مطبخ راكب'], fal: '2345678' },
-  { id: 3, hood: 'النرجس', title: 'شقة 3 غرف — مشروع الماجدية', type: 'شقة', adv: 68000, cond: 'new', condLabel: 'جديد', tags: ['3 غرف', 'سنتان', 'مكيفات مركزية'], fal: '3456789' },
-  { id: 4, hood: 'العليا', title: 'شقة 2 غرف — حي العليا', type: 'شقة', adv: 52000, cond: 'good', condLabel: 'حالة جيدة', tags: ['2 غرفة', 'مطبخ راكب', '3 سنوات'], fal: '4567890' },
-  { id: 5, hood: 'الملقا', title: 'شقة 3 غرف — حي الملقا', type: 'شقة', adv: 48000, cond: 'good', condLabel: 'حالة جيدة', tags: ['3 غرف', '120م²', 'سنة'], fal: '5678901' },
-  { id: 6, hood: 'حطين', title: 'استوديو — حي حطين', type: 'استوديو', adv: 50400, cond: 'new', condLabel: 'جديد', tags: ['مؤثث', 'قرب البوليفارد'], fal: '6789012' },
-  { id: 7, hood: 'الياسمين', title: 'شقة 2 غرف — الياسمين', type: 'شقة', adv: 48000, cond: 'good', condLabel: 'حالة جيدة', tags: ['2 غرفة', '90م²', '4 سنوات'], fal: '7890123' },
-  { id: 8, hood: 'القيروان', title: 'شقة 3 غرف — القيروان', type: 'شقة', adv: 38000, cond: 'old', condLabel: 'يحتاج ترميم', tags: ['3 غرف', '130م²', '7 سنوات'], fal: '8901234' },
-  { id: 9, hood: 'النخيل', title: 'فيلا — حي النخيل', type: 'فيلا', adv: 140000, cond: 'new', condLabel: 'جديد', tags: ['5 غرف', '450م²', 'مسبح'], fal: '9012345' },
-  { id: 10, hood: 'إشبيلية', title: 'شقة 2 غرف — إشبيلية', type: 'شقة', adv: 36000, cond: 'good', condLabel: 'حالة جيدة', tags: ['2 غرفة', '80م²', '5 سنوات'], fal: '0123456' },
+// إعلانات افتراضية (تظهر إذا لم تتوفر بيانات من قاعدة البيانات) — مع إحداثيات للخريطة
+const DEFAULT_LISTINGS: UIListing[] = [
+  { id: 1, hood: 'النرجس', title: 'شقة 3 غرف — حي النرجس', type: 'شقة', adv: 90000, rooms: 3, area: 150, baths: 2, furnished: false, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة عائلية واسعة في حي النرجس، موقف خاص ودخول ذكي.', fal: '1234567', lat: 24.8024, lng: 46.6286 },
+  { id: 2, hood: 'النرجس', title: 'شقة 2 غرف — حي النرجس', type: 'شقة', adv: 42000, rooms: 2, area: 110, baths: 1, furnished: false, cond: 'new', condLabel: 'جديد', description: 'شقة جديدة بمجلس ومطبخ راكب في حي النرجس.', fal: '2345678', lat: 24.8060, lng: 46.6340 },
+  { id: 3, hood: 'النرجس', title: 'شقة 3 غرف — مشروع الماجدية', type: 'شقة', adv: 68000, rooms: 3, area: 140, baths: 2, furnished: false, cond: 'new', condLabel: 'جديد', description: 'شقة حديثة بمكيفات مركزية، عمر سنتان.', fal: '3456789', lat: 24.8100, lng: 46.6180 },
+  { id: 4, hood: 'العليا', title: 'شقة 2 غرف — حي العليا', type: 'شقة', adv: 52000, rooms: 2, area: 105, baths: 1, furnished: false, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة بموقع مميز في العليا، مطبخ راكب.', fal: '4567890', lat: 24.6877, lng: 46.6853 },
+  { id: 5, hood: 'الملقا', title: 'شقة 3 غرف — حي الملقا', type: 'شقة', adv: 48000, rooms: 3, area: 120, baths: 2, furnished: false, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة عائلية في الملقا، عمر سنة.', fal: '5678901', lat: 24.7766, lng: 46.6228 },
+  { id: 6, hood: 'حطين', title: 'استوديو — حي حطين', type: 'استوديو', adv: 50400, rooms: 1, area: 55, baths: 1, furnished: true, cond: 'new', condLabel: 'جديد', description: 'استوديو مؤثث بالكامل قرب البوليفارد.', fal: '6789012', lat: 24.7611, lng: 46.6511 },
+  { id: 7, hood: 'الياسمين', title: 'شقة 2 غرف — الياسمين', type: 'شقة', adv: 48000, rooms: 2, area: 90, baths: 1, furnished: false, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة في الياسمين، عمر 4 سنوات.', fal: '7890123', lat: 24.8196, lng: 46.6402 },
+  { id: 8, hood: 'القيروان', title: 'شقة 3 غرف — القيروان', type: 'شقة', adv: 38000, rooms: 3, area: 130, baths: 2, furnished: false, cond: 'old', condLabel: 'يحتاج ترميم', description: 'شقة واسعة في القيروان تحتاج بعض الترميم.', fal: '8901234', lat: 24.8400, lng: 46.6350 },
+  { id: 9, hood: 'النخيل', title: 'فيلا — حي النخيل', type: 'فيلا', adv: 140000, rooms: 5, area: 450, baths: 4, furnished: false, cond: 'new', condLabel: 'جديد', description: 'فيلا فاخرة بمسبح في حي النخيل.', fal: '9012345', lat: 24.8300, lng: 46.6100 },
+  { id: 10, hood: 'إشبيلية', title: 'شقة 2 غرف — إشبيلية', type: 'شقة', adv: 36000, rooms: 2, area: 80, baths: 1, furnished: false, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة هادئة في إشبيلية، عمر 5 سنوات.', fal: '0123456', lat: 24.7200, lng: 46.6550 },
 ];
 
-function getFair(l: typeof listings[0]) {
-  const m = mktAvg[l.hood];
-  if (!m) return l.adv;
-  return Math.round(m.avg * (l.type === 'فيلا' ? 2.2 : l.type === 'استوديو' ? 0.55 : 1));
-}
+// دوال نقية لا تعتمد على المتوسطات
 function getSt(adv: number, fair: number) { return adv / fair > 1.12 ? 'hi' : adv / fair < 0.85 ? 'lo' : 'ok'; }
-function isOpp(l: typeof listings[0]) { return getSt(l.adv, getFair(l)) === 'lo'; }
 function rl(st: string) { return st === 'ok' ? 'مناسب' : st === 'hi' ? 'مرتفع' : 'فرصة'; }
 
 export default function Home() {
-  const [page, setPage] = useState<'search' | 'map' | 'alerts' | 'pricing' | 'office'>('search');
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
-  const [inputVal, setInputVal] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [siZone, setSiZone] = useState('65000');
+  const [page, setPage] = useState<'search' | 'map' | 'alerts' | 'pricing' | 'office' | 'privacy' | 'terms'>('search');
+  const [leadName, setLeadName] = useState('');
+  const [leadPhone, setLeadPhone] = useState('');
+  const [leadMsg, setLeadMsg] = useState('');
+  const [leadSent, setLeadSent] = useState(false);
+  const [leadSending, setLeadSending] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<UIListing | null>(null);
+  const [siZone, setSiZone] = useState('النرجس'); // اسم الحي المختار في "جرّب المؤشر"
   const [siPrice, setSiPrice] = useState('');
   const [filterHood, setFilterHood] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterBudget, setFilterBudget] = useState('');
   const [prefs, setPrefs] = useState<{ hood: string; type: string; maxBudget: number | null } | null>(null);
   const [searched, setSearched] = useState(false);
-  const chatRef = useRef<HTMLDivElement>(null);
 
+  // البيانات الحقيقية من قاعدة البيانات (مع رجوع آمن للافتراضية)
+  const { mktAvg, listings } = useAppData(DEFAULT_MKT_AVG, DEFAULT_LISTINGS);
+
+  // تسجيل الدخول
+  const { user, isAdmin, sendMagicLink, signOut } = useAuth();
+  const [authEmail, setAuthEmail] = useState('');
+  const [authMsg, setAuthMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [authSending, setAuthSending] = useState(false);
+
+  // إظهار رسالة واضحة إذا فشل إكمال تسجيل الدخول من رابط الإيميل (?auth_error=...)
   useEffect(() => {
-    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [chatMessages]);
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get('auth_error');
+    if (!err) return;
+    setAuthMsg({ ok: false, text: 'تعذّر إكمال تسجيل الدخول: ' + err });
+    setPage('pricing');
+    params.delete('auth_error');
+    const qs = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+  }, []);
+  const handleMagicLink = async () => {
+    setAuthSending(true);
+    setAuthMsg(null);
+    const r = await sendMagicLink(authEmail);
+    setAuthMsg({ ok: r.ok, text: r.message });
+    setAuthSending(false);
+  };
 
-  const sendAI = async () => {
-    const msg = inputVal.trim();
-    if (!msg || loading) return;
-    setInputVal('');
-    setChatMessages(prev => [...prev, { role: 'user', text: msg }]);
-    setLoading(true);
+  // حساب السعر العادل وحالته بناءً على المتوسطات الحالية
+  const getFair = (l: UIListing) => {
+    const m = mktAvg[l.hood];
+    if (!m) return l.adv;
+    // نقرأ متوسط النوع المُدار من /admin إن توفّر، وإلا نشتقّه بالمعامل القديم.
+    if (l.type === 'فيلا') return m.villa ?? Math.round(m.avg * 2.2);
+    if (l.type === 'استوديو') return m.studio ?? Math.round(m.avg * 0.55);
+    if (l.type === 'دور') return Math.round(m.avg * 1.4);
+    return m.avg; // شقة
+  };
+  const isOpp = (l: UIListing) => getSt(l.adv, getFair(l)) === 'lo';
+
+  // نقاط الخريطة (الإعلانات التي لها إحداثيات فقط)
+  const mapPoints = listings
+    .filter((l) => typeof l.lat === 'number' && typeof l.lng === 'number')
+    .map((l) => {
+      const fair = getFair(l);
+      return { id: l.id, lat: l.lat as number, lng: l.lng as number, title: l.title, adv: l.adv, fair, st: getSt(l.adv, fair) };
+    });
+
+  const submitLead = async () => {
+    if (!leadName.trim() || !leadPhone.trim() || leadSending) return;
+    setLeadSending(true);
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, preferences: prefs }),
-      });
-      const data = await res.json();
-      setChatMessages(prev => [...prev, { role: 'ai', text: data.reply || 'حدث خطأ' }]);
-      const hm = msg.match(/(العليا|النرجس|الملقا|حطين|الياسمين|القيروان|النخيل|إشبيلية)/);
-      const tm = msg.match(/(شقة|فيلا|استوديو|دور)/);
-      const pm = msg.match(/(\d{4,6})/);
-      if (hm) setFilterHood(hm[0]);
-      if (tm) setFilterType(tm[0]);
-      if (pm) setFilterBudget(pm[0]);
-      if (hm || tm || pm) {
-        setPrefs({ hood: hm?.[0] || '', type: tm?.[0] || '', maxBudget: pm ? parseInt(pm[0]) : null });
-        setSearched(true);
+      if (isSupabaseConfigured()) {
+        const sb = createClient();
+        await sb.from('leads').insert({ name: leadName.trim(), phone: leadPhone.trim(), message: leadMsg.trim() || null });
       }
+      setLeadSent(true);
+      setLeadName(''); setLeadPhone(''); setLeadMsg('');
     } catch {
-      setChatMessages(prev => [...prev, { role: 'ai', text: 'تعذّر الاتصال بالمساعد الذكي' }]);
+      setLeadSent(true);
     }
-    setLoading(false);
+    setLeadSending(false);
   };
 
   const doSearch = () => { setSearched(true); };
 
   const checkPrice = () => {
-    const avg = parseInt(siZone);
+    // المتوسط يُقرأ من القاعدة (mktAvg) — يعكس تعديلات لوحة الأدمن فوراً.
+    const zoneName = siZone;
+    const avg = mktAvg[siZone]?.avg ?? 0;
     const price = parseInt(siPrice) || 0;
+    if (!avg) return { type: 'none', icon: Icons.chart, title: 'لا يوجد متوسط لهذا الحي بعد', detail: '', color: 'bg-gray-50 border-gray-200' };
     if (!price) return { type: 'none', icon: Icons.chart, title: 'أدخل قيمة الإيجار للمقارنة', detail: '', color: 'bg-gray-50 border-gray-200' };
-    const zoneName = { '65000': 'النرجس', '52000': 'العليا', '60000': 'الملقا', '58000': 'حطين', '54000': 'الياسمين', '38000': 'إشبيلية' }[siZone] || '';
     if (price > avg * 1.12) return { type: 'hi', icon: Icons.warning, title: 'السعر مرتفع', detail: `أعلى بـ ${(price - avg).toLocaleString('ar-SA')} ريال من متوسط ${zoneName}`, color: 'bg-orange-50 border-orange-300' };
     if (price < avg * 0.85) return { type: 'lo', icon: Icons.target, title: 'فرصة ممتازة', detail: `أقل بـ ${(avg - price).toLocaleString('ar-SA')} ريال من متوسط ${zoneName}`, color: 'bg-green-50 border-green-300' };
     return { type: 'ok', icon: Icons.okCircle, title: 'السعر مناسب للسوق', detail: `متوسط ${zoneName} حوالي ${avg.toLocaleString('ar-SA')} ريال سنوياً`, color: 'bg-blue-50 border-blue-200' };
@@ -130,13 +165,35 @@ export default function Home() {
     hi: 'bg-orange-100 text-orange-800 border border-orange-200',
     lo: 'bg-green-100 text-green-800 border border-green-200',
   };
-  const stIcon: Record<string, string> = { ok: '↔', hi: '↑', lo: '↓' };
+
+  const renderListing = (l: UIListing) => {
+    const fair = getFair(l);
+    const st = getSt(l.adv, fair);
+    return (
+      <div key={l.id} onClick={() => setSelectedListing(l)}
+        className={`bg-white rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all ${isOpp(l) ? 'border-green-400' : 'border-gray-200'}`}>
+        <div className="flex justify-between items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-lg font-bold text-gray-900">{l.adv.toLocaleString('ar-SA')} <span className="text-xs font-medium text-gray-500">ريال/سنة</span></div>
+            <div className="text-xs text-blue-700 mt-0.5 font-medium">السعر العادل: {fair.toLocaleString('ar-SA')} ريال</div>
+            <div className="text-sm text-gray-700 mt-1 font-semibold">{l.type} · {l.hood}</div>
+          </div>
+          <span className={`text-xs px-2.5 py-1 rounded-xl font-bold whitespace-nowrap ${stBadge[st]}`}>{rl(st)}</span>
+        </div>
+        <div className="flex items-center gap-5 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600">
+          <span>الغرف <b className="text-gray-900">{l.rooms ?? '—'}</b></span>
+          <span>المساحة <b className="text-gray-900">{l.area ?? '—'}</b> م²</span>
+          <span>الحمامات <b className="text-gray-900">{l.baths ?? '—'}</b></span>
+        </div>
+      </div>
+    );
+  };
 
   const inputCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400";
   const selectCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
   return (
-    <div className="min-h-screen bg-[#F5F8FB]" dir="rtl" style={{ fontFamily: "'Tajawal', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F8FB]" dir="rtl" style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}>
 
       {/* NAV */}
       <nav className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] px-5 py-3 flex items-center justify-between sticky top-0 z-50 shadow-lg">
@@ -161,9 +218,23 @@ export default function Home() {
             </button>
           ))}
         </div>
-        <button onClick={() => setPage('pricing')} className="bg-white text-[#0A3D62] px-4 py-2 rounded-lg text-sm font-bold shadow">
-          التسجيل
-        </button>
+        {user ? (
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <a href="/admin" className="bg-amber-400 text-[#0A3D62] px-3 py-2 rounded-lg text-sm font-bold shadow hover:bg-amber-300">
+                لوحة الإدارة
+              </a>
+            )}
+            <span className="text-white/90 text-xs hidden sm:inline max-w-[140px] truncate" title={user.email || ''}>{user.email}</span>
+            <button onClick={signOut} className="bg-white/15 text-white px-3 py-2 rounded-lg text-sm font-bold border border-white/30 hover:bg-white/25">
+              خروج
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setPage('pricing')} className="bg-white text-[#0A3D62] px-4 py-2 rounded-lg text-sm font-bold shadow">
+            التسجيل
+          </button>
+        )}
       </nav>
 
       {/* ═══ SEARCH ═══ */}
@@ -199,61 +270,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* 1. المساعد الذكي */}
-            <div className="bg-white rounded-2xl overflow-hidden border border-blue-200 shadow-sm">
-              <div className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] px-4 py-3 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center text-white border border-white/30">
-                  {Icons.ai}
-                </div>
-                <div className="flex-1">
-                  <div className="text-white font-bold text-sm">المساعد الذكي</div>
-                  <div className="text-white/80 text-xs">صِف ما تبحث عنه بكلامك الخاص</div>
-                </div>
-                <div className="w-2 h-2 rounded-full bg-[#9BE5C5] animate-pulse" />
-              </div>
-              <div className="p-4">
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {['رب أسرة · 65 ألف', 'أعزب · استوديو', 'عائلة · فيلا'].map(s => (
-                    <button key={s} onClick={() => setInputVal(s)}
-                      className="bg-blue-50 text-blue-700 text-xs px-3 py-1.5 rounded-xl border border-blue-200 hover:bg-blue-100 transition-all font-medium">
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <div ref={chatRef} className="max-h-40 overflow-y-auto mb-3 space-y-2">
-                  {chatMessages.map((m, i) => (
-                    <div key={i} className={`flex gap-2 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${m.role === 'user' ? 'bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] text-white' : 'bg-blue-100 text-blue-800'}`}>
-                        {m.role === 'user' ? 'أ' : 'م'}
-                      </div>
-                      <div className={`px-3 py-2 rounded-xl text-sm leading-relaxed max-w-[85%] ${m.role === 'user' ? 'bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] text-white rounded-tr-sm' : 'bg-blue-50 text-gray-900 rounded-tl-sm'}`}>
-                        {m.text}
-                      </div>
-                    </div>
-                  ))}
-                  {loading && (
-                    <div className="flex gap-2">
-                      <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-800">م</div>
-                      <div className="bg-blue-50 px-3 py-2 rounded-xl flex gap-1 items-center">
-                        {[0, 150, 300].map(d => <div key={d} className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-2 items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200">
-                  <input value={inputVal} onChange={e => setInputVal(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && sendAI()}
-                    placeholder="اكتب طلبك — مثال: شقة 3 غرف بالنرجس بميزانية 70 ألف..."
-                    className="flex-1 bg-transparent text-sm outline-none text-right placeholder-gray-400 text-gray-900" dir="rtl" />
-                  <button onClick={sendAI} disabled={loading}
-                    className="w-8 h-8 bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] text-white rounded-lg flex items-center justify-center flex-shrink-0 disabled:opacity-50">
-                    {Icons.send}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. البحث */}
+                        {/* 2. البحث */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-700">
@@ -305,34 +322,7 @@ export default function Home() {
                   <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm">لا توجد نتائج — جرّب تغيير المعايير</div>
                 ) : (
                   <div className="space-y-3">
-                    {filtered.map(l => {
-                      const fair = getFair(l); const st = getSt(l.adv, fair);
-                      const diff = Math.abs(l.adv - fair).toLocaleString('ar-SA');
-                      const dtxt = l.adv > fair ? `أعلى بـ ${diff}` : l.adv < fair ? `وفّر ${diff} ريال` : 'يطابق المتوسط';
-                      return (
-                        <div key={l.id} className={`bg-white rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all relative overflow-hidden ${isOpp(l) ? 'border-green-400' : 'border-gray-200'}`}>
-                          {isOpp(l) && <div className="absolute top-0 right-0 bg-green-600 text-white text-xs px-3 py-1 rounded-bl-xl font-bold">فرصة</div>}
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <div className="text-lg font-bold text-gray-900">{l.adv.toLocaleString('ar-SA')} ريال/سنة</div>
-                              <div className="text-xs text-blue-700 mt-0.5 font-medium">السعر العادل: {fair.toLocaleString('ar-SA')} · {dtxt}</div>
-                              <div className="text-xs text-gray-600 mt-0.5">{l.title}</div>
-                            </div>
-                            <span className={`text-xs px-2.5 py-1 rounded-xl font-bold ${stBadge[st]}`}>{stIcon[st]} {rl(st)}</span>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5 mt-2">
-                            <span className={`text-xs px-2 py-1 rounded-lg font-medium ${condColor[l.cond]}`}>{l.condLabel}</span>
-                            {l.tags.map(t => <span key={t} className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded-lg border border-gray-200">{t}</span>)}
-                          </div>
-                          <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-100">
-                            <span className="text-xs text-green-700 flex items-center gap-1 font-medium">
-                              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />رخصة فال: {l.fal}
-                            </span>
-                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">عقار.fm</span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    {filtered.map(renderListing)}
                   </div>
                 )}
               </div>
@@ -354,8 +344,8 @@ export default function Home() {
                   <div>
                     <label className="text-xs text-gray-700 block mb-1 font-semibold">الحي</label>
                     <select value={siZone} onChange={e => setSiZone(e.target.value)} className={selectCls}>
-                      {[['65000', 'النرجس'], ['52000', 'العليا'], ['60000', 'الملقا'], ['58000', 'حطين'], ['54000', 'الياسمين'], ['38000', 'إشبيلية']].map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
+                      {Object.keys(mktAvg).map(h => (
+                        <option key={h} value={h}>{h}</option>
                       ))}
                     </select>
                   </div>
@@ -394,6 +384,34 @@ export default function Home() {
               </button>
               <div className="text-white/70 text-xs mt-3">خدمة مجانية · ردود سريعة · مقارنة عروض</div>
             </div>
+
+            {/* تواصل — اترك رسالة */}
+            <div className="bg-white rounded-2xl overflow-hidden border border-blue-200 shadow-sm">
+              <div className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] px-4 py-3">
+                <div className="text-white font-bold text-sm">اترك رسالة وسنتواصل معك</div>
+                <div className="text-white/80 text-xs">اكتب طلبك أو استفسارك ونرجع لك قريباً</div>
+              </div>
+              <div className="p-4">
+                {leadSent ? (
+                  <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl p-4 text-sm text-center font-medium">
+                    شكراً لك! وصلتنا رسالتك وسنتواصل معك قريباً.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <input value={leadName} onChange={e => setLeadName(e.target.value)} placeholder="الاسم" className={inputCls} />
+                      <input value={leadPhone} onChange={e => setLeadPhone(e.target.value)} placeholder="رقم الجوال" className={inputCls} dir="ltr" />
+                    </div>
+                    <textarea value={leadMsg} onChange={e => setLeadMsg(e.target.value)} placeholder="رسالتك (اختياري) — مثال: أبحث عن شقة 3 غرف بالنرجس" rows={3} className={inputCls + ' resize-none'} />
+                    <button onClick={submitLead} disabled={leadSending}
+                      className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-2.5 rounded-xl font-bold text-sm shadow-md hover:opacity-95 transition-all disabled:opacity-50">
+                      {leadSending ? 'جارٍ الإرسال…' : 'إرسال'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
         </div>
       )}
@@ -409,22 +427,10 @@ export default function Home() {
             ))}
           </div>
           {/* الخريطة التفاعلية */}
-          <MapComponent />
+          <MapComponent points={mapPoints} />
           <div className="p-4 space-y-3">
             <div className="font-bold text-gray-900 mb-2">كل الإعلانات ({listings.length})</div>
-            {listings.map(l => {
-              const fair = getFair(l); const st = getSt(l.adv, fair);
-              return (
-                <div key={l.id} className={`bg-white rounded-xl border p-3.5 flex justify-between items-center hover:shadow-sm transition-all ${isOpp(l) ? 'border-green-300' : 'border-gray-200'}`}>
-                  <div>
-                    <div className="font-bold text-sm text-gray-900">{l.adv.toLocaleString('ar-SA')} ريال/سنة</div>
-                    <div className="text-xs text-gray-600 mt-0.5">{l.title}</div>
-                    <div className="text-xs text-blue-700 mt-0.5 font-medium">السعر العادل: {fair.toLocaleString('ar-SA')}</div>
-                  </div>
-                  <span className={`text-xs px-2.5 py-1 rounded-xl font-bold ${stBadge[st]}`}>{stIcon[st]} {rl(st)}</span>
-                </div>
-              );
-            })}
+            {listings.map(renderListing)}
           </div>
         </div>
       )}
@@ -489,6 +495,48 @@ export default function Home() {
             </div>
           </div>
           <div className="p-4 space-y-4">
+
+            {/* تسجيل الدخول / الدخول السحري */}
+            <div className="bg-white rounded-2xl p-5 border-2 border-blue-200 shadow-sm">
+              {user ? (
+                <div className="text-center">
+                  <div className="font-bold text-[#0A3D62] mb-1">أنت مسجّل الدخول ✓</div>
+                  <div className="text-sm text-gray-600 mb-3">{user.email}</div>
+                  <button onClick={() => setPage('office')} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
+                    دخول لوحة المكتب
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="font-bold text-gray-900 mb-1">دخول / تسجيل سريع</div>
+                  <div className="text-xs text-gray-500 mb-3">أدخل بريدك ونرسل لك رابط دخول — بدون كلمة مرور.</div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="email"
+                      dir="ltr"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleMagicLink()}
+                      placeholder="name@example.com"
+                      className="flex-1 px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                    <button
+                      onClick={handleMagicLink}
+                      disabled={authSending}
+                      className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {authSending ? 'جارٍ الإرسال…' : 'أرسل رابط الدخول'}
+                    </button>
+                  </div>
+                  {authMsg && (
+                    <div className={`mt-3 text-sm rounded-xl p-3 border ${authMsg.ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                      {authMsg.text}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {[
               {
                 name: 'باحث عن إيجار',
@@ -548,11 +596,85 @@ export default function Home() {
         <OfficeDashboard />
       )}
 
+      {/* تفاصيل الإعلان */}
+      {selectedListing && (() => {
+        const l = selectedListing; const fair = getFair(l); const st = getSt(l.adv, fair);
+        return (
+          <div onClick={() => setSelectedListing(null)} className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-4">
+            <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl w-full max-w-md max-h-[88vh] overflow-auto">
+              <div className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] p-5 text-white flex justify-between items-start">
+                <div>
+                  <div className="text-2xl font-bold">{l.adv.toLocaleString('ar-SA')} <span className="text-sm font-normal opacity-80">ريال/سنة</span></div>
+                  <div className="text-sm opacity-90 mt-1">{l.type} · {l.hood}</div>
+                </div>
+                <button onClick={() => setSelectedListing(null)} className="text-white text-3xl leading-none px-1">×</button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="flex items-center justify-between bg-blue-50 rounded-xl p-3">
+                  <span className="text-sm text-gray-700">السعر العادل للسوق</span>
+                  <span className="font-bold text-[#0A3D62]">{fair.toLocaleString('ar-SA')} ريال</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">حالة السعر</span>
+                  <span className={`text-xs px-2.5 py-1 rounded-xl font-bold ${stBadge[st]}`}>{rl(st)}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-gray-50 rounded-xl p-3"><div className="text-lg font-bold text-gray-900">{l.rooms ?? '—'}</div><div className="text-xs text-gray-500">غرف</div></div>
+                  <div className="bg-gray-50 rounded-xl p-3"><div className="text-lg font-bold text-gray-900">{l.area ?? '—'}</div><div className="text-xs text-gray-500">م²</div></div>
+                  <div className="bg-gray-50 rounded-xl p-3"><div className="text-lg font-bold text-gray-900">{l.baths ?? '—'}</div><div className="text-xs text-gray-500">حمامات</div></div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${condColor[l.cond] || ''}`}>{l.condLabel || 'الحالة غير محددة'}</span>
+                  {l.furnished && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-purple-100 text-purple-800 border border-purple-200">مؤثثة</span>}
+                </div>
+                {l.description && <p className="text-sm text-gray-700 leading-relaxed">{l.description}</p>}
+                <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">رخصة فال: {l.fal || '—'}</div>
+                <button onClick={() => { setSelectedListing(null); setPage('search'); }} className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-3 rounded-xl font-bold text-sm">تواصل بخصوص هذا الإعلان</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══ سياسة الخصوصية ═══ */}
+      {(page === 'privacy' || page === 'terms') && (
+        <div className="max-w-2xl mx-auto px-5 py-8">
+          <button onClick={() => setPage('search')} className="text-blue-600 text-sm font-medium mb-4 hover:underline">→ العودة للرئيسية</button>
+          {page === 'privacy' ? (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 text-gray-700 leading-relaxed text-sm space-y-4">
+              <h1 className="text-xl font-bold text-gray-900">سياسة الخصوصية</h1>
+              <p className="text-xs text-gray-400">آخر تحديث: 2026</p>
+              <p>تُوضّح هذه السياسة كيفية جمع منصة «مؤشر العقارية» للمعلومات الشخصية واستخدامها وحمايتها عند استخدامك للمنصة. باستخدامك المنصة فإنك توافق على ما ورد في هذه السياسة.</p>
+              <div><h2 className="font-bold text-gray-900 mb-1">١. المعلومات التي نجمعها</h2><p>قد نجمع: الاسم، رقم الجوال، البريد الإلكتروني، ومحتوى الرسائل التي ترسلها عبر نموذج التواصل. وبالنسبة للمكاتب العقارية: بيانات المكتب ورقم رخصة فال وبيانات الوحدات المعروضة.</p></div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٢. كيف نستخدم معلوماتك</h2><p>نستخدم المعلومات للرد على استفساراتك، عرض الإعلانات، تحسين خدماتنا، والتواصل معك بخصوص طلباتك. لا نستخدم بياناتك لأغراض خارج نطاق الخدمة دون موافقتك.</p></div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٣. مشاركة المعلومات</h2><p>لا نبيع بياناتك الشخصية لأي طرف ثالث. قد نشارك بيانات محدودة مع مزوّدي الخدمات التقنية (مثل الاستضافة وقواعد البيانات) بالقدر اللازم لتشغيل المنصة فقط، أو عند طلب الجهات النظامية المختصة.</p></div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٤. حماية البيانات</h2><p>نتّخذ تدابير تقنية وتنظيمية معقولة لحماية بياناتك من الوصول غير المصرّح به أو التعديل أو الإفشاء.</p></div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٥. حقوقك</h2><p>يحق لك طلب الاطلاع على بياناتك أو تصحيحها أو حذفها، وذلك بالتواصل معنا عبر القنوات الرسمية للمنصة.</p></div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٦. التعديلات</h2><p>قد نُحدّث هذه السياسة من وقت لآخر، وسيُنشر أي تحديث على هذه الصفحة مع تاريخ آخر تعديل.</p></div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٧. التواصل</h2><p>لأي استفسار بخصوص الخصوصية، تواصل معنا عبر نموذج «اترك رسالة» في المنصة.</p></div>
+              <p className="text-xs text-gray-400 border-t border-gray-100 pt-4">ملاحظة: هذه صياغة عامة لأغراض المنصة، ويُنصح بمراجعتها قانونياً قبل الإطلاق الرسمي.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 text-gray-700 leading-relaxed text-sm space-y-4">
+              <h1 className="text-xl font-bold text-gray-900">شروط الاستخدام</h1>
+              <p className="text-xs text-gray-400">آخر تحديث: 2026</p>
+              <p>باستخدامك منصة «مؤشر العقارية» فإنك توافق على الالتزام بهذه الشروط.</p>
+              <div><h2 className="font-bold text-gray-900 mb-1">١. طبيعة الخدمة</h2><p>توفّر المنصة أداة استرشادية لمقارنة أسعار الإيجار بمتوسطات السوق، إضافةً لعرض إعلانات عقارية. مؤشر «السعر العادل» تقديري للاسترشاد فقط ولا يُعدّ تقييماً رسمياً مُلزِماً.</p></div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٢. مسؤولية المحتوى</h2><p>المكاتب والمعلنون مسؤولون عن دقة بيانات إعلاناتهم وصحّة تراخيصهم. لا تتحمل المنصة مسؤولية أي اتفاق يتم خارجها بين الأطراف.</p></div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٣. الاستخدام المقبول</h2><p>يُمنع استخدام المنصة لأي غرض غير نظامي أو لنشر بيانات مضلّلة أو إعلانات وهمية.</p></div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٤. حدود المسؤولية</h2><p>تُقدَّم الخدمة «كما هي»، ولا تضمن المنصة خلوّها من الأخطاء أو دقّة كل البيانات المعروضة بشكل مطلق.</p></div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٥. التعديلات</h2><p>يحق للمنصة تحديث هذه الشروط، ويسري التحديث فور نشره على هذه الصفحة.</p></div>
+              <p className="text-xs text-gray-400 border-t border-gray-100 pt-4">ملاحظة: هذه صياغة عامة لأغراض المنصة، ويُنصح بمراجعتها قانونياً قبل الإطلاق الرسمي.</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Footer */}
       <div className="bg-white border-t border-gray-200 py-4 px-5 text-center text-xs text-gray-500 mt-4">
-        <button className="text-blue-600 font-medium hover:underline">سياسة الخصوصية</button>
+        <button onClick={() => { setPage('privacy'); if (typeof window !== 'undefined') window.scrollTo(0, 0); }} className="text-blue-600 font-medium hover:underline">سياسة الخصوصية</button>
         <span className="mx-3 text-gray-300">·</span>
-        <button className="text-blue-600 font-medium hover:underline">شروط الاستخدام</button>
+        <button onClick={() => { setPage('terms'); if (typeof window !== 'undefined') window.scrollTo(0, 0); }} className="text-blue-600 font-medium hover:underline">شروط الاستخدام</button>
         <span className="mx-3 text-gray-300">·</span>
         <span>© 2026 مؤشر العقارية</span>
       </div>
@@ -573,6 +695,59 @@ function OfficeDashboard() {
   const [cReno, setCReno] = useState('40000');
   const [cMargin, setCMargin] = useState('10');
   const [cFee, setCFee] = useState('2.5');
+
+  // حقول نموذج إضافة الوحدة (مربوطة بقاعدة البيانات)
+  const [fType, setFType] = useState('شقة');
+  const [fHood, setFHood] = useState('النرجس');
+  const [fRent, setFRent] = useState('');
+  const [fArea, setFArea] = useState('');
+  const [fRooms, setFRooms] = useState('2');
+  const [fBaths, setFBaths] = useState('1');
+  const [fCond, setFCond] = useState('حالة جيدة');
+  const [fFurnished, setFFurnished] = useState(false);
+  const [fDesc, setFDesc] = useState('');
+  const [fFiles, setFFiles] = useState<File[]>([]);
+  const [publishing, setPublishing] = useState(false);
+  const [publishMsg, setPublishMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const condMap: Record<string, string> = { 'جديد': 'new', 'حالة جيدة': 'good', 'يحتاج ترميم': 'old' };
+
+  const publishListing = async () => {
+    if (!fRent.trim()) { setPublishMsg({ ok: false, text: 'أدخل قيمة الإيجار السنوي.' }); return; }
+    setPublishing(true); setPublishMsg(null);
+    try {
+      if (!isSupabaseConfigured()) {
+        setPublishMsg({ ok: false, text: 'الاتصال بقاعدة البيانات غير مُفعّل بعد.' }); setPublishing(false); return;
+      }
+      const sb = createClient();
+      // رفع الصور إلى التخزين
+      const urls: string[] = [];
+      for (const file of fFiles) {
+        const path = `${Date.now()}_${Math.random().toString(36).slice(2)}_${file.name}`;
+        const { error: upErr } = await sb.storage.from('listings').upload(path, file);
+        if (!upErr) {
+          const { data: pub } = sb.storage.from('listings').getPublicUrl(path);
+          if (pub?.publicUrl) urls.push(pub.publicUrl);
+        }
+      }
+      const { error } = await sb.from('listings').insert({
+        title: `${fType} ${fRooms} غرف — ${fHood}`.replace('استوديو 1 غرف','استوديو'),
+        hood: fHood, type: fType, advertised: parseInt(fRent) || 0,
+        area: fArea ? parseInt(fArea) : null, rooms: parseInt(fRooms) || null,
+        baths: parseInt(fBaths) || null, furnished: fFurnished,
+        condition: condMap[fCond] || 'good', cond_label: fCond,
+        description: fDesc.trim() || null, images: urls, fal_license: falNum || null,
+      });
+      if (error) { setPublishMsg({ ok: false, text: 'تعذّر النشر: ' + error.message }); setPublishing(false); return; }
+      setPublishMsg({ ok: true, text: 'تم نشر الإعلان بنجاح!' });
+      setFRent(''); setFArea(''); setFDesc(''); setFFiles([]);
+      setTimeout(() => { setPublishMsg(null); setAddStep(1); setOffPage('listings'); }, 1200);
+    } catch {
+      setPublishMsg({ ok: false, text: 'حدث خطأ غير متوقع أثناء النشر.' });
+    }
+    setPublishing(false);
+  };
+
 
   const calcFair = () => {
     const avg = parseInt(cHood);
@@ -767,25 +942,28 @@ function OfficeDashboard() {
                 <div className="font-bold text-gray-900 mb-4">بيانات العقار</div>
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">نوع العقار</label>
-                    <select className={selectCls}><option>شقة</option><option>فيلا</option><option>دور</option><option>استوديو</option></select></div>
+                    <select className={selectCls} value={fType} onChange={e=>setFType(e.target.value)}><option>شقة</option><option>فيلا</option><option>دور</option><option>استوديو</option></select></div>
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحي</label>
-                    <select className={selectCls}><option>النرجس</option><option>العليا</option><option>الملقا</option><option>حطين</option><option>الياسمين</option></select></div>
+                    <select className={selectCls} value={fHood} onChange={e=>setFHood(e.target.value)}><option>النرجس</option><option>العليا</option><option>الملقا</option><option>حطين</option><option>الياسمين</option><option>القيروان</option><option>النخيل</option><option>إشبيلية</option></select></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">الإيجار السنوي (ريال)</label>
-                    <input type="number" placeholder="65000" className={inputCls} /></div>
+                    <input type="number" value={fRent} onChange={e=>setFRent(e.target.value)} placeholder="65000" className={inputCls} /></div>
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">المساحة م²</label>
-                    <input type="number" placeholder="120" className={inputCls} /></div>
+                    <input type="number" value={fArea} onChange={e=>setFArea(e.target.value)} placeholder="120" className={inputCls} /></div>
                 </div>
                 <div className="grid grid-cols-3 gap-3 mb-3">
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">الغرف</label>
-                    <select className={selectCls}><option>1</option><option>2</option><option>3</option><option>4</option><option>5+</option></select></div>
-                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">حالة العقار</label>
-                    <select className={selectCls}><option>جديد</option><option>حالة جيدة</option><option>يحتاج ترميم</option></select></div>
-                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">عمر العقار</label>
-                    <select className={selectCls}><option>أقل من سنة</option><option>1-3 سنوات</option><option>3-7 سنوات</option></select></div>
+                    <select className={selectCls} value={fRooms} onChange={e=>setFRooms(e.target.value)}><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">دورات المياه</label>
+                    <select className={selectCls} value={fBaths} onChange={e=>setFBaths(e.target.value)}><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحالة</label>
+                    <select className={selectCls} value={fCond} onChange={e=>setFCond(e.target.value)}><option>جديد</option><option>حالة جيدة</option><option>يحتاج ترميم</option></select></div>
                 </div>
-                <div className="flex gap-3 mt-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700 mb-1 cursor-pointer">
+                  <input type="checkbox" checked={fFurnished} onChange={e=>setFFurnished(e.target.checked)} /> الوحدة مؤثثة
+                </label>
+                <div className="flex gap-2 mt-4">
                   <button onClick={() => setAddStep(3)} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">التالي: الحاسبة</button>
                   <button onClick={() => setAddStep(4)} className="bg-white border border-dashed border-gray-300 text-gray-500 px-5 py-2.5 rounded-xl font-medium text-sm hover:border-gray-400 transition-all">تخطي الحاسبة</button>
                 </div>
@@ -855,32 +1033,22 @@ function OfficeDashboard() {
             {addStep === 4 && (
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                 <div className="font-bold text-gray-900 mb-4">الصور والوصف</div>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center mb-4 hover:border-blue-400 transition-all cursor-pointer">
-                  <div className="text-3xl mb-2 text-gray-400">📷</div>
-                  <div className="font-medium text-gray-700 mb-1">اضغط لرفع الصور</div>
-                  <div className="text-xs text-gray-400">يفضل 5 صور على الأقل</div>
-                </div>
-                <div className="mb-4">
-                  <label className="text-xs text-gray-700 font-semibold block mb-1">وصف العقار</label>
-                  <textarea rows={3} placeholder="صف العقار ومميزاته..." className={`${inputCls} resize-none`} />
-                </div>
-                <div className="mb-4">
-                  <label className="text-xs text-gray-700 font-semibold block mb-1">رقم التواصل</label>
-                  <input type="tel" placeholder="05XXXXXXXX" className={inputCls} />
-                </div>
-                <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-800 border border-blue-100 mb-4">
-                  بعد النشر، يقيّم المؤشر سعرك تلقائياً مقارنة بمتوسط حيّك
-                </div>
-                <div className="flex gap-3">
+                <label className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center mb-3 block cursor-pointer hover:border-blue-400 transition-all">
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => setFFiles(Array.from(e.target.files || []))} />
+                  <div className="text-gray-500 text-sm">{fFiles.length ? `تم اختيار ${fFiles.length} صورة` : 'اضغط لاختيار صور الوحدة'}</div>
+                </label>
+                {fFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {fFiles.map((f, i) => <span key={i} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-lg border border-gray-200">{f.name}</span>)}
+                  </div>
+                )}
+                <textarea value={fDesc} onChange={e=>setFDesc(e.target.value)} placeholder="وصف العقار..." rows={4} className={inputCls + ' resize-none'} />
+                {publishMsg && (
+                  <div className={`mt-3 text-sm rounded-xl p-3 border ${publishMsg.ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>{publishMsg.text}</div>
+                )}
+                <div className="flex gap-2 mt-4">
                   <button onClick={() => setAddStep(3)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-medium text-sm">السابق</button>
-                  <button onClick={() => {
-                    setOffPage('listings');
-                    setAddStep(1);
-                    setFalStatus('idle');
-                    setFalNum('');
-                  }} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow flex-1">
-                    نشر الإعلان
-                  </button>
+                  <button onClick={publishListing} disabled={publishing} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50">{publishing ? 'جارٍ النشر…' : 'نشر الإعلان'}</button>
                 </div>
               </div>
             )}
