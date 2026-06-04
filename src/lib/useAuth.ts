@@ -56,10 +56,19 @@ export function useAuth() {
     };
   }, []);
 
+  // يقرأ صلاحية المدير لمعرّف مستخدم (للتحويل الفوري للأدمن بعد الدخول)
+  const fetchIsAdmin = async (
+    sb: ReturnType<typeof createClient>,
+    id: string
+  ): Promise<boolean> => {
+    const { data } = await sb.from('profiles').select('is_admin').eq('id', id).maybeSingle();
+    return !!data?.is_admin;
+  };
+
   async function signInWithPassword(
     email: string,
     password: string
-  ): Promise<{ ok: boolean; message: string }> {
+  ): Promise<{ ok: boolean; message: string; isAdmin?: boolean }> {
     if (!isSupabaseConfigured()) {
       return { ok: false, message: 'لم يتم ضبط الاتصال بقاعدة البيانات بعد.' };
     }
@@ -70,7 +79,7 @@ export function useAuth() {
       return { ok: false, message: 'أدخل كلمة المرور.' };
     }
     const sb = createClient();
-    const { error } = await sb.auth.signInWithPassword({ email, password });
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) {
       const msg = /invalid login credentials/i.test(error.message)
         ? 'البريد أو كلمة المرور غير صحيحة.'
@@ -79,14 +88,16 @@ export function useAuth() {
           : 'تعذّر الدخول: ' + error.message;
       return { ok: false, message: msg };
     }
+    // نقرأ is_admin مباشرةً ليُحوّل الأدمن فوراً للوحة الإدارة
+    const admin = data.user ? await fetchIsAdmin(sb, data.user.id) : false;
     // onAuthStateChange سيحدّث user و isAdmin تلقائياً
-    return { ok: true, message: 'تم تسجيل الدخول ✓' };
+    return { ok: true, message: 'تم تسجيل الدخول ✓', isAdmin: admin };
   }
 
   async function signUpWithPassword(
     email: string,
     password: string
-  ): Promise<{ ok: boolean; message: string }> {
+  ): Promise<{ ok: boolean; message: string; isAdmin?: boolean }> {
     if (!isSupabaseConfigured()) {
       return { ok: false, message: 'لم يتم ضبط الاتصال بقاعدة البيانات بعد.' };
     }
@@ -116,8 +127,9 @@ export function useAuth() {
         };
       }
     }
-    // onAuthStateChange سيحدّث user و isAdmin تلقائياً
-    return { ok: true, message: 'تم إنشاء الحساب وتسجيل الدخول ✓' };
+    // نقرأ is_admin (حساب جديد = false عادةً، فلا يُحوّل) — onAuthStateChange سيحدّث الحالة
+    const admin = data.user ? await fetchIsAdmin(sb, data.user.id) : false;
+    return { ok: true, message: 'تم إنشاء الحساب وتسجيل الدخول ✓', isAdmin: admin };
   }
 
   async function signOut() {

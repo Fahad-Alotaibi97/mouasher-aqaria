@@ -82,7 +82,7 @@ export default function Home() {
     setAuthBusy(true);
     setAuthMsg(null);
     const email = authEmail.trim();
-    let r: { ok: boolean; message: string };
+    let r: { ok: boolean; message: string; isAdmin?: boolean };
     if (authMode === 'signup') {
       if (authPass !== authPass2) {
         setAuthMsg({ ok: false, text: 'كلمتا المرور غير متطابقتين.' });
@@ -97,6 +97,12 @@ export default function Home() {
     if (r.ok) {
       setAuthPass('');
       setAuthPass2('');
+      // الأدمن يُحوّل فوراً للوحة الإدارة (تنقّل كامل ليحمل الصفحة الجلسة من الكوكي)
+      if (r.isAdmin) {
+        setAuthMsg({ ok: true, text: 'تم تسجيل الدخول كمدير — جارٍ التحويل للوحة الإدارة…' });
+        window.location.href = '/admin';
+        return; // نُبقي authBusy=true أثناء التحويل
+      }
     }
     setAuthBusy(false);
   };
