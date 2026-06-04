@@ -2,9 +2,11 @@
 // ════════════════════════════════════════════════════════════
 //  لوحة الأدمن — إدارة متوسطات الأحياء حسب تفصيل خانات الغرف.
 //
-//  • لا يوجد نموذج دخول هنا إطلاقاً — مصدر الدخول الوحيد هو الصفحة الرئيسية.
-//    تعتمد هذه الصفحة على الجلسة الموجودة فقط: مدير ⇒ تُعرض اللوحة مباشرة،
-//    غير مسجّل ⇒ تحويل للصفحة الرئيسية «/»، مسجّل غير مدير ⇒ «غير مصرّح».
+//  • بوّابة كلمة مرور بسيطة مستقلّة تماماً عن Supabase (لا جلسة/كوكيز/تحويل):
+//    تُدخل كلمة المرور مرة واحدة ⇒ تُفتح اللوحة (وتُحفظ الحالة في sessionStorage).
+//    كلمة المرور = NEXT_PUBLIC_ADMIN_GATE وإلا القيمة الافتراضية في الكود.
+//    الحفظ في جدول neighborhoods يتم بمفتاح anon (يتطلب سياسة الكتابة العامة —
+//    راجع supabase/admin_gate_neighborhoods_write.sql).
 //  • كل حي accordion يُظهر تفصيل الغرف عند التوسعة.
 //  • شقة/فيلا: 4 خانات (غرفة/غرفتين/ثلاث/أربع+) ، استوديو: خانة واحدة.
 //  • المتوسط المعتمد = متوسط الخانات المعبّأة فقط (الفارغة تُتجاهل).
@@ -12,10 +14,9 @@
 //    وتفصيل الخانات → apt_detail / villa_detail (JSONB) حتى لا يضيع.
 //  • السعر العادل والمؤشر في باقي الموقع يقرآن القيم الجديدة فوراً.
 // ════════════════════════════════════════════════════════════
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
-import { useAuth } from '@/lib/useAuth';
 
 // خانات الغرف للشقة/الفيلا (4 خانات): غرفة / غرفتين / ثلاث / أربع فأكثر
 const ROOM_LABELS = ['غرفة', 'غرفتين', 'ثلاث غرف', 'أربع غرف فأكثر'];
@@ -63,9 +64,37 @@ function approvedAvg(slots: (number | null)[]): number | null {
 const fmt = (n: number | null | undefined) =>
   n == null ? '—' : `${n.toLocaleString('ar-SA')} ريال`;
 
+// كلمة مرور البوّابة: من متغيّر البيئة NEXT_PUBLIC_ADMIN_GATE وإلا القيمة الافتراضية.
+const ADMIN_GATE = process.env.NEXT_PUBLIC_ADMIN_GATE || 'aqaria-admin-2026';
+
 export default function AdminPage() {
-  // الدخول مصدره الوحيد الصفحة الرئيسية — هنا نعتمد الجلسة الموجودة فقط.
-  const { user, isAdmin, ready, signOut } = useAuth();
+  // ── بوّابة كلمة المرور (مستقلّة تماماً عن Supabase: لا جلسة/كوكيز/تحويل) ──
+  const [unlocked, setUnlocked] = useState(false);
+  const [gatePass, setGatePass] = useState('');
+  const [gateErr, setGateErr] = useState(false);
+
+  // استعادة حالة الفتح خلال جلسة التبويب (sessionStorage) — لا كوكيز ولا Supabase
+  useEffect(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('admin_gate') === '1') {
+      setUnlocked(true);
+    }
+  }, []);
+
+  const tryUnlock = () => {
+    if (gatePass === ADMIN_GATE) {
+      setUnlocked(true);
+      setGateErr(false);
+      if (typeof window !== 'undefined') sessionStorage.setItem('admin_gate', '1');
+    } else {
+      setGateErr(true);
+    }
+  };
+
+  const lock = () => {
+    setUnlocked(false);
+    setGatePass('');
+    if (typeof window !== 'undefined') sessionStorage.removeItem('admin_gate');
+  };
 
   // بيانات الأحياء
   const [rows, setRows] = useState<HoodRow[]>([]);
@@ -76,10 +105,10 @@ export default function AdminPage() {
   // هل توجد أعمدة التفصيل (apt_detail/villa_detail) في القاعدة؟ (للحفظ المرن)
   const [hasDetailCols, setHasDetailCols] = useState(true);
 
-  // ── جلب الأحياء بعد التأكد أن المستخدم مدير ──────────────────
+  // ── جلب الأحياء بعد فتح البوّابة ─────────────────────────────
   useEffect(() => {
-    if (!ready) return;
-    if (!isSupabaseConfigured() || !user || !isAdmin) {
+    if (!unlocked) return;
+    if (!isSupabaseConfigured()) {
       setLoading(false);
       return;
     }
@@ -126,19 +155,7 @@ export default function AdminPage() {
     return () => {
       cancelled = true;
     };
-  }, [ready, user, isAdmin]);
-
-  // ── لا يوجد نموذج دخول هنا: غير المسجّل يُحوّل للصفحة الرئيسية ──
-  //    (مصدر تسجيل الدخول الوحيد في المنصة هو الصفحة الرئيسية)
-  //    لا نُحوّل أثناء تحميل الجلسة: فقط بعد ready=true والتأكد من عدم وجود
-  //    مستخدم، ومرّة واحدة فقط (redirectedRef) منعاً لأي حلقة تحويل.
-  const redirectedRef = useRef(false);
-  useEffect(() => {
-    if (ready && isSupabaseConfigured() && !user && !redirectedRef.current) {
-      redirectedRef.current = true;
-      window.location.href = '/';
-    }
-  }, [ready, user]);
+  }, [unlocked]);
 
   // ── تحديث خانة غرفة (شقة/فيلا) ───────────────────────────────
   const setSlot = (name: string, kind: 'apt' | 'villa', idx: number, value: string) => {
@@ -241,39 +258,53 @@ export default function AdminPage() {
     </div>
   );
 
-  // ── حالات الوصول ─────────────────────────────────────────────
-  if (!ready || loading) return wrap(<div className="text-center text-gray-600">جارٍ التحميل…</div>);
+  // ── البوّابة: غير مفتوحة ⇒ نموذج كلمة مرور (لا اعتماد على Supabase إطلاقاً) ──
+  if (!unlocked)
+    return wrap(
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-9 h-9 rounded-xl bg-[#0A3D62] text-white flex items-center justify-center font-bold">م</div>
+          <div>
+            <div className="font-bold text-gray-900 leading-none">لوحة الأدمن</div>
+            <div className="text-xs text-gray-500 mt-0.5">أدخل كلمة المرور للدخول</div>
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 mt-3 mb-4">صفحة محمية بكلمة مرور — لا تحتاج تسجيل دخول.</p>
+        <label className="text-xs text-gray-700 font-semibold block mb-1">كلمة المرور</label>
+        <input
+          type="password"
+          dir="ltr"
+          value={gatePass}
+          onChange={(e) => { setGatePass(e.target.value); setGateErr(false); }}
+          onKeyDown={(e) => e.key === 'Enter' && tryUnlock()}
+          placeholder="••••••••"
+          autoFocus
+          className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+        />
+        <button
+          onClick={tryUnlock}
+          className="w-full mt-4 bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-2.5 rounded-xl font-bold text-sm shadow"
+        >
+          دخول
+        </button>
+        {gateErr && (
+          <div className="mt-3 text-sm rounded-xl p-3 border bg-red-50 text-red-700 border-red-200">
+            كلمة المرور غير صحيحة.
+          </div>
+        )}
+        <a href="/" className="block mt-4 text-center text-blue-600 text-sm font-medium hover:underline">→ العودة للصفحة الرئيسية</a>
+      </div>
+    );
 
+  // مفتوحة لكن البيانات قيد التحميل
+  if (loading) return wrap(<div className="text-center text-gray-600">جارٍ التحميل…</div>);
+
+  // مفتوحة لكن القاعدة غير مضبوطة
   if (!isSupabaseConfigured())
     return wrap(
       <div className="text-center">
         <div className="text-gray-900 font-bold mb-1">لم يتم ضبط الاتصال بقاعدة البيانات بعد.</div>
         <a href="/" className="inline-block mt-4 text-blue-600 text-sm font-medium hover:underline">→ العودة للرئيسية</a>
-      </div>
-    );
-
-  // غير مسجّل دخول → لا نعرض أي نموذج دخول، بل نُحوّل للصفحة الرئيسية (يتكفّل به useEffect أعلاه)
-  if (!user)
-    return wrap(
-      <div className="text-center">
-        <div className="text-gray-900 font-bold mb-1">يلزم تسجيل الدخول</div>
-        <div className="text-gray-500 text-sm">جارٍ تحويلك للصفحة الرئيسية لتسجيل الدخول…</div>
-        <a href="/" className="inline-block mt-4 text-blue-600 text-sm font-medium hover:underline">→ الذهاب للصفحة الرئيسية الآن</a>
-      </div>
-    );
-
-  // مسجّل لكن ليس مديراً
-  if (!isAdmin)
-    return wrap(
-      <div className="text-center">
-        <div className="text-gray-900 font-bold mb-1">غير مصرّح</div>
-        <div className="text-gray-500 text-sm">
-          حسابك ({user.email}) ليس مديراً. فعّل صلاحية المدير من قاعدة البيانات (is_admin = true).
-        </div>
-        <button onClick={signOut} className="mt-4 text-sm text-gray-600 border border-gray-300 px-4 py-2 rounded-xl hover:bg-gray-50">
-          تسجيل الخروج
-        </button>
-        <a href="/" className="block mt-3 text-blue-600 text-sm font-medium hover:underline">→ العودة للرئيسية</a>
       </div>
     );
 
@@ -289,9 +320,8 @@ export default function AdminPage() {
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-2xl font-bold text-[#0A3D62]">لوحة الأدمن — متوسطات الأحياء</h1>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500 hidden sm:inline">{user.email}</span>
-            <button onClick={signOut} className="text-xs text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50">
-              خروج
+            <button onClick={lock} className="text-xs text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50">
+              قفل اللوحة
             </button>
             <a href="/" className="text-blue-600 text-sm font-medium hover:underline">→ الرئيسية</a>
           </div>

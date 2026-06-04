@@ -16,10 +16,6 @@ export interface AuthUser {
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 // يقرأ صلاحية المدير (is_admin) لمعرّف مستخدم من جدول profiles.
-// قوي ضد عدم جاهزية الجلسة: لو رجع خطأ أو لم يجد صفاً في المحاولة الأولى،
-// يحدّث الجلسة ثم يعيد المحاولة مرة واحدة قبل أن يعتبره غير مدير.
-// (الإصلاح الجذري لقراءة الصف هو سياسة RLS «profiles_read_own» — راجع
-//  supabase/fix_profiles_rls.sql — وهذا تحصين إضافي في الكود.)
 async function fetchIsAdmin(
   sb: ReturnType<typeof createClient>,
   id: string
@@ -28,20 +24,25 @@ async function fetchIsAdmin(
   return !!data?.is_admin;
 }
 
-// يتأكّد من جاهزية الجلسة قبل التحويل — قراءة واحدة من العميل المفرد.
-// لا ينشئ عملاء جدداً ولا يفرض تحديث رمز (auth-js يكتب كوكي الجلسة بانتظار
-// await داخل signInWithPassword، فالجلسة جاهزة هنا). هذا يتفادى إغراق
-// /auth/v1/token الذي كان يسبّب 429 وكسر الجلسة.
+// يتأكّد من حفظ الجلسة في الكوكيز فعلاً قبل التحويل لـ /admin.
+// السبب: @supabase/ssr يكتب كوكي الجلسة (sb-<ref>-auth-token) بشكل غير
+// متزامن بعد signInWithPassword. لو حوّلنا فوراً قد تُفتح /admin قبل وصول
+// الكوكي للخادم ⇒ لا يرى جلسة ⇒ ارتداد للرئيسية. لذا ننتظر ظهور كوكي sb-.
 async function confirmSessionPersisted(): Promise<boolean> {
   const sb = createClient();
   const { data } = await sb.auth.getSession();
-  return !!data.session;
+  if (!data.session) return false;
+  if (typeof document === 'undefined') return true;
+  for (let i = 0; i < 20; i++) {
+    if (/(^|;\s*)sb-[^=]+-auth-token/.test(document.cookie)) return true;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return true; // الجلسة موجودة؛ نكمل حتى لو تأخّر ظهور الكوكي
 }
 
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  // إذا لم تُضبط القاعدة، نعتبر الحالة جاهزة فوراً (دون setState داخل التأثير)
   const [ready, setReady] = useState(() => !isSupabaseConfigured());
 
   useEffect(() => {
@@ -49,7 +50,6 @@ export function useAuth() {
     const sb = createClient();
     let cancelled = false;
 
-    // يجلب صلاحية المدير لمستخدمٍ ما (فارغ ⇒ غير مدير)
     const loadAdmin = async (u: AuthUser | null) => {
       if (!u) {
         if (!cancelled) setIsAdmin(false);
@@ -59,9 +59,6 @@ export function useAuth() {
       if (!cancelled) setIsAdmin(admin);
     };
 
-    // نعتمد getSession (قراءة محلية من الكوكيز) بدل getUser (نداء شبكي) لتحديد
-    // حالة الدخول عند التحميل — موثوق فور فتح /admin بعد التحويل، ولا ينخدع
-    // بفشل شبكي عابر فيُظهر شاشة دخول لمستخدمٍ لديه جلسة فعلاً (سبب الحلقة).
     sb.auth.getSession().then(async ({ data }) => {
       const su = data.session?.user;
       const u = su ? { id: su.id, email: su.email ?? null } : null;
@@ -71,14 +68,10 @@ export function useAuth() {
       if (!cancelled) setReady(true);
     });
 
-    // مهم: ردّ onAuthStateChange لا ينفّذ أي نداء شبكي إطلاقاً (لا profiles ولا
-    // getSession/getUser). أي نداء هنا يعمل ضمن قفل المصادقة وقد يطلب تحديث رمز،
-    // فيتسبّب في حلقة تغذية راجعة وإغراق /auth/v1/token. نكتفي بتحديث user محلياً.
-    // is_admin يُقرأ مرة واحدة فقط في مسار التحميل الأولي (getSession أعلاه).
     const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ? { id: session.user.id, email: session.user.email ?? null } : null;
       setUser(u);
-      if (!u) setIsAdmin(false); // عند الخروج فقط
+      if (!u) setIsAdmin(false);
     });
 
     return () => {
@@ -110,9 +103,7 @@ export function useAuth() {
           : 'تعذّر الدخول: ' + error.message;
       return { ok: false, message: msg };
     }
-    // نقرأ is_admin مباشرةً ليُحوّل الأدمن فوراً للوحة الإدارة
     const admin = data.user ? await fetchIsAdmin(sb, data.user.id) : false;
-    // onAuthStateChange سيحدّث user و isAdmin تلقائياً
     return { ok: true, message: 'تم تسجيل الدخول ✓', isAdmin: admin };
   }
 
@@ -130,7 +121,6 @@ export function useAuth() {
       return { ok: false, message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.' };
     }
     const sb = createClient();
-    // إنشاء الحساب في Supabase Auth — التريغر on_auth_user_created يُنشئ صف profiles تلقائياً.
     const { data, error } = await sb.auth.signUp({ email, password });
     if (error) {
       const msg = /already registered|already been registered|user already/i.test(error.message)
@@ -138,7 +128,6 @@ export function useAuth() {
         : 'تعذّر إنشاء الحساب: ' + error.message;
       return { ok: false, message: msg };
     }
-    // إذا كان تأكيد البريد مُعطّلاً تُنشأ الجلسة فوراً؛ وإلا نحاول الدخول مباشرةً.
     if (!data.session) {
       const { error: signInErr } = await sb.auth.signInWithPassword({ email, password });
       if (signInErr) {
@@ -149,7 +138,6 @@ export function useAuth() {
         };
       }
     }
-    // نقرأ is_admin (حساب جديد = false عادةً، فلا يُحوّل) — onAuthStateChange سيحدّث الحالة
     const admin = data.user ? await fetchIsAdmin(sb, data.user.id) : false;
     return { ok: true, message: 'تم إنشاء الحساب وتسجيل الدخول ✓', isAdmin: admin };
   }
