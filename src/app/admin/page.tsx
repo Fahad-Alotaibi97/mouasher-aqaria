@@ -63,7 +63,7 @@ const fmt = (n: number | null | undefined) =>
   n == null ? '—' : `${n.toLocaleString('ar-SA')} ريال`;
 
 export default function AdminPage() {
-  const { user, isAdmin, ready, signInWithPassword, signOut } = useAuth();
+  const { user, isAdmin, ready, signInWithPassword, signOut, confirmSession } = useAuth();
 
   // حالة شاشة الدخول بكلمة المرور
   const [loginEmail, setLoginEmail] = useState('');
@@ -137,6 +137,16 @@ export default function AdminPage() {
     setLoggingIn(true);
     setLoginMsg(null);
     const r = await signInWithPassword(loginEmail.trim(), loginPass);
+    if (r.ok) {
+      // لا نعتمد على تحديث الـ hook عبر onAuthStateChange (قد يتعثّر داخل قفل
+      // المصادقة عند جلب is_admin). بدلاً من ذلك: نؤكّد حفظ الجلسة ثم نعيد تحميل
+      // الصفحة — فتُقرأ الجلسة من الكوكيز عبر مسار getSession الأولي، ويظهر
+      // المستخدم كأدمن فتُعرض لوحة الأحياء مباشرةً بلا بقاء على شاشة الدخول.
+      setLoginMsg({ ok: true, text: 'تم تسجيل الدخول ✓ — جارٍ فتح اللوحة…' });
+      await confirmSession();
+      window.location.reload();
+      return; // نُبقي الزر معطّلاً أثناء إعادة التحميل
+    }
     setLoginMsg({ ok: r.ok, text: r.message });
     setLoggingIn(false);
   };
