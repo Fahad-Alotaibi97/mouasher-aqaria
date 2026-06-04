@@ -70,7 +70,7 @@ export default function Home() {
   const { mktAvg, listings } = useAppData(DEFAULT_MKT_AVG, DEFAULT_LISTINGS);
 
   // تسجيل الدخول — بالإيميل وكلمة المرور (تبويب: دخول / إنشاء حساب)
-  const { user, isAdmin, signInWithPassword, signUpWithPassword, signOut } = useAuth();
+  const { user, isAdmin, signInWithPassword, signUpWithPassword, signOut, confirmSession } = useAuth();
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authEmail, setAuthEmail] = useState('');
   const [authPass, setAuthPass] = useState('');
@@ -97,9 +97,11 @@ export default function Home() {
     if (r.ok) {
       setAuthPass('');
       setAuthPass2('');
-      // الأدمن يُحوّل فوراً للوحة الإدارة (تنقّل كامل ليحمل الصفحة الجلسة من الكوكي)
+      // الأدمن يُحوّل للوحة الإدارة — لكن بعد تأكيد حفظ الجلسة في الكوكيز
+      // (تنقّل كامل ليحمل /admin الجلسة)، حتى لا تُفتح /admin بلا جلسة فتطلب دخولاً.
       if (r.isAdmin) {
         setAuthMsg({ ok: true, text: 'تم تسجيل الدخول كمدير — جارٍ التحويل للوحة الإدارة…' });
+        await confirmSession(); // انتظار صريح لتأكيد الجلسة بدل التحويل الفوري
         window.location.href = '/admin';
         return; // نُبقي authBusy=true أثناء التحويل
       }

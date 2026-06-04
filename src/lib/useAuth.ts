@@ -32,6 +32,19 @@ async function fetchIsAdmin(
   return false;
 }
 
+// يؤكّد أن جلسة الدخول كُتبت فعلياً في الكوكيز التي ستقرأها صفحة /admin بعد التحويل.
+// ينشئ عميلاً جديداً (يقرأ الكوكيز من الصفر، تماماً كما تفعل /admin عند تحميلها)
+// ويستفسر حتى تظهر الجلسة أو تنتهي المهلة (~2 ثانية). يمنع فتح /admin بلا جلسة.
+async function confirmSessionPersisted(): Promise<boolean> {
+  for (let i = 0; i < 25; i++) {
+    const probe = createClient();
+    const { data } = await probe.auth.getSession();
+    if (data.session) return true;
+    await new Promise((r) => setTimeout(r, 80));
+  }
+  return false;
+}
+
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -53,8 +66,12 @@ export function useAuth() {
       if (!cancelled) setIsAdmin(admin);
     };
 
-    sb.auth.getUser().then(async ({ data }) => {
-      const u = data.user ? { id: data.user.id, email: data.user.email ?? null } : null;
+    // نعتمد getSession (قراءة محلية من الكوكيز) بدل getUser (نداء شبكي) لتحديد
+    // حالة الدخول عند التحميل — موثوق فور فتح /admin بعد التحويل، ولا ينخدع
+    // بفشل شبكي عابر فيُظهر شاشة دخول لمستخدمٍ لديه جلسة فعلاً (سبب الحلقة).
+    sb.auth.getSession().then(async ({ data }) => {
+      const su = data.session?.user;
+      const u = su ? { id: su.id, email: su.email ?? null } : null;
       if (cancelled) return;
       setUser(u);
       await loadAdmin(u);
@@ -148,5 +165,13 @@ export function useAuth() {
     setIsAdmin(false);
   }
 
-  return { user, isAdmin, ready, signInWithPassword, signUpWithPassword, signOut };
+  return {
+    user,
+    isAdmin,
+    ready,
+    signInWithPassword,
+    signUpWithPassword,
+    signOut,
+    confirmSession: confirmSessionPersisted,
+  };
 }
