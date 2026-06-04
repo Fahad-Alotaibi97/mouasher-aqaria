@@ -2,8 +2,9 @@
 // ════════════════════════════════════════════════════════════
 //  لوحة الأدمن — إدارة متوسطات الأحياء حسب تفصيل خانات الغرف.
 //
-//  • دخول الأدمن بكلمة المرور (signInWithPassword) — وليس Magic Link.
-//  • محمية: غير المسجّل أو غير المدير يُحوّل لشاشة دخول واضحة.
+//  • لا يوجد نموذج دخول هنا إطلاقاً — مصدر الدخول الوحيد هو الصفحة الرئيسية.
+//    تعتمد هذه الصفحة على الجلسة الموجودة فقط: مدير ⇒ تُعرض اللوحة مباشرة،
+//    غير مسجّل ⇒ تحويل للصفحة الرئيسية «/»، مسجّل غير مدير ⇒ «غير مصرّح».
 //  • كل حي accordion يُظهر تفصيل الغرف عند التوسعة.
 //  • شقة/فيلا: 4 خانات (غرفة/غرفتين/ثلاث/أربع+) ، استوديو: خانة واحدة.
 //  • المتوسط المعتمد = متوسط الخانات المعبّأة فقط (الفارغة تُتجاهل).
@@ -63,13 +64,8 @@ const fmt = (n: number | null | undefined) =>
   n == null ? '—' : `${n.toLocaleString('ar-SA')} ريال`;
 
 export default function AdminPage() {
-  const { user, isAdmin, ready, signInWithPassword, signOut, confirmSession } = useAuth();
-
-  // حالة شاشة الدخول بكلمة المرور
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPass, setLoginPass] = useState('');
-  const [loginMsg, setLoginMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [loggingIn, setLoggingIn] = useState(false);
+  // الدخول مصدره الوحيد الصفحة الرئيسية — هنا نعتمد الجلسة الموجودة فقط.
+  const { user, isAdmin, ready, signOut } = useAuth();
 
   // بيانات الأحياء
   const [rows, setRows] = useState<HoodRow[]>([]);
@@ -132,24 +128,13 @@ export default function AdminPage() {
     };
   }, [ready, user, isAdmin]);
 
-  // ── دخول بكلمة المرور ────────────────────────────────────────
-  const doLogin = async () => {
-    setLoggingIn(true);
-    setLoginMsg(null);
-    const r = await signInWithPassword(loginEmail.trim(), loginPass);
-    if (r.ok) {
-      // لا نعتمد على تحديث الـ hook عبر onAuthStateChange (قد يتعثّر داخل قفل
-      // المصادقة عند جلب is_admin). بدلاً من ذلك: نؤكّد حفظ الجلسة ثم نعيد تحميل
-      // الصفحة — فتُقرأ الجلسة من الكوكيز عبر مسار getSession الأولي، ويظهر
-      // المستخدم كأدمن فتُعرض لوحة الأحياء مباشرةً بلا بقاء على شاشة الدخول.
-      setLoginMsg({ ok: true, text: 'تم تسجيل الدخول ✓ — جارٍ فتح اللوحة…' });
-      await confirmSession();
-      window.location.reload();
-      return; // نُبقي الزر معطّلاً أثناء إعادة التحميل
+  // ── لا يوجد نموذج دخول هنا: غير المسجّل يُحوّل للصفحة الرئيسية ──
+  //    (مصدر تسجيل الدخول الوحيد في المنصة هو الصفحة الرئيسية)
+  useEffect(() => {
+    if (ready && isSupabaseConfigured() && !user) {
+      window.location.href = '/';
     }
-    setLoginMsg({ ok: r.ok, text: r.message });
-    setLoggingIn(false);
-  };
+  }, [ready, user]);
 
   // ── تحديث خانة غرفة (شقة/فيلا) ───────────────────────────────
   const setSlot = (name: string, kind: 'apt' | 'villa', idx: number, value: string) => {
@@ -241,8 +226,6 @@ export default function AdminPage() {
   // ── أنماط ────────────────────────────────────────────────────
   const cellCls =
     'w-full px-2 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm text-center outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
-  const fieldCls =
-    'w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 
   const wrap = (children: React.ReactNode) => (
     <div
@@ -265,59 +248,13 @@ export default function AdminPage() {
       </div>
     );
 
-  // غير مسجّل دخول → شاشة دخول الأدمن بكلمة المرور
+  // غير مسجّل دخول → لا نعرض أي نموذج دخول، بل نُحوّل للصفحة الرئيسية (يتكفّل به useEffect أعلاه)
   if (!user)
     return wrap(
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <div className="w-9 h-9 rounded-xl bg-[#0A3D62] text-white flex items-center justify-center font-bold">م</div>
-          <div>
-            <div className="font-bold text-gray-900 leading-none">لوحة الأدمن</div>
-            <div className="text-xs text-gray-500 mt-0.5">دخول المدير بكلمة المرور</div>
-          </div>
-        </div>
-        <p className="text-xs text-gray-500 mt-3 mb-4">
-          هذه الصفحة للمدراء فقط. أدخل بريد المدير وكلمة المرور.
-        </p>
-        <label className="text-xs text-gray-700 font-semibold block mb-1">البريد الإلكتروني</label>
-        <input
-          type="email"
-          dir="ltr"
-          value={loginEmail}
-          onChange={(e) => setLoginEmail(e.target.value)}
-          placeholder="name@example.com"
-          className={fieldCls + ' mb-3'}
-        />
-        <label className="text-xs text-gray-700 font-semibold block mb-1">كلمة المرور</label>
-        <input
-          type="password"
-          dir="ltr"
-          value={loginPass}
-          onChange={(e) => setLoginPass(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && doLogin()}
-          placeholder="••••••••"
-          className={fieldCls}
-        />
-        <button
-          onClick={doLogin}
-          disabled={loggingIn}
-          className="w-full mt-4 bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-60"
-        >
-          {loggingIn ? 'جارٍ الدخول…' : 'دخول'}
-        </button>
-        {loginMsg && (
-          <div
-            className={`mt-3 text-sm rounded-xl p-3 border ${
-              loginMsg.ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
-            }`}
-          >
-            {loginMsg.text}
-          </div>
-        )}
-        <div className="mt-4 text-center text-xs text-gray-400">
-          الدخول بالبريد وكلمة المرور.{' '}
-          <a href="/" className="text-blue-600 hover:underline">العودة للصفحة الرئيسية</a>.
-        </div>
+      <div className="text-center">
+        <div className="text-gray-900 font-bold mb-1">يلزم تسجيل الدخول</div>
+        <div className="text-gray-500 text-sm">جارٍ تحويلك للصفحة الرئيسية لتسجيل الدخول…</div>
+        <a href="/" className="inline-block mt-4 text-blue-600 text-sm font-medium hover:underline">→ الذهاب للصفحة الرئيسية الآن</a>
       </div>
     );
 

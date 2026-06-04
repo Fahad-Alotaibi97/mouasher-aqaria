@@ -32,17 +32,14 @@ async function fetchIsAdmin(
   return false;
 }
 
-// يؤكّد أن جلسة الدخول كُتبت فعلياً في الكوكيز التي ستقرأها صفحة /admin بعد التحويل.
-// ينشئ عميلاً جديداً (يقرأ الكوكيز من الصفر، تماماً كما تفعل /admin عند تحميلها)
-// ويستفسر حتى تظهر الجلسة أو تنتهي المهلة (~2 ثانية). يمنع فتح /admin بلا جلسة.
+// يتأكّد من جاهزية الجلسة قبل التحويل — قراءة واحدة من العميل المفرد.
+// لا ينشئ عملاء جدداً ولا يفرض تحديث رمز (auth-js يكتب كوكي الجلسة بانتظار
+// await داخل signInWithPassword، فالجلسة جاهزة هنا). هذا يتفادى إغراق
+// /auth/v1/token الذي كان يسبّب 429 وكسر الجلسة.
 async function confirmSessionPersisted(): Promise<boolean> {
-  for (let i = 0; i < 25; i++) {
-    const probe = createClient();
-    const { data } = await probe.auth.getSession();
-    if (data.session) return true;
-    await new Promise((r) => setTimeout(r, 80));
-  }
-  return false;
+  const sb = createClient();
+  const { data } = await sb.auth.getSession();
+  return !!data.session;
 }
 
 export function useAuth() {
@@ -81,7 +78,10 @@ export function useAuth() {
     const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ? { id: session.user.id, email: session.user.email ?? null } : null;
       setUser(u);
-      loadAdmin(u);
+      // مهم: لا نستدعي أي عملية Supabase (مثل قراءة is_admin) داخل ردّ
+      // onAuthStateChange لأنها تعمل ضمن قفل المصادقة فتتعلّق. نخرج من القفل
+      // بـ setTimeout(0) ثم نقرأ is_admin بأمان خارج الردّ.
+      setTimeout(() => loadAdmin(u), 0);
     });
 
     return () => {
