@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 import dynamic from 'next/dynamic';
@@ -69,29 +69,36 @@ export default function Home() {
   // البيانات الحقيقية من قاعدة البيانات (مع رجوع آمن للافتراضية)
   const { mktAvg, listings } = useAppData(DEFAULT_MKT_AVG, DEFAULT_LISTINGS);
 
-  // تسجيل الدخول
-  const { user, isAdmin, sendMagicLink, signOut } = useAuth();
+  // تسجيل الدخول — بالإيميل وكلمة المرور (تبويب: دخول / إنشاء حساب)
+  const { user, isAdmin, signInWithPassword, signUpWithPassword, signOut } = useAuth();
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authEmail, setAuthEmail] = useState('');
+  const [authPass, setAuthPass] = useState('');
+  const [authPass2, setAuthPass2] = useState('');
   const [authMsg, setAuthMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [authSending, setAuthSending] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
 
-  // إظهار رسالة واضحة إذا فشل إكمال تسجيل الدخول من رابط الإيميل (?auth_error=...)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const err = params.get('auth_error');
-    if (!err) return;
-    setAuthMsg({ ok: false, text: 'تعذّر إكمال تسجيل الدخول: ' + err });
-    setPage('pricing');
-    params.delete('auth_error');
-    const qs = params.toString();
-    window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
-  }, []);
-  const handleMagicLink = async () => {
-    setAuthSending(true);
+  const submitAuth = async () => {
+    setAuthBusy(true);
     setAuthMsg(null);
-    const r = await sendMagicLink(authEmail);
+    const email = authEmail.trim();
+    let r: { ok: boolean; message: string };
+    if (authMode === 'signup') {
+      if (authPass !== authPass2) {
+        setAuthMsg({ ok: false, text: 'كلمتا المرور غير متطابقتين.' });
+        setAuthBusy(false);
+        return;
+      }
+      r = await signUpWithPassword(email, authPass);
+    } else {
+      r = await signInWithPassword(email, authPass);
+    }
     setAuthMsg({ ok: r.ok, text: r.message });
-    setAuthSending(false);
+    if (r.ok) {
+      setAuthPass('');
+      setAuthPass2('');
+    }
+    setAuthBusy(false);
   };
 
   // حساب السعر العادل وحالته بناءً على المتوسطات الحالية
@@ -496,7 +503,7 @@ export default function Home() {
           </div>
           <div className="p-4 space-y-4">
 
-            {/* تسجيل الدخول / الدخول السحري */}
+            {/* تسجيل الدخول / إنشاء حساب — بالإيميل وكلمة المرور */}
             <div className="bg-white rounded-2xl p-5 border-2 border-blue-200 shadow-sm">
               {user ? (
                 <div className="text-center">
@@ -508,26 +515,66 @@ export default function Home() {
                 </div>
               ) : (
                 <div>
-                  <div className="font-bold text-gray-900 mb-1">دخول / تسجيل سريع</div>
-                  <div className="text-xs text-gray-500 mb-3">أدخل بريدك ونرسل لك رابط دخول — بدون كلمة مرور.</div>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="email"
-                      dir="ltr"
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleMagicLink()}
-                      placeholder="name@example.com"
-                      className="flex-1 px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
+                  {/* تبويبات: تسجيل دخول / إنشاء حساب */}
+                  <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
                     <button
-                      onClick={handleMagicLink}
-                      disabled={authSending}
-                      className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50 whitespace-nowrap"
+                      onClick={() => { setAuthMode('login'); setAuthMsg(null); }}
+                      className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${authMode === 'login' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                      {authSending ? 'جارٍ الإرسال…' : 'أرسل رابط الدخول'}
+                      تسجيل دخول
+                    </button>
+                    <button
+                      onClick={() => { setAuthMode('signup'); setAuthMsg(null); }}
+                      className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${authMode === 'signup' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      إنشاء حساب
                     </button>
                   </div>
+
+                  <label className="text-xs text-gray-700 font-semibold block mb-1">البريد الإلكتروني</label>
+                  <input
+                    type="email"
+                    dir="ltr"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full mb-3 px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
+                  />
+
+                  <label className="text-xs text-gray-700 font-semibold block mb-1">كلمة المرور</label>
+                  <input
+                    type="password"
+                    dir="ltr"
+                    value={authPass}
+                    onChange={(e) => setAuthPass(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && authMode === 'login' && submitAuth()}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
+                  />
+
+                  {authMode === 'signup' && (
+                    <>
+                      <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">تأكيد كلمة المرور</label>
+                      <input
+                        type="password"
+                        dir="ltr"
+                        value={authPass2}
+                        onChange={(e) => setAuthPass2(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && submitAuth()}
+                        placeholder="••••••••"
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
+                      />
+                    </>
+                  )}
+
+                  <button
+                    onClick={submitAuth}
+                    disabled={authBusy}
+                    className="w-full mt-4 bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50"
+                  >
+                    {authBusy ? 'جارٍ المعالجة…' : authMode === 'login' ? 'تسجيل دخول' : 'إنشاء حساب'}
+                  </button>
+
                   {authMsg && (
                     <div className={`mt-3 text-sm rounded-xl p-3 border ${authMsg.ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                       {authMsg.text}

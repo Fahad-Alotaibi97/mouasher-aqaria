@@ -305,8 +305,8 @@ export default function AdminPage() {
           </div>
         )}
         <div className="mt-4 text-center text-xs text-gray-400">
-          المستخدمون العاديون يدخلون عبر رابط الإيميل من{' '}
-          <a href="/" className="text-blue-600 hover:underline">الصفحة الرئيسية</a>.
+          الدخول بالبريد وكلمة المرور.{' '}
+          <a href="/" className="text-blue-600 hover:underline">العودة للصفحة الرئيسية</a>.
         </div>
       </div>
     );

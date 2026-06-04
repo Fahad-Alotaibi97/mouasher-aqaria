@@ -11,18 +11,6 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // شبكة أمان: إذا رجع رمز الدخول إلى الجذر "/" بدل "/auth/callback"
-  // (يحدث عندما لا يكون Redirect URL مضبوطاً في Supabase فيُستخدم Site URL)،
-  // نحوّله تلقائياً إلى صفحة المعالجة بدل أن "لا يحدث شيء".
-  const { pathname, searchParams } = request.nextUrl;
-  const hasCode = searchParams.has('code');
-  const hasTokenHash = searchParams.has('token_hash') && searchParams.has('type');
-  if (pathname === '/' && (hasCode || hasTokenHash)) {
-    const callbackUrl = request.nextUrl.clone();
-    callbackUrl.pathname = '/auth/callback';
-    return NextResponse.redirect(callbackUrl);
-  }
-
   let response = NextResponse.next({ request });
 
   try {
