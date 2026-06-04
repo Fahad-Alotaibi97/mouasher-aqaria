@@ -15,6 +15,23 @@ export interface AuthUser {
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+// يقرأ صلاحية المدير (is_admin) لمعرّف مستخدم من جدول profiles.
+// قوي ضد عدم جاهزية الجلسة: لو رجع خطأ أو لم يجد صفاً في المحاولة الأولى،
+// يحدّث الجلسة ثم يعيد المحاولة مرة واحدة قبل أن يعتبره غير مدير.
+// (الإصلاح الجذري لقراءة الصف هو سياسة RLS «profiles_read_own» — راجع
+//  supabase/fix_profiles_rls.sql — وهذا تحصين إضافي في الكود.)
+async function fetchIsAdmin(
+  sb: ReturnType<typeof createClient>,
+  id: string
+): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { data, error } = await sb.from('profiles').select('is_admin').eq('id', id).maybeSingle();
+    if (!error && data) return !!data.is_admin;
+    if (attempt === 0) await sb.auth.getSession(); // نضمن أن الجلسة جاهزة ثم نعيد المحاولة
+  }
+  return false;
+}
+
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -32,8 +49,8 @@ export function useAuth() {
         if (!cancelled) setIsAdmin(false);
         return;
       }
-      const { data } = await sb.from('profiles').select('is_admin').eq('id', u.id).maybeSingle();
-      if (!cancelled) setIsAdmin(!!data?.is_admin);
+      const admin = await fetchIsAdmin(sb, u.id);
+      if (!cancelled) setIsAdmin(admin);
     };
 
     sb.auth.getUser().then(async ({ data }) => {
@@ -55,15 +72,6 @@ export function useAuth() {
       sub.subscription.unsubscribe();
     };
   }, []);
-
-  // يقرأ صلاحية المدير لمعرّف مستخدم (للتحويل الفوري للأدمن بعد الدخول)
-  const fetchIsAdmin = async (
-    sb: ReturnType<typeof createClient>,
-    id: string
-  ): Promise<boolean> => {
-    const { data } = await sb.from('profiles').select('is_admin').eq('id', id).maybeSingle();
-    return !!data?.is_admin;
-  };
 
   async function signInWithPassword(
     email: string,
