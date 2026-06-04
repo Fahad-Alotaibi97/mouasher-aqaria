@@ -12,7 +12,7 @@
 //    وتفصيل الخانات → apt_detail / villa_detail (JSONB) حتى لا يضيع.
 //  • السعر العادل والمؤشر في باقي الموقع يقرآن القيم الجديدة فوراً.
 // ════════════════════════════════════════════════════════════
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { useAuth } from '@/lib/useAuth';
@@ -130,8 +130,12 @@ export default function AdminPage() {
 
   // ── لا يوجد نموذج دخول هنا: غير المسجّل يُحوّل للصفحة الرئيسية ──
   //    (مصدر تسجيل الدخول الوحيد في المنصة هو الصفحة الرئيسية)
+  //    لا نُحوّل أثناء تحميل الجلسة: فقط بعد ready=true والتأكد من عدم وجود
+  //    مستخدم، ومرّة واحدة فقط (redirectedRef) منعاً لأي حلقة تحويل.
+  const redirectedRef = useRef(false);
   useEffect(() => {
-    if (ready && isSupabaseConfigured() && !user) {
+    if (ready && isSupabaseConfigured() && !user && !redirectedRef.current) {
+      redirectedRef.current = true;
       window.location.href = '/';
     }
   }, [ready, user]);

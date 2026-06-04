@@ -24,12 +24,8 @@ async function fetchIsAdmin(
   sb: ReturnType<typeof createClient>,
   id: string
 ): Promise<boolean> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const { data, error } = await sb.from('profiles').select('is_admin').eq('id', id).maybeSingle();
-    if (!error && data) return !!data.is_admin;
-    if (attempt === 0) await sb.auth.getSession(); // نضمن أن الجلسة جاهزة ثم نعيد المحاولة
-  }
-  return false;
+  const { data } = await sb.from('profiles').select('is_admin').eq('id', id).maybeSingle();
+  return !!data?.is_admin;
 }
 
 // يتأكّد من جاهزية الجلسة قبل التحويل — قراءة واحدة من العميل المفرد.
@@ -75,13 +71,14 @@ export function useAuth() {
       if (!cancelled) setReady(true);
     });
 
+    // مهم: ردّ onAuthStateChange لا ينفّذ أي نداء شبكي إطلاقاً (لا profiles ولا
+    // getSession/getUser). أي نداء هنا يعمل ضمن قفل المصادقة وقد يطلب تحديث رمز،
+    // فيتسبّب في حلقة تغذية راجعة وإغراق /auth/v1/token. نكتفي بتحديث user محلياً.
+    // is_admin يُقرأ مرة واحدة فقط في مسار التحميل الأولي (getSession أعلاه).
     const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ? { id: session.user.id, email: session.user.email ?? null } : null;
       setUser(u);
-      // مهم: لا نستدعي أي عملية Supabase (مثل قراءة is_admin) داخل ردّ
-      // onAuthStateChange لأنها تعمل ضمن قفل المصادقة فتتعلّق. نخرج من القفل
-      // بـ setTimeout(0) ثم نقرأ is_admin بأمان خارج الردّ.
-      setTimeout(() => loadAdmin(u), 0);
+      if (!u) setIsAdmin(false); // عند الخروج فقط
     });
 
     return () => {

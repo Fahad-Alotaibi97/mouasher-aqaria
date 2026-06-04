@@ -1,11 +1,11 @@
-// عميل Supabase للمتصفح (Client Components) — نسخة واحدة (singleton).
-// مهم جداً: إنشاء عميل جديد في كل نداء يُنشئ عدّة نسخ GoTrueClient، لكلٍّ منها
-// مؤقّت تحديث رمز مستقل (autoRefreshToken)، فتنهال طلبات
-// /auth/v1/token?grant_type=refresh_token بالتوازي حتى يردّ Supabase بـ 429
-// فتنكسر الجلسة ويعود المستخدم لشاشة الدخول. لذا نُعيد دائماً النسخة نفسها.
+// عميل Supabase للمتصفح (Client Components) — نسخة واحدة مثبّتة على globalThis.
+// مهم جداً: كل نسخة GoTrueClient تشغّل مؤقّت تحديث رمز مستقل (autoRefreshToken).
+// لو تعدّدت النسخ (إنشاء عميل في كل نداء، أو تكرار تقييم الوحدة مع Turbopack/HMR
+// أو عبر عدة chunks) تتوازى طلبات /auth/v1/token?grant_type=refresh_token حتى
+// يردّ Supabase بـ 429 فتنكسر الجلسة. لذا نُثبّت النسخة على globalThis لتبقى
+// واحدة فعلاً مهما تكرّر تقييم هذا الملف.
 import { createBrowserClient } from '@supabase/ssr';
 
-// مصنع داخلي — نشتقّ منه نوع النسخة المخزّنة حتى نُبقي نفس استدلال الأنواع تماماً.
 function makeClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,9 +13,13 @@ function makeClient() {
   );
 }
 
-let browserClient: ReturnType<typeof makeClient> | undefined;
+const globalForSupabase = globalThis as unknown as {
+  __supabaseBrowserClient?: ReturnType<typeof makeClient>;
+};
 
 export function createClient() {
-  if (!browserClient) browserClient = makeClient();
-  return browserClient;
+  if (!globalForSupabase.__supabaseBrowserClient) {
+    globalForSupabase.__supabaseBrowserClient = makeClient();
+  }
+  return globalForSupabase.__supabaseBrowserClient;
 }
