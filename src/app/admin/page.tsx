@@ -19,6 +19,7 @@ import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { useAuth } from '@/lib/useAuth';
 import SiteNav from '../components/SiteNav';
+import { AdminSidebar, StatsSection, ListingsSection, OfficesSection, LeadsSection, type AdminSection } from './sections';
 
 // خانات الغرف للشقة/الفيلا (4 خانات): غرفة / غرفتين / ثلاث / أربع فأكثر
 const ROOM_LABELS = ['غرفة', 'غرفتين', 'ثلاث غرف', 'أربع غرف فأكثر'];
@@ -83,6 +84,9 @@ export default function AdminPage() {
 
   // اللوحة مفتوحة إمّا بجلسة مدير موحّدة، أو ببوّابة كلمة المرور (الاحتياطية).
   const open = sessionAdmin || unlocked;
+
+  // القسم المعروض في الشريط الجانبي (الإحصائيات هي صفحة الهبوط بعد الدخول).
+  const [section, setSection] = useState<AdminSection>('stats');
 
   // الخروج من جلسة المدير الموحّدة ثم العودة للرئيسية.
   const exitSession = async () => {
@@ -340,25 +344,23 @@ export default function AdminPage() {
       style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}
     >
       <SiteNav active="admin" />
-      <div className="max-w-3xl mx-auto p-5 sm:p-8">
+      <div className="max-w-6xl mx-auto p-4 sm:p-6 flex flex-col md:flex-row gap-5 items-start">
+        <AdminSidebar
+          section={section}
+          setSection={setSection}
+          userEmail={sessionAdmin ? (user?.email ?? null) : null}
+          onExit={sessionAdmin ? exitSession : lock}
+          exitLabel={sessionAdmin ? 'تسجيل الخروج' : 'قفل اللوحة'}
+        />
+        <main className="flex-1 w-full min-w-0">
+
+        {/* ═══ 1) الأسعار والمتوسطات (كما هي تماماً) ═══ */}
+        {section === 'prices' && (
+        <div>
         {/* رأس الصفحة */}
         <div className="flex items-center justify-between mb-1">
-          <h1 className="text-2xl font-bold text-[#0A3D62] sec-underline">لوحة الأدمن — متوسطات الأحياء</h1>
-          <div className="flex items-center gap-3">
-            {sessionAdmin ? (
-              <>
-                <span className="text-xs text-gray-500 hidden sm:inline max-w-[160px] truncate" title={user?.email || ''}>{user?.email}</span>
-                <button onClick={exitSession} className="text-xs text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50">
-                  تسجيل الخروج
-                </button>
-              </>
-            ) : (
-              <button onClick={lock} className="text-xs text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50">
-                قفل اللوحة
-              </button>
-            )}
-            <a href="/" className="text-blue-600 text-sm font-medium hover:underline">→ الرئيسية</a>
-          </div>
+          <h1 className="text-2xl font-bold text-[#0A3D62] sec-underline">الأسعار والمتوسطات</h1>
+          <a href="/" className="text-blue-600 text-sm font-medium hover:underline">→ الرئيسية</a>
         </div>
         <p className="text-gray-500 text-sm mb-5">
           اضغط على أي حي لإظهار تفصيل الغرف. المتوسط المعتمد لكل نوع = متوسط الخانات المعبّأة فقط (الفارغة تُتجاهل)،
@@ -505,6 +507,14 @@ export default function AdminPage() {
             {saving ? 'جارٍ الحفظ…' : 'حفظ التغييرات'}
           </button>
         </div>
+        </div>
+        )}
+
+        {section === 'stats' && <StatsSection sessionAdmin={sessionAdmin} />}
+        {section === 'listings' && <ListingsSection sessionAdmin={sessionAdmin} />}
+        {section === 'offices' && <OfficesSection sessionAdmin={sessionAdmin} />}
+        {section === 'leads' && <LeadsSection sessionAdmin={sessionAdmin} />}
+        </main>
       </div>
     </div>
   );

@@ -55,11 +55,25 @@ export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) 
           setMktAvg(map);
         }
 
-        const { data: rows } = await sb
+        // العامة ترى المعتمد فقط (status='approved'). نحاول مع الفلتر؛ وإن لم يكن
+        // عمود status موجوداً بعد (قبل تشغيل admin_dashboard.sql) نرجع بلا الفلتر
+        // حتى لا تنكسر القائمة العامة.
+        const SEL =
+          'id, hood, title, type, advertised, rooms, area, baths, furnished, condition, cond_label, description, images, fal_license, lat, lng';
+        let res = await sb
           .from('listings')
-          .select('id, hood, title, type, advertised, rooms, area, baths, furnished, condition, cond_label, description, images, fal_license, lat, lng')
+          .select(SEL)
           .eq('active', true)
+          .eq('status', 'approved')
           .order('created_at', { ascending: false });
+        if (res.error) {
+          res = await sb
+            .from('listings')
+            .select(SEL)
+            .eq('active', true)
+            .order('created_at', { ascending: false });
+        }
+        const rows = res.data;
         if (!cancelled && rows && rows.length) {
           setListings(
             rows.map((r) => ({
