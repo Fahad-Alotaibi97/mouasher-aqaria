@@ -17,6 +17,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
+import { useAuth } from '@/lib/useAuth';
 import SiteNav from '../components/SiteNav';
 
 // خانات الغرف للشقة/الفيلا (4 خانات): غرفة / غرفتين / ثلاث / أربع فأكثر
@@ -69,10 +70,25 @@ const fmt = (n: number | null | undefined) =>
 const ADMIN_GATE = process.env.NEXT_PUBLIC_ADMIN_GATE || 'aqaria-admin-2026';
 
 export default function AdminPage() {
-  // ── بوّابة كلمة المرور (مستقلّة تماماً عن Supabase: لا جلسة/كوكيز/تحويل) ──
+  // ── الدخول الموحّد (المسار الأساسي): جلسة Supabase من الرئيسية + is_admin=true ──
+  //   useAuth يقرأ الجلسة عبر getSession() (كوكي محلّي) ولا يستدعي is_admin داخل
+  //   onAuthStateChange (تفادي قفل المصادقة)، ويستخدم عميلاً واحداً (singleton).
+  const { user, isAdmin, ready, signOut } = useAuth();
+  const sessionAdmin = !!user && isAdmin;
+
+  // ── بوّابة كلمة المرور (احتياطية فقط: تعمل بلا جلسة) ──
   const [unlocked, setUnlocked] = useState(false);
   const [gatePass, setGatePass] = useState('');
   const [gateErr, setGateErr] = useState(false);
+
+  // اللوحة مفتوحة إمّا بجلسة مدير موحّدة، أو ببوّابة كلمة المرور (الاحتياطية).
+  const open = sessionAdmin || unlocked;
+
+  // الخروج من جلسة المدير الموحّدة ثم العودة للرئيسية.
+  const exitSession = async () => {
+    await signOut();
+    if (typeof window !== 'undefined') window.location.href = '/';
+  };
 
   // استعادة حالة الفتح خلال جلسة التبويب (sessionStorage) — لا كوكيز ولا Supabase
   useEffect(() => {
@@ -106,9 +122,9 @@ export default function AdminPage() {
   // هل توجد أعمدة التفصيل (apt_detail/villa_detail) في القاعدة؟ (للحفظ المرن)
   const [hasDetailCols, setHasDetailCols] = useState(true);
 
-  // ── جلب الأحياء بعد فتح البوّابة ─────────────────────────────
+  // ── جلب الأحياء بعد فتح اللوحة (بجلسة موحّدة أو بكلمة المرور) ──
   useEffect(() => {
-    if (!unlocked) return;
+    if (!open) return;
     if (!isSupabaseConfigured()) {
       setLoading(false);
       return;
@@ -156,7 +172,7 @@ export default function AdminPage() {
     return () => {
       cancelled = true;
     };
-  }, [unlocked]);
+  }, [open]);
 
   // ── تحديث خانة غرفة (شقة/فيلا) ───────────────────────────────
   const setSlot = (name: string, kind: 'apt' | 'villa', idx: number, value: string) => {
@@ -262,18 +278,22 @@ export default function AdminPage() {
     </div>
   );
 
-  // ── البوّابة: غير مفتوحة ⇒ نموذج كلمة مرور (لا اعتماد على Supabase إطلاقاً) ──
-  if (!unlocked)
+  // أثناء التحقّق من الجلسة الموحّدة — لا نُظهر البوّابة فجأة لمدير مسجّل دخوله.
+  if (!open && isSupabaseConfigured() && !ready)
+    return wrap(<div className="text-center text-gray-600">جارٍ التحقّق من جلستك…</div>);
+
+  // ── غير مفتوحة ⇒ بوّابة كلمة المرور (احتياطية؛ المسار الأساسي هو الدخول الموحّد) ──
+  if (!open)
     return wrap(
       <div>
         <div className="flex items-center gap-2 mb-1">
           <div className="w-9 h-9 rounded-xl bg-[#0A3D62] text-white flex items-center justify-center font-bold">م</div>
           <div>
             <div className="font-bold text-gray-900 leading-none">لوحة الأدمن</div>
-            <div className="text-xs text-gray-500 mt-0.5">أدخل كلمة المرور للدخول</div>
+            <div className="text-xs text-gray-500 mt-0.5">سجّل دخولك من الرئيسية بحساب مدير، أو أدخل كلمة المرور</div>
           </div>
         </div>
-        <p className="text-xs text-gray-500 mt-3 mb-4">صفحة محمية بكلمة مرور — لا تحتاج تسجيل دخول.</p>
+        <p className="text-xs text-gray-500 mt-3 mb-4">إن دخلت من الرئيسية بحساب مدير (is_admin) تُفتح اللوحة تلقائياً. وإلا فهذه بوّابة احتياطية بكلمة مرور.</p>
         <label className="text-xs text-gray-700 font-semibold block mb-1">كلمة المرور</label>
         <input
           type="password"
@@ -325,9 +345,18 @@ export default function AdminPage() {
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-2xl font-bold text-[#0A3D62] sec-underline">لوحة الأدمن — متوسطات الأحياء</h1>
           <div className="flex items-center gap-3">
-            <button onClick={lock} className="text-xs text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50">
-              قفل اللوحة
-            </button>
+            {sessionAdmin ? (
+              <>
+                <span className="text-xs text-gray-500 hidden sm:inline max-w-[160px] truncate" title={user?.email || ''}>{user?.email}</span>
+                <button onClick={exitSession} className="text-xs text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50">
+                  تسجيل الخروج
+                </button>
+              </>
+            ) : (
+              <button onClick={lock} className="text-xs text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50">
+                قفل اللوحة
+              </button>
+            )}
             <a href="/" className="text-blue-600 text-sm font-medium hover:underline">→ الرئيسية</a>
           </div>
         </div>

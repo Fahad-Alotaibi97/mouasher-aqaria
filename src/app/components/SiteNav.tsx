@@ -48,7 +48,7 @@ const NAV_ITEMS: { id: string; label: string; icon: React.ReactNode }[] = [
   { id: 'home', label: 'الرئيسية', icon: I.home },
   { id: 'search', label: 'ابحث عن إيجارك', icon: I.search },
   { id: 'indicator', label: 'مؤشر السعر العادل', icon: I.chart },
-  { id: 'finance', label: 'التمويل العقاري', icon: I.bank },
+  { id: 'finance', label: 'خيارات تقسيط الإيجار', icon: I.bank },
 ];
 
 const NAV_ITEMS_SECONDARY: { id: string; label: string; icon: React.ReactNode }[] = [

@@ -52,6 +52,17 @@ const DEFAULT_LISTINGS: UIListing[] = [
 function getSt(adv: number, fair: number) { return adv / fair > 1.12 ? 'hi' : adv / fair < 0.85 ? 'lo' : 'ok'; }
 function rl(st: string) { return st === 'ok' ? 'مناسب' : st === 'hi' ? 'مرتفع' : 'فرصة'; }
 
+// ★ مصدر واحد لحساب السعر العادل من متوسط الحي (مأخوذ من جدول neighborhoods عبر /admin).
+//   يُستخدم في: شارات الحالة للإعلانات (getFair) + الحاسبة الذكية للمكاتب.
+//   يقرأ متوسط النوع المُدار من /admin إن توفّر (villa/studio)، وإلا يشتقّه بالمعامل.
+function fairForType(m: { avg: number; villa?: number; studio?: number } | undefined, type: string): number {
+  if (!m) return 0;
+  if (type === 'فيلا') return m.villa ?? Math.round(m.avg * 2.2);
+  if (type === 'استوديو') return m.studio ?? Math.round(m.avg * 0.55);
+  if (type === 'دور') return Math.round(m.avg * 1.4);
+  return m.avg; // شقة
+}
+
 // أحياء مركزية قريبة من الخدمات — تُستخدم في منطق المساعد الذكي المحلّي (heuristic).
 const NEAR_HOODS = new Set(['العليا', 'الملقا', 'حطين', 'الياسمين']);
 
@@ -125,15 +136,10 @@ export default function Home() {
     setAuthBusy(false);
   };
 
-  // حساب السعر العادل وحالته بناءً على المتوسطات الحالية
+  // حساب السعر العادل وحالته بناءً على متوسطات /admin الحالية (mktAvg)
   const getFair = (l: UIListing) => {
     const m = mktAvg[l.hood];
-    if (!m) return l.adv;
-    // نقرأ متوسط النوع المُدار من /admin إن توفّر، وإلا نشتقّه بالمعامل القديم.
-    if (l.type === 'فيلا') return m.villa ?? Math.round(m.avg * 2.2);
-    if (l.type === 'استوديو') return m.studio ?? Math.round(m.avg * 0.55);
-    if (l.type === 'دور') return Math.round(m.avg * 1.4);
-    return m.avg; // شقة
+    return m ? fairForType(m, l.type) : l.adv; // الرجوع للسعر المُعلن إن لم يوجد متوسط للحي
   };
   // نقاط الخريطة من أي قائمة (الإعلانات التي لها إحداثيات فقط)
   const toPoints = (list: UIListing[]) =>
@@ -518,9 +524,16 @@ export default function Home() {
         </div>
       )}
 
-      {/* ═══ التمويل العقاري — صفحة مستقلّة (تضم نموذج «اترك رسالة») ═══ */}
+      {/* ═══ خيارات تقسيط الإيجار — صفحة مستقلّة (تضم نموذج «اترك رسالة») ═══ */}
       {page === 'finance' && (
         <div>
+          <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-6 text-center text-white relative">
+            <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#F5F8FB] rounded-t-3xl" />
+            <div className="relative z-10">
+              <h1 className="text-xl font-bold mb-1">خيارات تقسيط الإيجار</h1>
+              <p className="text-white/85 text-sm">حلول تقسيط ميسّرة تناسب ميزانيتك</p>
+            </div>
+          </div>
           <div className="px-4 pt-5 pb-6 space-y-4 max-w-xl mx-auto">
             <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] rounded-2xl p-6 text-center shadow-xl">
               <div className="flex justify-center mb-3 text-white opacity-90">{Icons.bank}</div>
@@ -716,7 +729,7 @@ export default function Home() {
 
       {/* ═══ OFFICE DASHBOARD ═══ */}
       {page === 'office' && (
-        <OfficeDashboard />
+        <OfficeDashboard mktAvg={mktAvg} />
       )}
 
       {/* تفاصيل الإعلان */}
@@ -844,13 +857,14 @@ export default function Home() {
 }
 
 // ═══ لوحة تحكم المكتب الكاملة ═══
-function OfficeDashboard() {
+function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [offPage, setOffPage] = useState<'dashboard'|'listings'|'add'|'calc'|'inquiries'|'profile'|'settings'>('dashboard');
   const [addStep, setAddStep] = useState(1);
   const [falNum, setFalNum] = useState('');
   const [falStatus, setFalStatus] = useState<'idle'|'loading'|'success'|'error'>('idle');
-  const [cHood, setCHood] = useState('65000');
-  const [cType, setCType] = useState('1');
+  // الحاسبة الذكية: الحي والنوع بالاسم — يُقرأ متوسطهما من /admin (mktAvg) لا من أرقام ثابتة.
+  const [cHood, setCHood] = useState(() => Object.keys(mktAvg)[0] ?? 'النرجس');
+  const [cType, setCType] = useState('شقة');
   const [cArea, setCArea] = useState('130');
   const [cCost, setCCost] = useState('600000');
   const [cReno, setCReno] = useState('40000');
@@ -911,10 +925,10 @@ function OfficeDashboard() {
 
 
   const calcFair = () => {
-    const avg = parseInt(cHood);
-    const mul = parseFloat(cType);
-    const area = parseInt(cArea)||130;
-    return Math.round(avg * mul * (area/130));
+    // السعر العادل = متوسط /admin للحي والنوع (mktAvg) معدّلاً بالمساحة. لا أرقام ثابتة.
+    const base = fairForType(mktAvg[cHood], cType);
+    const area = parseInt(cArea) || 130;
+    return Math.round(base * (area / 130));
   };
   const calcMin = () => {
     const cost = parseInt(cCost)||0;
@@ -1140,12 +1154,12 @@ function OfficeDashboard() {
                   <div className="space-y-3">
                     <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحي</label>
                       <select value={cHood} onChange={e => setCHood(e.target.value)} className={selectCls}>
-                        <option value="65000">النرجس</option><option value="52000">العليا</option><option value="60000">الملقا</option><option value="58000">حطين</option><option value="54000">الياسمين</option>
+                        {Object.keys(mktAvg).map((h) => <option key={h} value={h}>{h}</option>)}
                       </select></div>
                     <div className="grid grid-cols-2 gap-3">
                       <div><label className="text-xs text-gray-700 font-semibold block mb-1">النوع</label>
                         <select value={cType} onChange={e => setCType(e.target.value)} className={selectCls}>
-                          <option value="1">شقة</option><option value="2.2">فيلا</option><option value="0.55">استوديو</option>
+                          <option value="شقة">شقة</option><option value="فيلا">فيلا</option><option value="استوديو">استوديو</option>
                         </select></div>
                       <div><label className="text-xs text-gray-700 font-semibold block mb-1">المساحة م²</label>
                         <input type="number" value={cArea} onChange={e => setCArea(e.target.value)} className={inputCls} /></div>
@@ -1226,11 +1240,11 @@ function OfficeDashboard() {
                 <div className="grid grid-cols-2 gap-3">
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحي</label>
                     <select value={cHood} onChange={e => setCHood(e.target.value)} className={selectCls}>
-                      <option value="65000">النرجس</option><option value="52000">العليا</option><option value="60000">الملقا</option><option value="58000">حطين</option><option value="54000">الياسمين</option>
+                      {Object.keys(mktAvg).map((h) => <option key={h} value={h}>{h}</option>)}
                     </select></div>
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">نوع العقار</label>
                     <select value={cType} onChange={e => setCType(e.target.value)} className={selectCls}>
-                      <option value="1">شقة</option><option value="2.2">فيلا</option><option value="0.55">استوديو</option>
+                      <option value="شقة">شقة</option><option value="فيلا">فيلا</option><option value="استوديو">استوديو</option>
                     </select></div>
                 </div>
                 <div><label className="text-xs text-gray-700 font-semibold block mb-1">المساحة م²</label>
