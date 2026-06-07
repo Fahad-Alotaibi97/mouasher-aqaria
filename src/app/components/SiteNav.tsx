@@ -42,13 +42,12 @@ const I = {
   shield: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z" /><path d="M9 12l2 2 4-4" /></svg>),
 };
 
-// روابط الدرج — كل القائمة القديمة منقولة هنا
+// روابط الدرج — كل بند يفتح صفحته الخاصّة
+// ملاحظة: البحث والخريطة دُمجا في صفحة واحدة «ابحث عن إيجارك».
 const NAV_ITEMS: { id: string; label: string; icon: React.ReactNode }[] = [
-  { id: 'search', label: 'الرئيسية', icon: I.home },
-  { id: 'search-focus', label: 'البحث عن إيجار', icon: I.search },
+  { id: 'home', label: 'الرئيسية', icon: I.home },
+  { id: 'search', label: 'ابحث عن إيجارك', icon: I.search },
   { id: 'indicator', label: 'مؤشر السعر العادل', icon: I.chart },
-  { id: 'map', label: 'الخريطة', icon: I.map },
-  { id: 'alerts', label: 'أحدث الإعلانات', icon: I.bell },
   { id: 'finance', label: 'التمويل العقاري', icon: I.bank },
 ];
 
@@ -99,7 +98,7 @@ export default function SiteNav({ active, onNavigate, user, isAdmin, onSignOut }
         </button>
 
         {/* الشعار + اسم العلامة (يسار) */}
-        <button onClick={() => go('search')} className="flex items-center gap-2.5">
+        <button onClick={() => go('home')} className="flex items-center gap-2.5">
           <span className="w-10 h-10 rounded-xl bg-white/15 border border-white/25 flex items-center justify-center flex-shrink-0">
             {I.logo}
           </span>

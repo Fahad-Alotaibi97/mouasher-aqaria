@@ -63,7 +63,7 @@ const HousePlaceholder = (
 );
 
 export default function Home() {
-  const [page, setPage] = useState<'search' | 'map' | 'alerts' | 'pricing' | 'office' | 'privacy' | 'terms' | 'about'>('search');
+  const [page, setPage] = useState<'home' | 'search' | 'indicator' | 'finance' | 'pricing' | 'office' | 'privacy' | 'terms' | 'about'>('home');
   // المساعد الذكي — منطق محلّي بالكلمات المفتاحية (بدون أي استدعاء API)
   const [aiQuery, setAiQuery] = useState('');
   const [aiReply, setAiReply] = useState<string | null>(null);
@@ -80,7 +80,6 @@ export default function Home() {
   const [filterHood, setFilterHood] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterBudget, setFilterBudget] = useState('');
-  const [prefs, setPrefs] = useState<{ hood: string; type: string; maxBudget: number | null } | null>(null);
   const [searched, setSearched] = useState(false);
 
   // البيانات الحقيقية من قاعدة البيانات (مع رجوع آمن للافتراضية)
@@ -136,15 +135,14 @@ export default function Home() {
     if (l.type === 'دور') return Math.round(m.avg * 1.4);
     return m.avg; // شقة
   };
-  const isOpp = (l: UIListing) => getSt(l.adv, getFair(l)) === 'lo';
-
-  // نقاط الخريطة (الإعلانات التي لها إحداثيات فقط)
-  const mapPoints = listings
-    .filter((l) => typeof l.lat === 'number' && typeof l.lng === 'number')
-    .map((l) => {
-      const fair = getFair(l);
-      return { id: l.id, lat: l.lat as number, lng: l.lng as number, title: l.title, adv: l.adv, fair, st: getSt(l.adv, fair) };
-    });
+  // نقاط الخريطة من أي قائمة (الإعلانات التي لها إحداثيات فقط)
+  const toPoints = (list: UIListing[]) =>
+    list
+      .filter((l) => typeof l.lat === 'number' && typeof l.lng === 'number')
+      .map((l) => {
+        const fair = getFair(l);
+        return { id: l.id, lat: l.lat as number, lng: l.lng as number, title: l.title, adv: l.adv, fair, st: getSt(l.adv, fair) };
+      });
 
   const submitLead = async () => {
     if (!leadName.trim() || !leadPhone.trim() || leadSending) return;
@@ -162,12 +160,7 @@ export default function Home() {
     setLeadSending(false);
   };
 
-  const doSearch = () => {
-    setSearched(true);
-    if (typeof document !== 'undefined') {
-      setTimeout(() => document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
-    }
-  };
+  const clearFilters = () => { setFilterHood(''); setFilterType(''); setFilterBudget(''); };
 
   const checkPrice = () => {
     // المتوسط يُقرأ من القاعدة (mktAvg) — يعكس تعديلات لوحة الأدمن فوراً.
@@ -183,6 +176,7 @@ export default function Home() {
 
   const indicator = checkPrice();
 
+  // مصدر الحقيقة الوحيد: قائمة مصفّاة بالمعايير، تُغذّي الخريطة والقائمة معاً.
   const filtered = listings.filter(l => {
     if (filterHood && l.hood !== filterHood) return false;
     if (filterType && l.type !== filterType) return false;
@@ -190,16 +184,11 @@ export default function Home() {
     return true;
   });
 
-  const opportunities = listings.filter(isOpp);
+  // نقاط الخريطة مشتقّة من نفس القائمة المصفّاة ⇒ تتحدّث العلامات فور تغيّر أي فلتر.
+  const filteredMapPoints = toPoints(filtered);
 
-  // ── التنقّل الموحّد (يُمرَّر للدرج الجانبي) ──────────────────
+  // ── التنقّل الموحّد (يُمرَّر للدرج الجانبي) — كل بند صفحة مستقلّة ──
   const go = (id: string) => {
-    if (id === 'indicator' || id === 'finance' || id === 'search-focus') {
-      setPage('search');
-      const target = id === 'indicator' ? 'si-section' : id === 'finance' ? 'finance-section' : 'search-section';
-      setTimeout(() => document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
-      return;
-    }
     setPage(id as typeof page);
     if (typeof window !== 'undefined') window.scrollTo(0, 0);
   };
@@ -313,8 +302,8 @@ export default function Home() {
       {/* الشريط العلوي + الدرج الجانبي (مكوّن مشترك على كل الصفحات) */}
       <SiteNav active={page} onNavigate={go} user={user} isAdmin={isAdmin} onSignOut={signOut} />
 
-      {/* ═══ SEARCH ═══ */}
-      {page === 'search' && (
+      {/* ═══ HOME — المساعد الذكي + الإعلانات فقط ═══ */}
+      {page === 'home' && (
         <div>
           <div className="bg-gradient-to-br from-[#0A3D62] via-[#1B6CA8] to-[#378ADD] px-5 pt-6 pb-0 relative overflow-hidden">
             <div className="relative z-10 text-center pb-2">
@@ -332,21 +321,7 @@ export default function Home() {
 
           <div className="px-4 pt-3 pb-6 space-y-4">
 
-            {/* welcome back */}
-            {prefs && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-3">
-                <div className="text-blue-600">{Icons.building}</div>
-                <div className="flex-1 text-sm text-blue-800">
-                  <strong>أهلاً بعودتك!</strong> آخر عمليات بحثك:
-                  {prefs.hood && <span> {prefs.hood}</span>}
-                  {prefs.type && <span> · {prefs.type}</span>}
-                  {prefs.maxBudget && <span> · {prefs.maxBudget.toLocaleString('ar-SA')} ريال</span>}
-                </div>
-                <button onClick={() => { setPrefs(null); setSearched(false); }} className="text-gray-500 text-xs border border-gray-300 px-2 py-1 rounded-lg">مسح</button>
-              </div>
-            )}
-
-            {/* 1. المساعد الذكي — فوق الإعلانات (منطق محلّي بدون API) */}
+            {/* المساعد الذكي — فوق الإعلانات (منطق محلّي بدون API) */}
             <div className="bg-gradient-to-b from-white to-[#f7fafd] border-[1.5px] border-[#c2d2e2] rounded-2xl p-5 shadow-[0_8px_28px_rgba(10,61,98,0.13)]">
               <div className="flex items-center gap-3 mb-3.5">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] flex items-center justify-center text-white flex-shrink-0">{Icons.ai}</div>
@@ -398,15 +373,30 @@ export default function Home() {
               )}
             </div>
 
-            {/* 3. البحث المتقدّم بالمعايير */}
-            <div id="search-section" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          </div>
+        </div>
+      )}
+
+      {/* ═══ ابحث عن إيجارك — البحث + الخريطة (صفحة واحدة مدمجة) ═══ */}
+      {page === 'search' && (
+        <div>
+          <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-6 text-center text-white relative">
+            <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#F5F8FB] rounded-t-3xl" />
+            <div className="relative z-10">
+              <h1 className="text-xl font-bold mb-1">ابحث عن إيجارك</h1>
+              <p className="text-white/85 text-sm">حدّد المعايير وشاهد العقارات على الخريطة مباشرة</p>
+            </div>
+          </div>
+          <div className="px-4 pt-3 pb-6 space-y-4">
+            {/* الفلاتر — مصدر الحقيقة الذي يغذّي الخريطة والقائمة معاً */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-700">
                   {Icons.search}
                 </div>
                 <div>
-                  <div className="font-bold text-sm text-gray-900">ابحث عن إيجارك المناسب</div>
-                  <div className="text-xs text-gray-500">حدّد المعايير لتظهر لك العقارات المتاحة</div>
+                  <div className="font-bold text-sm text-gray-900">صفِّ النتائج</div>
+                  <div className="text-xs text-gray-500">تتحدّث الخريطة والقائمة فور تغيير أي فلتر</div>
                 </div>
               </div>
               <div className="p-4 grid grid-cols-3 gap-3">
@@ -430,17 +420,56 @@ export default function Home() {
                     placeholder="مثال: 70000" className={inputCls} />
                 </div>
               </div>
-              <div className="px-4 pb-4">
-                <button onClick={doSearch}
-                  className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-md hover:opacity-95 transition-all">
-                  {Icons.search}
-                  <span>بحث</span>
-                </button>
+              <div className="px-4 pb-4 flex items-center justify-between">
+                <div className="text-xs text-[#33414f]">{filtered.length} نتيجة · {filteredMapPoints.length} على الخريطة</div>
+                {(filterHood || filterType || filterBudget) && (
+                  <button onClick={clearFilters} className="text-xs text-[#0A3D62] border border-[#cfd9e4] px-3 py-1.5 rounded-lg hover:bg-[#f0f4f8] transition-colors">مسح الفلاتر</button>
+                )}
               </div>
             </div>
 
-            {/* 4. المؤشر — جرّب المؤشر (منطق السعر العادل كما هو) */}
-            <div id="si-section" className="bg-white rounded-2xl border border-orange-200 shadow-sm overflow-hidden">
+            {/* الخريطة — نقاطها مشتقّة من نفس القائمة المصفّاة (تتحدّث العلامات حيّاً) */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+                <span className="text-[#1B6CA8]">{Icons.map}</span>
+                <span className="font-bold text-sm text-gray-900">الخريطة التفاعلية</span>
+                <span className="text-xs text-[#33414f] mr-auto">{filteredMapPoints.length} عقار على الخريطة</span>
+              </div>
+              {filteredMapPoints.length === 0 ? (
+                <div className="p-8 text-center text-[#33414f] text-sm">لا توجد عقارات بإحداثيات مطابقة للفلاتر الحالية.</div>
+              ) : (
+                <MapComponent points={filteredMapPoints} />
+              )}
+            </div>
+
+            {/* القائمة المطابقة — نفس مصدر الفلاتر */}
+            <div>
+              <div className="flex justify-between items-center mb-3 px-1">
+                <h2 className="font-bold text-[#0f1a28] text-lg sec-underline">العقارات المطابقة</h2>
+                <div className="text-xs text-[#33414f] flex items-center gap-1">{Icons.chart} {filtered.length} نتيجة</div>
+              </div>
+              {filtered.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 text-center text-[#33414f] text-sm">لا توجد نتائج — جرّب توسيع المعايير.</div>
+              ) : (
+                <div className="space-y-3">{filtered.map((l) => renderListing(l))}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ مؤشر السعر العادل — صفحة مستقلّة ═══ */}
+      {page === 'indicator' && (
+        <div>
+          <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-6 text-center text-white relative">
+            <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#F5F8FB] rounded-t-3xl" />
+            <div className="relative z-10">
+              <h1 className="text-xl font-bold mb-1">مؤشر السعر العادل</h1>
+              <p className="text-white/85 text-sm">قارن أي إيجار بمتوسط سوق الحي قبل التوقيع</p>
+            </div>
+          </div>
+          <div className="px-4 pt-4 pb-6 max-w-xl mx-auto">
+            <div className="bg-white rounded-2xl border border-orange-200 shadow-sm overflow-hidden">
               <div className="bg-gradient-to-l from-orange-50 to-white px-4 py-3 border-b border-orange-100 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
                   {Icons.chart}
@@ -485,8 +514,15 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 5. التمويل */}
-            <div id="finance-section" className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] rounded-2xl p-6 text-center shadow-xl">
+          </div>
+        </div>
+      )}
+
+      {/* ═══ التمويل العقاري — صفحة مستقلّة (تضم نموذج «اترك رسالة») ═══ */}
+      {page === 'finance' && (
+        <div>
+          <div className="px-4 pt-5 pb-6 space-y-4 max-w-xl mx-auto">
+            <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] rounded-2xl p-6 text-center shadow-xl">
               <div className="flex justify-center mb-3 text-white opacity-90">{Icons.bank}</div>
               <div className="text-white font-bold text-lg mb-2">تحتاج تمويلاً عقارياً؟</div>
               <div className="text-white/85 text-sm mb-4 leading-relaxed max-w-sm mx-auto">نربطك مباشرة بشركائنا من الجهات التمويلية المعتمدة لتحصل على أفضل عرض يناسبك</div>
@@ -527,73 +563,9 @@ export default function Home() {
         </div>
       )}
 
-      {/* ═══ MAP ═══ */}
-      {page === 'map' && (
-        <div>
-          <div className="bg-white px-4 py-3 flex gap-2 flex-wrap border-b border-gray-200 items-center">
-            <div className="text-blue-700 ml-1">{Icons.map}</div>
-            <span className="font-bold text-gray-900 ml-2">خريطة الإيجارات</span>
-            {['الكل', 'شقق', 'فلل', 'استوديو'].map(f => (
-              <button key={f} className="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-2xl text-sm text-blue-700 font-medium hover:bg-blue-100 transition-all">{f}</button>
-            ))}
-          </div>
-          {/* الخريطة التفاعلية */}
-          <MapComponent points={mapPoints} />
-          <div className="p-4 space-y-3">
-            <div className="font-bold text-gray-900 mb-2 sec-underline">كل الإعلانات ({listings.length})</div>
-            <div className="space-y-3">{listings.map((l) => renderListing(l))}</div>
-          </div>
-        </div>
-      )}
+      {/* (دُمجت الخريطة داخل صفحة «ابحث عن إيجارك») */}
 
-      {/* ═══ ALERTS ═══ */}
-      {page === 'alerts' && (
-        <div className="p-4">
-          <div className="bg-gradient-to-l from-green-600 to-green-700 rounded-2xl p-5 text-white mb-4 flex items-center gap-4 shadow-lg">
-            <div className="text-white">{Icons.news}</div>
-            <div>
-              <h2 className="font-bold text-lg mb-1">أحدث الإعلانات</h2>
-              <p className="text-sm opacity-90">أحدث ما طُرح في السوق العقاري — مرتّبة حسب الأقرب زمنياً</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 mb-5">
-            <div className="bg-white rounded-xl border border-gray-200 p-4 text-center shadow-sm">
-              <div className="text-2xl font-bold text-green-700">2</div>
-              <div className="text-xs text-gray-600 mt-1 font-medium">تنبيهات مفعّلة</div>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-200 p-4 text-center shadow-sm">
-              <div className="text-2xl font-bold text-green-700">{opportunities.length}</div>
-              <div className="text-xs text-gray-600 mt-1 font-medium">إعلانات جديدة اليوم</div>
-            </div>
-          </div>
-          <div className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-            <div className="text-green-600">{Icons.bell}</div>
-            الإعلانات الجديدة
-          </div>
-          <div className="space-y-3">
-            {opportunities.map((l, i) => {
-              const fair = getFair(l); const sav = fair - l.adv;
-              return (
-                <div key={l.id} className={`bg-white rounded-xl border-r-4 border border-green-400 p-4 cursor-pointer hover:shadow-md transition-all ${i < 2 ? 'bg-green-50/50' : ''}`}>
-                  <div className="flex justify-between items-start mb-2 gap-2">
-                    <div>
-                      <div className="font-bold text-sm text-gray-900">{l.title}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">منذ {i * 3 + 5} دقائق · {l.hood}</div>
-                    </div>
-                    <span className="bg-green-100 text-green-800 text-xs px-2.5 py-1 rounded-xl font-bold border border-green-200 whitespace-nowrap">
-                      وفّر {sav.toLocaleString('ar-SA')}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-600">
-                    السعر المُعلن <strong className="text-gray-900">{l.adv.toLocaleString('ar-SA')} ريال</strong> · السعر العادل <strong className="text-gray-900">{fair.toLocaleString('ar-SA')} ريال</strong> · {l.condLabel}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
+      {/* ═══ ALERTS (مُزالة) ═══ */}
       {/* ═══ PRICING / REGISTRATION ═══ */}
       {page === 'pricing' && (
         <div>
