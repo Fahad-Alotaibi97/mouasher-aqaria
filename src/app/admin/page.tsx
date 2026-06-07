@@ -17,6 +17,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
+import SiteNav from '../components/SiteNav';
 
 // خانات الغرف للشقة/الفيلا (4 خانات): غرفة / غرفتين / ثلاث / أربع فأكثر
 const ROOM_LABELS = ['غرفة', 'غرفتين', 'ثلاث غرف', 'أربع غرف فأكثر'];
@@ -250,11 +251,14 @@ export default function AdminPage() {
 
   const wrap = (children: React.ReactNode) => (
     <div
-      className="min-h-screen bg-[#F5F8FB] flex items-center justify-center p-6"
+      className="min-h-screen bg-[#EAF0F6]"
       dir="rtl"
       style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}
     >
-      <div className="bg-white rounded-2xl border border-gray-200 p-8 max-w-md w-full shadow-sm">{children}</div>
+      <SiteNav active="admin" />
+      <div className="flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 max-w-md w-full shadow-sm">{children}</div>
+      </div>
     </div>
   );
 
@@ -311,14 +315,15 @@ export default function AdminPage() {
   // ── لوحة التحرير (accordion) ─────────────────────────────────
   return (
     <div
-      className="min-h-screen bg-[#F5F8FB] p-5 sm:p-8"
+      className="min-h-screen bg-[#EAF0F6]"
       dir="rtl"
       style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}
     >
-      <div className="max-w-3xl mx-auto">
+      <SiteNav active="admin" />
+      <div className="max-w-3xl mx-auto p-5 sm:p-8">
         {/* رأس الصفحة */}
         <div className="flex items-center justify-between mb-1">
-          <h1 className="text-2xl font-bold text-[#0A3D62]">لوحة الأدمن — متوسطات الأحياء</h1>
+          <h1 className="text-2xl font-bold text-[#0A3D62] sec-underline">لوحة الأدمن — متوسطات الأحياء</h1>
           <div className="flex items-center gap-3">
             <button onClick={lock} className="text-xs text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50">
               قفل اللوحة

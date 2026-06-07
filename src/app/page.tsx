@@ -6,6 +6,8 @@ import { isSupabaseConfigured } from '@/lib/supabase/config';
 import dynamic from 'next/dynamic';
 import { useAppData, type UIListing, type MktAvg } from '@/lib/useAppData';
 import { useAuth } from '@/lib/useAuth';
+import { useEffect } from 'react';
+import SiteNav from './components/SiteNav';
 const MapComponent = dynamic(() => import('./components/Map'), { ssr: false });
 
 // SVG Icons — بدل الإيموجي
@@ -50,8 +52,23 @@ const DEFAULT_LISTINGS: UIListing[] = [
 function getSt(adv: number, fair: number) { return adv / fair > 1.12 ? 'hi' : adv / fair < 0.85 ? 'lo' : 'ok'; }
 function rl(st: string) { return st === 'ok' ? 'مناسب' : st === 'hi' ? 'مرتفع' : 'فرصة'; }
 
+// أحياء مركزية قريبة من الخدمات — تُستخدم في منطق المساعد الذكي المحلّي (heuristic).
+const NEAR_HOODS = new Set(['العليا', 'الملقا', 'حطين', 'الياسمين']);
+
+// أيقونة منزل بديلة عند غياب صورة الإعلان
+const HousePlaceholder = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-9 h-9">
+    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><path d="M9 22V12h6v10" />
+  </svg>
+);
+
 export default function Home() {
-  const [page, setPage] = useState<'search' | 'map' | 'alerts' | 'pricing' | 'office' | 'privacy' | 'terms'>('search');
+  const [page, setPage] = useState<'search' | 'map' | 'alerts' | 'pricing' | 'office' | 'privacy' | 'terms' | 'about'>('search');
+  // المساعد الذكي — منطق محلّي بالكلمات المفتاحية (بدون أي استدعاء API)
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiReply, setAiReply] = useState<string | null>(null);
+  const [aiMatchIds, setAiMatchIds] = useState<(string | number)[]>([]);
+  const [aiOrder, setAiOrder] = useState<(string | number)[] | null>(null);
   const [leadName, setLeadName] = useState('');
   const [leadPhone, setLeadPhone] = useState('');
   const [leadMsg, setLeadMsg] = useState('');
@@ -145,7 +162,12 @@ export default function Home() {
     setLeadSending(false);
   };
 
-  const doSearch = () => { setSearched(true); };
+  const doSearch = () => {
+    setSearched(true);
+    if (typeof document !== 'undefined') {
+      setTimeout(() => document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    }
+  };
 
   const checkPrice = () => {
     // المتوسط يُقرأ من القاعدة (mktAvg) — يعكس تعديلات لوحة الأدمن فوراً.
@@ -170,6 +192,64 @@ export default function Home() {
 
   const opportunities = listings.filter(isOpp);
 
+  // ── التنقّل الموحّد (يُمرَّر للدرج الجانبي) ──────────────────
+  const go = (id: string) => {
+    if (id === 'indicator' || id === 'finance' || id === 'search-focus') {
+      setPage('search');
+      const target = id === 'indicator' ? 'si-section' : id === 'finance' ? 'finance-section' : 'search-section';
+      setTimeout(() => document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+      return;
+    }
+    setPage(id as typeof page);
+    if (typeof window !== 'undefined') window.scrollTo(0, 0);
+  };
+
+  // قراءة الـ hash عند التحميل (للقدوم من صفحات أخرى مثل /admin عبر '/#map')
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const h = window.location.hash.replace('#', '');
+    if (h) go(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── المساعد الذكي: ترتيب/تصفية محلّية بالكلمات المفتاحية (بدون API) ──
+  // TODO: لربط ذكاء اصطناعي حقيقي لاحقاً، استبدل منطق النقاط أدناه باستدعاء
+  //       واجهة (مثل Anthropic) يُرجع ترتيب المعرّفات؛ تبقى الواجهة كما هي.
+  const runAI = (raw?: string) => {
+    const q = (raw ?? aiQuery).trim();
+    if (raw !== undefined) setAiQuery(raw);
+    if (!q) return;
+    const scored = listings.map((l) => {
+      let score = 0;
+      const fair = getFair(l);
+      if (q.includes(l.hood)) score += 10;                                   // الحي
+      if (q.includes(l.type)) score += 8;                                    // النوع
+      if (/(رخيص|أرخص|ارخص|أقل سعر|اقل سعر|رخيصة|ميزانية|بسيط)/.test(q)) score += (200000 - l.adv) / 20000; // الرخص
+      if (/(فرص|فرصة|أقل من السوق|اقل من السوق|عادل|تحت السوق)/.test(q) && l.adv < fair) score += 6;          // الفرص
+      if (/(قريب|قريبة|خدمات|وسط|مركز)/.test(q) && NEAR_HOODS.has(l.hood)) score += 4;                        // قريبة من الخدمات
+      return { id: l.id, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const matches = scored.filter((s) => s.score > 0).slice(0, 2).map((s) => s.id);
+    setAiOrder(scored.map((s) => s.id));
+    setAiMatchIds(matches);
+    if (matches.length) {
+      const best = listings.find((l) => l.id === matches[0]);
+      setAiReply(best
+        ? `رتّبت لك الإعلانات حسب طلبك. الأنسب: ${best.title} في ${best.hood} — ${best.adv.toLocaleString('ar-SA')} ريال. الإعلانات المميّزة بعلامة ذهبية «الأنسب لطلبك».`
+        : null);
+    } else {
+      setAiReply('ما لقيت تطابقاً دقيقاً لطلبك، لكن هذي كل الإعلانات المتاحة. جرّب تذكر الحي أو النوع أو ميزانيتك.');
+    }
+    setSearched(true);
+    setTimeout(() => document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  };
+
+  // القائمة المعروضة = نتائج التصفية مرتّبة وفق المساعد الذكي (إن استُخدم)
+  const displayList = aiOrder
+    ? [...filtered].sort((a, b) => aiOrder.indexOf(a.id) - aiOrder.indexOf(b.id))
+    : filtered;
+
   const condColor: Record<string, string> = {
     new: 'bg-green-100 text-green-800 border border-green-200',
     good: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
@@ -181,24 +261,44 @@ export default function Home() {
     lo: 'bg-green-100 text-green-800 border border-green-200',
   };
 
-  const renderListing = (l: UIListing) => {
+  // بطاقة إعلان أفقية: عمود صورة (يمين) + شارة الحالة فوق الصورة + معلومات (يسار)
+  const renderListing = (l: UIListing, isMatch = false) => {
     const fair = getFair(l);
     const st = getSt(l.adv, fair);
+    const img = l.images && l.images.length ? l.images[0] : null;
+    const vBadge = st === 'hi' ? 'bg-[#fff3e0] text-[#C2410C]' : st === 'lo' ? 'bg-[#e8f7ee] text-[#1f7a44]' : 'bg-[#e6f1fb] text-[#1B6CA8]';
     return (
       <div key={l.id} onClick={() => setSelectedListing(l)}
-        className={`bg-white rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all ${isOpp(l) ? 'border-green-400' : 'border-gray-200'}`}>
-        <div className="flex justify-between items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="text-lg font-bold text-gray-900">{l.adv.toLocaleString('ar-SA')} <span className="text-xs font-medium text-gray-500">ريال/سنة</span></div>
-            <div className="text-xs text-blue-700 mt-0.5 font-medium">السعر العادل: {fair.toLocaleString('ar-SA')} ريال</div>
-            <div className="text-sm text-gray-700 mt-1 font-semibold">{l.type} · {l.hood}</div>
+        className={`card-fade bg-white rounded-2xl border overflow-hidden cursor-pointer transition-all shadow-sm hover:shadow-lg hover:-translate-y-0.5 ${isMatch ? 'border-[#C9A84C] ring-1 ring-[#C9A84C]/40' : 'border-[#cfd9e4] hover:border-[#1B6CA8]'}`}>
+        <div className="flex">
+          {/* عمود الصورة (يمين) */}
+          <div className="relative w-[140px] sm:w-[150px] flex-shrink-0 bg-gradient-to-br from-[#E6F1FB] to-[#d7e6f4] flex items-center justify-center text-[#1B6CA8]">
+            {img ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={img} alt={l.title} className="w-full h-full object-cover" />
+            ) : (
+              HousePlaceholder
+            )}
+            <span className={`absolute bottom-2 right-2 text-[11px] px-2.5 py-1 rounded-lg font-bold shadow-sm ${vBadge}`}>{rl(st)}</span>
+            {isMatch && (
+              <span className="absolute top-0 right-0 bg-[#C9A84C] text-[#0A3D62] text-[10px] font-bold px-2.5 py-1 rounded-bl-xl shadow">الأنسب لطلبك</span>
+            )}
           </div>
-          <span className={`text-xs px-2.5 py-1 rounded-xl font-bold whitespace-nowrap ${stBadge[st]}`}>{rl(st)}</span>
-        </div>
-        <div className="flex items-center gap-5 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600">
-          <span>الغرف <b className="text-gray-900">{l.rooms ?? '—'}</b></span>
-          <span>المساحة <b className="text-gray-900">{l.area ?? '—'}</b> م²</span>
-          <span>الحمامات <b className="text-gray-900">{l.baths ?? '—'}</b></span>
+          {/* المعلومات (يسار) */}
+          <div className="flex-1 min-w-0 p-3.5">
+            <div className="font-bold text-[15px] text-[#0f1a28] truncate">{l.title}</div>
+            <div className="text-xs text-[#33414f] mt-0.5 font-medium">{l.type} · {l.hood}</div>
+            <div className="mt-2 leading-none">
+              <span className="text-[19px] font-extrabold text-[#0A3D62]">{l.adv.toLocaleString('ar-SA')}</span>
+              <span className="text-[11px] text-[#33414f] mr-1">ريال/سنة</span>
+            </div>
+            <div className="text-[11px] text-[#1B6CA8] font-medium mt-1">السعر العادل: {fair.toLocaleString('ar-SA')} ريال</div>
+            <div className="flex items-center gap-4 mt-2.5 pt-2.5 border-t border-[#f0f4f8] text-[11px] text-[#33414f]">
+              <span><b className="text-[#0f1a28]">{l.rooms ?? '—'}</b> غرف</span>
+              <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> م²</span>
+              <span><b className="text-[#0f1a28]">{l.baths ?? '—'}</b> حمام</span>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -210,47 +310,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#F5F8FB]" dir="rtl" style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}>
 
-      {/* NAV */}
-      <nav className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] px-5 py-3 flex items-center justify-between sticky top-0 z-50 shadow-lg">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setPage('search')}>
-          <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white border border-white/30">
-            {Icons.building}
-          </div>
-          <div>
-            <div className="text-white font-bold text-base leading-none">مؤشر</div>
-            <div className="text-white/70 text-[9px] tracking-wider">العقارية</div>
-          </div>
-        </div>
-        <div className="flex gap-1 bg-white/10 rounded-xl p-1">
-          {[
-            { id: 'search', label: 'البحث' },
-            { id: 'map', label: 'الخريطة' },
-            { id: 'alerts', label: 'أحدث الإعلانات' },
-          ].map(n => (
-            <button key={n.id} onClick={() => setPage(n.id as typeof page)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${page === n.id ? 'bg-white text-[#0A3D62] font-bold' : 'text-white/80 hover:text-white hover:bg-white/10'}`}>
-              {n.label}
-            </button>
-          ))}
-        </div>
-        {user ? (
-          <div className="flex items-center gap-2">
-            {isAdmin && (
-              <a href="/admin" className="bg-amber-400 text-[#0A3D62] px-3 py-2 rounded-lg text-sm font-bold shadow hover:bg-amber-300">
-                لوحة الإدارة
-              </a>
-            )}
-            <span className="text-white/90 text-xs hidden sm:inline max-w-[140px] truncate" title={user.email || ''}>{user.email}</span>
-            <button onClick={signOut} className="bg-white/15 text-white px-3 py-2 rounded-lg text-sm font-bold border border-white/30 hover:bg-white/25">
-              خروج
-            </button>
-          </div>
-        ) : (
-          <button onClick={() => setPage('pricing')} className="bg-white text-[#0A3D62] px-4 py-2 rounded-lg text-sm font-bold shadow">
-            التسجيل
-          </button>
-        )}
-      </nav>
+      {/* الشريط العلوي + الدرج الجانبي (مكوّن مشترك على كل الصفحات) */}
+      <SiteNav active={page} onNavigate={go} user={user} isAdmin={isAdmin} onSignOut={signOut} />
 
       {/* ═══ SEARCH ═══ */}
       {page === 'search' && (
@@ -285,8 +346,60 @@ export default function Home() {
               </div>
             )}
 
-                        {/* 2. البحث */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* 1. المساعد الذكي — فوق الإعلانات (منطق محلّي بدون API) */}
+            <div className="bg-gradient-to-b from-white to-[#f7fafd] border-[1.5px] border-[#c2d2e2] rounded-2xl p-5 shadow-[0_8px_28px_rgba(10,61,98,0.13)]">
+              <div className="flex items-center gap-3 mb-3.5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] flex items-center justify-center text-white flex-shrink-0">{Icons.ai}</div>
+                <div>
+                  <div className="font-bold text-[15px] text-[#0A3D62]">المساعد الذكي</div>
+                  <div className="text-xs text-[#33414f]">اكتب رغبتك وسأرتّب لك الإعلانات الأنسب</div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && runAI()}
+                  placeholder="مثال: أبي شقة بالنرجس بسعر عادل وقريبة من الخدمات"
+                  className="flex-1 px-3.5 py-3 border-[1.5px] border-[#dde5ee] rounded-xl bg-[#fafcfe] text-sm text-[#0f1a28] text-right outline-none focus:border-[#1B6CA8] focus:bg-white focus:ring-2 focus:ring-[#1B6CA8]/10 placeholder-[#9aa7b4]"
+                />
+                <button onClick={() => runAI()} className="px-5 rounded-xl bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] text-white font-bold text-sm whitespace-nowrap hover:opacity-95 transition-all">
+                  ابحث
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {['أرخص شقة متاحة', 'فيلا في حطين', 'فرص بأقل من السوق', 'استوديو رخيص', 'قريب من الخدمات'].map((c) => (
+                  <button key={c} onClick={() => runAI(c)}
+                    className="px-3 py-1.5 rounded-full bg-[#E6F1FB] text-[#1B6CA8] text-xs border border-transparent hover:border-[#1B6CA8] transition-all">
+                    {c}
+                  </button>
+                ))}
+              </div>
+              {aiReply && (
+                <div className="mt-3.5 flex items-start gap-2 px-3.5 py-3 rounded-xl bg-[#E6F1FB] text-[#0A3D62] text-[13px] leading-relaxed">
+                  <span className="flex-shrink-0 mt-0.5 text-[#1B6CA8]">{Icons.check}</span>
+                  <span>{aiReply}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 2. الإعلانات — تُعرض دائماً، يرتّبها المساعد الذكي ويصفّيها البحث */}
+            <div id="listings-section">
+              <div className="flex justify-between items-center mb-3 px-1">
+                <h2 className="font-bold text-[#0f1a28] text-lg sec-underline">{searched ? 'نتائج بحثك' : 'الإعلانات'}</h2>
+                <div className="text-xs text-[#33414f] flex items-center gap-1">{Icons.chart} {displayList.length} إعلان · بيانات حقيقية</div>
+              </div>
+              {displayList.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 text-center text-[#33414f] text-sm">لا توجد نتائج — جرّب تغيير المعايير من البحث بالأعلى.</div>
+              ) : (
+                <div className="space-y-3">
+                  {displayList.map((l) => renderListing(l, aiMatchIds.includes(l.id)))}
+                </div>
+              )}
+            </div>
+
+            {/* 3. البحث المتقدّم بالمعايير */}
+            <div id="search-section" className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-700">
                   {Icons.search}
@@ -326,25 +439,8 @@ export default function Home() {
               </div>
             </div>
 
-            {/* نتائج البحث */}
-            {searched && (
-              <div>
-                <div className="flex justify-between items-center mb-3 px-1">
-                  <div className="font-bold text-gray-900">{filtered.length} نتيجة{filterHood ? ` في ${filterHood}` : ''}</div>
-                  <div className="text-xs text-gray-500 flex items-center gap-1">{Icons.chart} بيانات حقيقية</div>
-                </div>
-                {filtered.length === 0 ? (
-                  <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm">لا توجد نتائج — جرّب تغيير المعايير</div>
-                ) : (
-                  <div className="space-y-3">
-                    {filtered.map(renderListing)}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 3. المؤشر */}
-            <div className="bg-white rounded-2xl border border-orange-200 shadow-sm overflow-hidden">
+            {/* 4. المؤشر — جرّب المؤشر (منطق السعر العادل كما هو) */}
+            <div id="si-section" className="bg-white rounded-2xl border border-orange-200 shadow-sm overflow-hidden">
               <div className="bg-gradient-to-l from-orange-50 to-white px-4 py-3 border-b border-orange-100 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
                   {Icons.chart}
@@ -389,8 +485,8 @@ export default function Home() {
               </div>
             </div>
 
-            {/* 4. التمويل */}
-            <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] rounded-2xl p-6 text-center shadow-xl">
+            {/* 5. التمويل */}
+            <div id="finance-section" className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] rounded-2xl p-6 text-center shadow-xl">
               <div className="flex justify-center mb-3 text-white opacity-90">{Icons.bank}</div>
               <div className="text-white font-bold text-lg mb-2">تحتاج تمويلاً عقارياً؟</div>
               <div className="text-white/85 text-sm mb-4 leading-relaxed max-w-sm mx-auto">نربطك مباشرة بشركائنا من الجهات التمويلية المعتمدة لتحصل على أفضل عرض يناسبك</div>
@@ -444,8 +540,8 @@ export default function Home() {
           {/* الخريطة التفاعلية */}
           <MapComponent points={mapPoints} />
           <div className="p-4 space-y-3">
-            <div className="font-bold text-gray-900 mb-2">كل الإعلانات ({listings.length})</div>
-            {listings.map(renderListing)}
+            <div className="font-bold text-gray-900 mb-2 sec-underline">كل الإعلانات ({listings.length})</div>
+            <div className="space-y-3">{listings.map((l) => renderListing(l))}</div>
           </div>
         </div>
       )}
@@ -722,6 +818,44 @@ export default function Home() {
               <p className="text-xs text-gray-400 border-t border-gray-100 pt-4">ملاحظة: هذه صياغة عامة لأغراض المنصة، ويُنصح بمراجعتها قانونياً قبل الإطلاق الرسمي.</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ═══ عن المنصة ═══ */}
+      {page === 'about' && (
+        <div>
+          <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-8 text-center text-white relative">
+            <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#EAF0F6] rounded-t-3xl" />
+            <div className="relative z-10">
+              <h1 className="text-2xl font-bold mb-2">عن مؤشر العقارية</h1>
+              <p className="text-white/85 text-sm max-w-md mx-auto leading-relaxed">منصّة تجعل سوق الإيجار السكني في الرياض شفّافاً — تعرف السعر العادل قبل توقيع العقد.</p>
+            </div>
+          </div>
+          <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+            <div className="bg-white rounded-2xl border border-[#cfd9e4] shadow-sm p-6 text-[#33414f] text-sm leading-relaxed space-y-4">
+              <div>
+                <h2 className="font-bold text-[#0f1a28] text-base mb-1 sec-underline">فكرتنا</h2>
+                <p>نُساعد الباحث عن سكن والمكتب العقاري على اتخاذ قرار واثق، عبر مؤشر «السعر العادل» الذي يقارن أي إيجار بمتوسط سوق الحي، وخريطة تفاعلية، ومساعد ذكي يفهم طلبك بكلامك.</p>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-3">
+                {[
+                  { t: 'السعر العادل', d: 'قارن أي إيجار بمتوسط الحي فوراً.' },
+                  { t: 'خريطة شفافة', d: 'شاهد الأسعار وحالتها على الخريطة.' },
+                  { t: 'مساعد ذكي', d: 'اكتب رغبتك ونرتّب لك الأنسب.' },
+                ].map((f) => (
+                  <div key={f.t} className="bg-[#f7fafd] border border-[#dde5ee] rounded-xl p-4">
+                    <div className="font-bold text-[#0A3D62] text-sm mb-1">{f.t}</div>
+                    <div className="text-xs text-[#33414f] leading-relaxed">{f.d}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-3 pt-2">
+                <button onClick={() => go('search')} className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">ابدأ البحث</button>
+                <button onClick={() => { setPage('privacy'); if (typeof window !== 'undefined') window.scrollTo(0, 0); }} className="bg-white border border-[#cfd9e4] text-[#0A3D62] px-5 py-2.5 rounded-xl font-bold text-sm">سياسة الخصوصية</button>
+                <button onClick={() => { setPage('terms'); if (typeof window !== 'undefined') window.scrollTo(0, 0); }} className="bg-white border border-[#cfd9e4] text-[#0A3D62] px-5 py-2.5 rounded-xl font-bold text-sm">شروط الاستخدام</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
