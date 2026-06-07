@@ -305,13 +305,13 @@ export default function Home() {
       {/* ═══ HOME — المساعد الذكي + الإعلانات فقط ═══ */}
       {page === 'home' && (
         <div>
-          <div className="bg-gradient-to-br from-[#0A3D62] via-[#1B6CA8] to-[#378ADD] px-5 pt-6 pb-0 relative overflow-hidden">
-            <div className="relative z-10 text-center pb-2">
-              <h1 className="text-white text-xl font-bold mb-3">سوق الإيجار <span className="text-[#9BC8F0]">بكل وضوح</span></h1>
-              <div className="flex flex-wrap gap-3 justify-center mb-4">
+          <div className="bg-gradient-to-br from-[#0A3D62] via-[#1B6CA8] to-[#378ADD] px-5 pt-12 pb-16 relative overflow-hidden">
+            <div className="relative z-10 text-center">
+              <h1 className="text-white text-xl font-bold mb-5">سوق الإيجار <span className="text-[#9BC8F0]">بكل وضوح</span></h1>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 justify-center">
                 {['استشارة عقارية مجانية', 'اعرف السعر العادل قبل توقيع العقد', 'سوق شفاف، قرار واثق'].map(t => (
-                  <span key={t} className="text-white/90 text-xs flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#9BC8F0] inline-block" />{t}
+                  <span key={t} className="text-white/90 text-xs leading-relaxed flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#9BC8F0] inline-block flex-shrink-0" />{t}
                   </span>
                 ))}
               </div>
