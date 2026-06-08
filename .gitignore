@@ -27,6 +27,7 @@
 # local admin/login test harnesses (may contain credentials — never commit)
 _logintest.mjs
 _admincheck.mjs
+_leadscheck.mjs
 
 # debug
 npm-debug.log*

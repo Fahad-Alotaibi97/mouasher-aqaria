@@ -70,6 +70,13 @@ function fairForType(
 // أحياء مركزية قريبة من الخدمات — تُستخدم في منطق المساعد الذكي المحلّي (heuristic).
 const NEAR_HOODS = new Set(['العليا', 'الملقا', 'حطين', 'الياسمين']);
 
+// رسالة خطأ تشخيصية لإرسال الرسائل/الاستفسارات (تكشف حجب RLS بوضوح بدل نجاح صوري).
+function leadErrText(error: { code?: string; message?: string }): string {
+  if (error.code === '42501')
+    return 'تعذّر الحفظ: سياسة الحماية (RLS) تمنع الإضافة. يلزم تشغيل supabase/fix_leads.sql في Supabase.';
+  return 'تعذّر الإرسال حالياً — حاول لاحقاً.' + (error.message ? ` (${error.message})` : '');
+}
+
 // أيقونة منزل بديلة عند غياب صورة الإعلان
 const HousePlaceholder = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-9 h-9">
@@ -173,7 +180,7 @@ export default function Home() {
         const sb = createClient();
         // نتحقّق من خطأ الإدراج فعلياً (بدل النجاح الصوري) — يكشف حجب RLS إن وُجد.
         const { error } = await sb.from('leads').insert({ name: leadName.trim(), phone: leadPhone.trim(), message: leadMsg.trim() || null });
-        if (error) { setLeadErr('تعذّر إرسال الرسالة حالياً — حاول لاحقاً.'); setLeadSending(false); return; }
+        if (error) { setLeadErr(leadErrText(error)); setLeadSending(false); return; }
       }
       setLeadSent(true);
       setLeadName(''); setLeadPhone(''); setLeadMsg('');
@@ -194,7 +201,7 @@ export default function Home() {
       if (isSupabaseConfigured()) {
         const sb = createClient();
         const { error } = await sb.from('leads').insert({ name: inqName.trim(), phone: inqPhone.trim(), message });
-        if (error) { setInqErr('تعذّر إرسال الاستفسار حالياً — حاول لاحقاً.'); setInqSending(false); return; }
+        if (error) { setInqErr(leadErrText(error)); setInqSending(false); return; }
       }
       setInqSent(true);
       setInqName(''); setInqPhone(''); setInqHood(''); setInqType(''); setInqMsg('');
