@@ -91,6 +91,7 @@ export default function Home() {
   const [leadSending, setLeadSending] = useState(false);
   const [selectedListing, setSelectedListing] = useState<UIListing | null>(null);
   const [siZone, setSiZone] = useState('النرجس'); // اسم الحي المختار في "جرّب المؤشر"
+  const [siType, setSiType] = useState('شقة'); // نوع الوحدة في "جرّب المؤشر"
   const [siPrice, setSiPrice] = useState('');
   const [filterHood, setFilterHood] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -173,15 +174,18 @@ export default function Home() {
   const clearFilters = () => { setFilterHood(''); setFilterType(''); setFilterBudget(''); };
 
   const checkPrice = () => {
-    // المتوسط يُقرأ من القاعدة (mktAvg) — يعكس تعديلات لوحة الأدمن فوراً.
+    // المتوسط يُقرأ من القاعدة (mktAvg) حسب النوع المختار عبر fairForType —
+    // يعكس تعديلات لوحة الأدمن فوراً (شقة/فيلا/دور/دوبلكس/استوديو).
     const zoneName = siZone;
-    const avg = mktAvg[siZone]?.avg ?? 0;
+    const m = mktAvg[siZone];
+    const avg = m ? fairForType(m, siType) : 0;
     const price = parseInt(siPrice) || 0;
-    if (!avg) return { type: 'none', icon: Icons.chart, title: 'لا يوجد متوسط لهذا الحي بعد', detail: '', color: 'bg-gray-50 border-gray-200' };
+    const ref = `متوسط ${siType} في ${zoneName}`;
+    if (!avg) return { type: 'none', icon: Icons.chart, title: 'لا يوجد متوسط لهذا النوع في هذا الحي بعد', detail: '', color: 'bg-gray-50 border-gray-200' };
     if (!price) return { type: 'none', icon: Icons.chart, title: 'أدخل قيمة الإيجار للمقارنة', detail: '', color: 'bg-gray-50 border-gray-200' };
-    if (price > avg * 1.12) return { type: 'hi', icon: Icons.warning, title: 'السعر مرتفع', detail: `أعلى بـ ${(price - avg).toLocaleString('ar-SA')} ريال من متوسط ${zoneName}`, color: 'bg-orange-50 border-orange-300' };
-    if (price < avg * 0.85) return { type: 'lo', icon: Icons.target, title: 'فرصة ممتازة', detail: `أقل بـ ${(avg - price).toLocaleString('ar-SA')} ريال من متوسط ${zoneName}`, color: 'bg-green-50 border-green-300' };
-    return { type: 'ok', icon: Icons.okCircle, title: 'السعر مناسب للسوق', detail: `متوسط ${zoneName} حوالي ${avg.toLocaleString('ar-SA')} ريال سنوياً`, color: 'bg-blue-50 border-blue-200' };
+    if (price > avg * 1.12) return { type: 'hi', icon: Icons.warning, title: 'السعر مرتفع', detail: `أعلى بـ ${(price - avg).toLocaleString('ar-SA')} ريال من ${ref}`, color: 'bg-orange-50 border-orange-300' };
+    if (price < avg * 0.85) return { type: 'lo', icon: Icons.target, title: 'فرصة ممتازة', detail: `أقل بـ ${(avg - price).toLocaleString('ar-SA')} ريال من ${ref}`, color: 'bg-green-50 border-green-300' };
+    return { type: 'ok', icon: Icons.okCircle, title: 'السعر مناسب للسوق', detail: `${ref} حوالي ${avg.toLocaleString('ar-SA')} ريال سنوياً`, color: 'bg-blue-50 border-blue-200' };
   };
 
   const indicator = checkPrice();
@@ -500,10 +504,18 @@ export default function Home() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-700 block mb-1 font-semibold">الإيجار السنوي (ريال)</label>
-                    <input type="number" value={siPrice} onChange={e => setSiPrice(e.target.value)}
-                      placeholder="مثال: 65000" className={inputCls} />
+                    <label className="text-xs text-gray-700 block mb-1 font-semibold">نوع الوحدة</label>
+                    <select value={siType} onChange={e => setSiType(e.target.value)} className={selectCls}>
+                      {['شقة', 'فيلا', 'دور', 'دوبلكس', 'استوديو'].map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
                   </div>
+                </div>
+                <div className="mb-3">
+                  <label className="text-xs text-gray-700 block mb-1 font-semibold">الإيجار السنوي (ريال)</label>
+                  <input type="number" value={siPrice} onChange={e => setSiPrice(e.target.value)}
+                    placeholder="مثال: 65000" className={inputCls} />
                 </div>
                 {siPrice && (
                   <div className={`p-3 rounded-xl flex items-center gap-3 border ${indicator.color}`}>

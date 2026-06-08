@@ -26,8 +26,9 @@ const ROOM_LABELS = ['غرفة', 'غرفتين', 'ثلاث غرف', 'أربع غ
 
 interface HoodRow {
   name: string;
-  apt: (number | null)[]; // 4 خانات
-  villa: (number | null)[]; // 4 خانات
+  apt: (number | null)[]; // 4 خانات (الشقة فقط تبقى بخانات الغرف)
+  villa: (number | null)[]; // (مُهمل في الواجهة — يُقرأ من villa_detail القديم فقط)
+  villaSingle: number | null; // ★ الفيلا صارت قيمة واحدة (avg_villa)
   studio: number | null; // خانة واحدة
   floor: number | null; // الدور — قيمة واحدة (avg_dor)
   duplex: number | null; // الدوبلكس — قيمة واحدة (avg_duplex)
@@ -174,6 +175,7 @@ export default function AdminPage() {
             name: h.name as string,
             apt: detailToSlots(h.apt_detail),
             villa: detailToSlots(h.villa_detail),
+            villaSingle: (h.avg_villa as number) ?? null,
             studio: (h.avg_studio as number) ?? null,
             floor: (h.avg_dor as number) ?? null,
             duplex: (h.avg_duplex as number) ?? null,
@@ -203,7 +205,7 @@ export default function AdminPage() {
   };
 
   // ── تحديث قيمة مفردة (استوديو/دور/دوبلكس) ────────────────────
-  const setSingle = (name: string, key: 'studio' | 'floor' | 'duplex', value: string) => {
+  const setSingle = (name: string, key: 'studio' | 'floor' | 'duplex' | 'villaSingle', value: string) => {
     const num = value === '' ? null : parseInt(value, 10);
     setRows((prev) =>
       prev.map((r) => (r.name === name ? { ...r, [key]: Number.isNaN(num as number) ? null : num } : r))
@@ -226,7 +228,7 @@ export default function AdminPage() {
     }
     setRows((prev) => [
       ...prev,
-      { name, apt: [null, null, null, null], villa: [null, null, null, null], studio: null, floor: null, duplex: null, baseApt: null, baseVilla: null, isNew: true },
+      { name, apt: [null, null, null, null], villa: [null, null, null, null], villaSingle: null, studio: null, floor: null, duplex: null, baseApt: null, baseVilla: null, isNew: true },
     ]);
     setOpenHood(name);
     setMsg(null);
@@ -241,21 +243,21 @@ export default function AdminPage() {
       const buildPayload = (withDetail: boolean, withNewTypes: boolean) =>
         rows.map((r) => {
           const aptAvg = approvedAvg(r.apt);
-          const villaAvg = approvedAvg(r.villa);
           const base: Record<string, unknown> = {
             name: r.name,
-            // المتوسط المعتمد، وإن لم تُعبّأ خانات نُبقي القيمة المخزّنة (لا نصفّرها)
+            // الشقة: المتوسط المعتمد من الخانات، وإن لم تُعبّأ نُبقي القيمة المخزّنة.
             avg_rent: aptAvg ?? r.baseApt ?? 0,
-            avg_villa: villaAvg ?? r.baseVilla ?? null,
+            // الفيلا: صارت قيمة واحدة مباشرة (لا خانات غرف).
+            avg_villa: r.villaSingle,
             avg_studio: r.studio,
           };
           if (withNewTypes) {
             base.avg_dor = r.floor;
             base.avg_duplex = r.duplex;
           }
+          // نكتب تفصيل الشقة فقط؛ villa_detail يبقى في القاعدة دون تعديل (مُهمل).
           if (withDetail) {
             base.apt_detail = slotsToDetail(r.apt);
-            base.villa_detail = slotsToDetail(r.villa);
           }
           return base;
         });
@@ -394,7 +396,7 @@ export default function AdminPage() {
         <div className="space-y-3">
           {rows.map((r) => {
             const aptApproved = approvedAvg(r.apt) ?? r.baseApt;
-            const villaApproved = approvedAvg(r.villa) ?? r.baseVilla;
+            const villaApproved = r.villaSingle;
             const studioApproved = r.studio;
             const floorApproved = r.floor;
             const duplexApproved = r.duplex;
@@ -456,26 +458,24 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* الفيلا */}
+                    {/* الفيلا (قيمة واحدة) */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-bold text-gray-800">الفيلا — حسب عدد الغرف</div>
-                        <div className="text-xs text-purple-700">المعتمد: <b>{fmt(approvedAvg(r.villa))}</b></div>
+                        <div className="text-sm font-bold text-gray-800">الفيلا</div>
+                        <div className="text-xs text-purple-700">المعتمد: <b>{fmt(r.villaSingle)}</b></div>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {ROOM_LABELS.map((lbl, i) => (
-                          <div key={i}>
-                            <label className="text-[11px] text-gray-500 block mb-1 text-center">{lbl}</label>
-                            <input
-                              type="number"
-                              min={0}
-                              value={r.villa[i] ?? ''}
-                              onChange={(e) => setSlot(r.name, 'villa', i, e.target.value)}
-                              placeholder="—"
-                              className={cellCls}
-                            />
-                          </div>
-                        ))}
+                        <div>
+                          <label className="text-[11px] text-gray-500 block mb-1 text-center">المتوسط</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={r.villaSingle ?? ''}
+                            onChange={(e) => setSingle(r.name, 'villaSingle', e.target.value)}
+                            placeholder="—"
+                            className={cellCls}
+                          />
+                        </div>
                       </div>
                     </div>
 
