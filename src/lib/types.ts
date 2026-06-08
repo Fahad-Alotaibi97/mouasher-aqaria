@@ -9,6 +9,8 @@ export interface Neighborhood {
   avg_rent: number; // متوسط الشقة (الإيجار السنوي الأساس)
   avg_villa?: number | null; // متوسط الفيلا (اختياري — يُشتق من avg_rent إن غاب)
   avg_studio?: number | null; // متوسط الاستوديو (اختياري)
+  avg_dor?: number | null; // متوسط الدور (اختياري — يُشتق ×1.4 إن غاب)
+  avg_duplex?: number | null; // متوسط الدوبلكس (اختياري — يُشتق ×1.6 إن غاب)
 }
 
 export interface Listing {

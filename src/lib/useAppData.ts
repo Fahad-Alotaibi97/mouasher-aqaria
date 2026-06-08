@@ -25,8 +25,8 @@ export interface UIListing {
   lng?: number | null;
 }
 
-// avg = متوسط الشقة (الأساس) ، villa/studio متوسطات اختيارية لكل نوع
-export type MktAvg = Record<string, { avg: number; villa?: number; studio?: number }>;
+// avg = متوسط الشقة (الأساس) ، villa/studio/floor/duplex متوسطات اختيارية لكل نوع
+export type MktAvg = Record<string, { avg: number; villa?: number; studio?: number; floor?: number; duplex?: number }>;
 
 export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) {
   const [mktAvg, setMktAvg] = useState<MktAvg>(defaultMktAvg);
@@ -41,16 +41,24 @@ export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) 
       try {
         const sb = createClient();
 
-        const { data: hoods } = await sb
+        // نحاول قراءة أعمدة الدور/الدوبلكس؛ وإن لم تكن موجودة بعد (قبل تشغيل
+        // add_floor_duplex.sql) نرجع للأعمدة الأساسية حتى لا تنكسر القراءة.
+        let hres = await sb
           .from('neighborhoods')
-          .select('name, avg_rent, avg_villa, avg_studio');
+          .select('name, avg_rent, avg_villa, avg_studio, avg_dor, avg_duplex');
+        if (hres.error) {
+          hres = await sb.from('neighborhoods').select('name, avg_rent, avg_villa, avg_studio');
+        }
+        const hoods = hres.data as Record<string, number | null>[] | null;
         if (!cancelled && hoods && hoods.length) {
           const map: MktAvg = {};
           for (const h of hoods)
-            map[h.name] = {
-              avg: h.avg_rent,
-              villa: h.avg_villa ?? undefined,
-              studio: h.avg_studio ?? undefined,
+            map[h.name as unknown as string] = {
+              avg: h.avg_rent as number,
+              villa: (h.avg_villa as number) ?? undefined,
+              studio: (h.avg_studio as number) ?? undefined,
+              floor: (h.avg_dor as number) ?? undefined,
+              duplex: (h.avg_duplex as number) ?? undefined,
             };
           setMktAvg(map);
         }

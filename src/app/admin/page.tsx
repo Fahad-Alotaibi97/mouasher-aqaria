@@ -29,6 +29,8 @@ interface HoodRow {
   apt: (number | null)[]; // 4 خانات
   villa: (number | null)[]; // 4 خانات
   studio: number | null; // خانة واحدة
+  floor: number | null; // الدور — قيمة واحدة (avg_dor)
+  duplex: number | null; // الدوبلكس — قيمة واحدة (avg_duplex)
   baseApt: number | null; // avg_rent المُخزّن (للرجوع إن لم تُعبّأ خانات)
   baseVilla: number | null; // avg_villa المُخزّن
   isNew?: boolean;
@@ -125,6 +127,8 @@ export default function AdminPage() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   // هل توجد أعمدة التفصيل (apt_detail/villa_detail) في القاعدة؟ (للحفظ المرن)
   const [hasDetailCols, setHasDetailCols] = useState(true);
+  // هل توجد أعمدة الدور/الدوبلكس (avg_dor/avg_duplex)؟ (قبل تشغيل add_floor_duplex.sql)
+  const [hasNewTypeCols, setHasNewTypeCols] = useState(true);
 
   // ── جلب الأحياء بعد فتح اللوحة (بجلسة موحّدة أو بكلمة المرور) ──
   useEffect(() => {
@@ -137,35 +141,42 @@ export default function AdminPage() {
     (async () => {
       setLoading(true);
       const sb = createClient();
-      // نحاول جلب أعمدة التفصيل؛ إن لم تكن موجودة نرجع للأعمدة الأساسية فقط.
-      let detailOk = true;
-      const withDetail = await sb
-        .from('neighborhoods')
-        .select('name, avg_rent, avg_villa, avg_studio, apt_detail, villa_detail')
-        .order('id', { ascending: true });
-      let error = withDetail.error;
-      let rawData = withDetail.data as Record<string, unknown>[] | null;
-      if (error) {
-        detailOk = false;
-        const basic = await sb
-          .from('neighborhoods')
-          .select('name, avg_rent, avg_villa, avg_studio')
-          .order('id', { ascending: true });
-        error = basic.error;
-        rawData = basic.data as Record<string, unknown>[] | null;
+      // نتدرّج من أكثر الأعمدة شمولاً إلى الأساسية حتى نتوافق مع أي حالة للقاعدة
+      // (مع/بدون أعمدة التفصيل، ومع/بدون أعمدة الدور/الدوبلكس).
+      const variants: { cols: string; detail: boolean; newTypes: boolean }[] = [
+        { cols: 'name, avg_rent, avg_villa, avg_studio, avg_dor, avg_duplex, apt_detail, villa_detail', detail: true, newTypes: true },
+        { cols: 'name, avg_rent, avg_villa, avg_studio, avg_dor, avg_duplex', detail: false, newTypes: true },
+        { cols: 'name, avg_rent, avg_villa, avg_studio, apt_detail, villa_detail', detail: true, newTypes: false },
+        { cols: 'name, avg_rent, avg_villa, avg_studio', detail: false, newTypes: false },
+      ];
+      let error: { message: string } | null = null;
+      let rawData: Record<string, unknown>[] | null = null;
+      let detailOk = false;
+      let newTypesOk = false;
+      for (const v of variants) {
+        const res = await sb.from('neighborhoods').select(v.cols).order('id', { ascending: true });
+        if (!res.error) {
+          rawData = res.data as unknown as Record<string, unknown>[] | null;
+          detailOk = v.detail; newTypesOk = v.newTypes; error = null;
+          break;
+        }
+        error = res.error;
       }
       if (cancelled) return;
-      if (error) {
+      if (error && !rawData) {
         setMsg({ ok: false, text: 'تعذّر جلب الأحياء: ' + error.message });
       } else {
         const data = rawData ?? [];
         setHasDetailCols(detailOk);
+        setHasNewTypeCols(newTypesOk);
         setRows(
           data.map((h) => ({
             name: h.name as string,
             apt: detailToSlots(h.apt_detail),
             villa: detailToSlots(h.villa_detail),
             studio: (h.avg_studio as number) ?? null,
+            floor: (h.avg_dor as number) ?? null,
+            duplex: (h.avg_duplex as number) ?? null,
             baseApt: (h.avg_rent as number) ?? null,
             baseVilla: (h.avg_villa as number) ?? null,
           }))
@@ -191,7 +202,13 @@ export default function AdminPage() {
     );
   };
 
-  // ── تحديث خانة الاستوديو (واحدة) ─────────────────────────────
+  // ── تحديث قيمة مفردة (استوديو/دور/دوبلكس) ────────────────────
+  const setSingle = (name: string, key: 'studio' | 'floor' | 'duplex', value: string) => {
+    const num = value === '' ? null : parseInt(value, 10);
+    setRows((prev) =>
+      prev.map((r) => (r.name === name ? { ...r, [key]: Number.isNaN(num as number) ? null : num } : r))
+    );
+  };
   const setStudio = (name: string, value: string) => {
     const num = value === '' ? null : parseInt(value, 10);
     setRows((prev) =>
@@ -209,7 +226,7 @@ export default function AdminPage() {
     }
     setRows((prev) => [
       ...prev,
-      { name, apt: [null, null, null, null], villa: [null, null, null, null], studio: null, baseApt: null, baseVilla: null, isNew: true },
+      { name, apt: [null, null, null, null], villa: [null, null, null, null], studio: null, floor: null, duplex: null, baseApt: null, baseVilla: null, isNew: true },
     ]);
     setOpenHood(name);
     setMsg(null);
@@ -221,7 +238,7 @@ export default function AdminPage() {
     setMsg(null);
     try {
       const sb = createClient();
-      const buildPayload = (withDetail: boolean) =>
+      const buildPayload = (withDetail: boolean, withNewTypes: boolean) =>
         rows.map((r) => {
           const aptAvg = approvedAvg(r.apt);
           const villaAvg = approvedAvg(r.villa);
@@ -232,6 +249,10 @@ export default function AdminPage() {
             avg_villa: villaAvg ?? r.baseVilla ?? null,
             avg_studio: r.studio,
           };
+          if (withNewTypes) {
+            base.avg_dor = r.floor;
+            base.avg_duplex = r.duplex;
+          }
           if (withDetail) {
             base.apt_detail = slotsToDetail(r.apt);
             base.villa_detail = slotsToDetail(r.villa);
@@ -239,15 +260,17 @@ export default function AdminPage() {
           return base;
         });
 
-      // نحاول الحفظ مع التفصيل؛ إن فشل بسبب غياب الأعمدة نعيد بدون التفصيل.
-      let { error } = await sb.from('neighborhoods').upsert(buildPayload(hasDetailCols), { onConflict: 'name' });
-      if (error && /apt_detail|villa_detail|column/i.test(error.message)) {
+      // نحاول الحفظ بكل الأعمدة؛ إن فشل بسبب غياب أعمدة (التفصيل أو الدور/الدوبلكس)
+      // نعيد المحاولة بالأعمدة الأساسية فقط حتى لا يضيع الحفظ.
+      let { error } = await sb.from('neighborhoods').upsert(buildPayload(hasDetailCols, hasNewTypeCols), { onConflict: 'name' });
+      if (error && /apt_detail|villa_detail|avg_dor|avg_duplex|column/i.test(error.message)) {
         setHasDetailCols(false);
-        ({ error } = await sb.from('neighborhoods').upsert(buildPayload(false), { onConflict: 'name' }));
+        setHasNewTypeCols(false);
+        ({ error } = await sb.from('neighborhoods').upsert(buildPayload(false, false), { onConflict: 'name' }));
         if (!error) {
           setMsg({
             ok: true,
-            text: 'تم حفظ المتوسطات ✓ (لكن تفصيل الغرف لم يُحفظ — شغّل supabase/admin_neighborhoods_v2.sql مرة واحدة لتفعيل حفظ التفصيل).',
+            text: 'تم حفظ المتوسطات الأساسية ✓ (لكن تفصيل الغرف و/أو الدور/الدوبلكس لم تُحفظ — شغّل supabase/admin_neighborhoods_v2.sql و supabase/add_floor_duplex.sql مرة واحدة).',
           });
           setSaving(false);
           return;
@@ -373,6 +396,8 @@ export default function AdminPage() {
             const aptApproved = approvedAvg(r.apt) ?? r.baseApt;
             const villaApproved = approvedAvg(r.villa) ?? r.baseVilla;
             const studioApproved = r.studio;
+            const floorApproved = r.floor;
+            const duplexApproved = r.duplex;
             const isOpen = openHood === r.name;
             return (
               <div key={r.name} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -395,6 +420,12 @@ export default function AdminPage() {
                     </span>
                     <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-1 rounded-lg whitespace-nowrap">
                       استوديو: <b>{fmt(studioApproved)}</b>
+                    </span>
+                    <span className="bg-teal-50 text-teal-800 border border-teal-200 px-2 py-1 rounded-lg whitespace-nowrap">
+                      دور: <b>{fmt(floorApproved)}</b>
+                    </span>
+                    <span className="bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-1 rounded-lg whitespace-nowrap">
+                      دوبلكس: <b>{fmt(duplexApproved)}</b>
                     </span>
                   </div>
                 </button>
@@ -462,6 +493,48 @@ export default function AdminPage() {
                             min={0}
                             value={r.studio ?? ''}
                             onChange={(e) => setStudio(r.name, e.target.value)}
+                            placeholder="—"
+                            className={cellCls}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* الدور (قيمة واحدة) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-bold text-gray-800">الدور</div>
+                        <div className="text-xs text-teal-700">المعتمد: <b>{fmt(floorApproved)}</b></div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div>
+                          <label className="text-[11px] text-gray-500 block mb-1 text-center">المتوسط</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={r.floor ?? ''}
+                            onChange={(e) => setSingle(r.name, 'floor', e.target.value)}
+                            placeholder="—"
+                            className={cellCls}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* الدوبلكس (قيمة واحدة) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-bold text-gray-800">الدوبلكس</div>
+                        <div className="text-xs text-indigo-700">المعتمد: <b>{fmt(duplexApproved)}</b></div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div>
+                          <label className="text-[11px] text-gray-500 block mb-1 text-center">المتوسط</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={r.duplex ?? ''}
+                            onChange={(e) => setSingle(r.name, 'duplex', e.target.value)}
                             placeholder="—"
                             className={cellCls}
                           />
