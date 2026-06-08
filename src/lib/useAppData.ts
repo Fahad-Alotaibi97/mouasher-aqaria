@@ -15,7 +15,10 @@ export interface UIListing {
   rooms?: number | null;
   area?: number | null;
   baths?: number | null;
-  furnished?: boolean;
+  furnished?: boolean | null;
+  kitchen?: boolean | null;   // المطبخ راكب
+  ac?: boolean | null;        // مكيّفة
+  parking?: number | null;    // عدد المواقف
   cond: string;
   condLabel: string;
   description?: string;
@@ -63,44 +66,46 @@ export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) 
           setMktAvg(map);
         }
 
-        // العامة ترى المعتمد فقط (status='approved'). نحاول مع الفلتر؛ وإن لم يكن
-        // عمود status موجوداً بعد (قبل تشغيل admin_dashboard.sql) نرجع بلا الفلتر
-        // حتى لا تنكسر القائمة العامة.
-        const SEL =
-          'id, hood, title, type, advertised, rooms, area, baths, furnished, condition, cond_label, description, images, fal_license, lat, lng';
-        let res = await sb
-          .from('listings')
-          .select(SEL)
-          .eq('active', true)
-          .eq('status', 'approved')
-          .order('created_at', { ascending: false });
-        if (res.error) {
-          res = await sb
-            .from('listings')
-            .select(SEL)
-            .eq('active', true)
-            .order('created_at', { ascending: false });
+        // العامة ترى المعتمد فقط (status='approved') + الخصائص المنظّمة (kitchen/ac/parking).
+        // نتدرّج عبر عدة محاولات حتى نتوافق مع أي حالة للقاعدة (مع/بدون status، ومع/بدون
+        // أعمدة الخصائص) فلا تنكسر القائمة العامة قبل تشغيل SQL.
+        const BASE = 'id, hood, title, type, advertised, rooms, area, baths, furnished, condition, cond_label, description, images, fal_license, lat, lng';
+        const FULL = BASE + ', kitchen, ac, parking';
+        const attempts: { sel: string; status: boolean }[] = [
+          { sel: FULL, status: true },
+          { sel: FULL, status: false },
+          { sel: BASE, status: true },
+          { sel: BASE, status: false },
+        ];
+        let rows: Record<string, unknown>[] | null = null;
+        for (const a of attempts) {
+          let q = sb.from('listings').select(a.sel).eq('active', true);
+          if (a.status) q = q.eq('status', 'approved');
+          const res = await q.order('created_at', { ascending: false });
+          if (!res.error) { rows = res.data as unknown as Record<string, unknown>[] | null; break; }
         }
-        const rows = res.data;
         if (!cancelled && rows && rows.length) {
           setListings(
             rows.map((r) => ({
-              id: r.id,
-              hood: r.hood,
-              title: r.title,
-              type: r.type,
-              adv: r.advertised,
-              rooms: r.rooms,
-              area: r.area,
-              baths: r.baths,
-              furnished: !!r.furnished,
-              cond: r.condition || 'good',
-              condLabel: r.cond_label || '',
-              description: r.description || '',
-              images: Array.isArray(r.images) ? r.images : [],
-              fal: r.fal_license || '',
-              lat: r.lat,
-              lng: r.lng,
+              id: r.id as string | number,
+              hood: r.hood as string,
+              title: r.title as string,
+              type: r.type as string,
+              adv: r.advertised as number,
+              rooms: (r.rooms as number) ?? null,
+              area: (r.area as number) ?? null,
+              baths: (r.baths as number) ?? null,
+              furnished: (r.furnished as boolean) ?? null,
+              kitchen: (r.kitchen as boolean) ?? null,
+              ac: (r.ac as boolean) ?? null,
+              parking: (r.parking as number) ?? null,
+              cond: (r.condition as string) || 'good',
+              condLabel: (r.cond_label as string) || '',
+              description: (r.description as string) || '',
+              images: Array.isArray(r.images) ? (r.images as string[]) : [],
+              fal: (r.fal_license as string) || '',
+              lat: (r.lat as number) ?? null,
+              lng: (r.lng as number) ?? null,
             }))
           );
           setLoadedFromDB(true);

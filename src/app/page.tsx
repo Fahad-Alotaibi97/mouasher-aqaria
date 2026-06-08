@@ -36,13 +36,13 @@ const DEFAULT_MKT_AVG: MktAvg = {
 
 // إعلانات افتراضية (تظهر إذا لم تتوفر بيانات من قاعدة البيانات) — مع إحداثيات للخريطة
 const DEFAULT_LISTINGS: UIListing[] = [
-  { id: 1, hood: 'النرجس', title: 'شقة 3 غرف — حي النرجس', type: 'شقة', adv: 90000, rooms: 3, area: 150, baths: 2, furnished: false, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة عائلية واسعة في حي النرجس، موقف خاص ودخول ذكي.', fal: '1234567', lat: 24.8024, lng: 46.6286 },
-  { id: 2, hood: 'النرجس', title: 'شقة 2 غرف — حي النرجس', type: 'شقة', adv: 42000, rooms: 2, area: 110, baths: 1, furnished: false, cond: 'new', condLabel: 'جديد', description: 'شقة جديدة بمجلس ومطبخ راكب في حي النرجس.', fal: '2345678', lat: 24.8060, lng: 46.6340 },
-  { id: 3, hood: 'النرجس', title: 'شقة 3 غرف — مشروع الماجدية', type: 'شقة', adv: 68000, rooms: 3, area: 140, baths: 2, furnished: false, cond: 'new', condLabel: 'جديد', description: 'شقة حديثة بمكيفات مركزية، عمر سنتان.', fal: '3456789', lat: 24.8100, lng: 46.6180 },
-  { id: 4, hood: 'العليا', title: 'شقة 2 غرف — حي العليا', type: 'شقة', adv: 52000, rooms: 2, area: 105, baths: 1, furnished: false, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة بموقع مميز في العليا، مطبخ راكب.', fal: '4567890', lat: 24.6877, lng: 46.6853 },
-  { id: 5, hood: 'الملقا', title: 'شقة 3 غرف — حي الملقا', type: 'شقة', adv: 48000, rooms: 3, area: 120, baths: 2, furnished: false, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة عائلية في الملقا، عمر سنة.', fal: '5678901', lat: 24.7766, lng: 46.6228 },
-  { id: 6, hood: 'حطين', title: 'استوديو — حي حطين', type: 'استوديو', adv: 50400, rooms: 1, area: 55, baths: 1, furnished: true, cond: 'new', condLabel: 'جديد', description: 'استوديو مؤثث بالكامل قرب البوليفارد.', fal: '6789012', lat: 24.7611, lng: 46.6511 },
-  { id: 7, hood: 'الياسمين', title: 'شقة 2 غرف — الياسمين', type: 'شقة', adv: 48000, rooms: 2, area: 90, baths: 1, furnished: false, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة في الياسمين، عمر 4 سنوات.', fal: '7890123', lat: 24.8196, lng: 46.6402 },
+  { id: 1, hood: 'النرجس', title: 'شقة 3 غرف — حي النرجس', type: 'شقة', adv: 90000, rooms: 3, area: 150, baths: 2, furnished: false, kitchen: true, ac: true, parking: 1, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة عائلية واسعة في حي النرجس، موقف خاص ودخول ذكي.', fal: '1234567', lat: 24.8024, lng: 46.6286 },
+  { id: 2, hood: 'النرجس', title: 'شقة 2 غرف — حي النرجس', type: 'شقة', adv: 42000, rooms: 2, area: 110, baths: 1, furnished: true, kitchen: true, ac: false, parking: 0, cond: 'new', condLabel: 'جديد', description: 'شقة جديدة بمجلس ومطبخ راكب في حي النرجس.', fal: '2345678', lat: 24.8060, lng: 46.6340 },
+  { id: 3, hood: 'النرجس', title: 'شقة 3 غرف — مشروع الماجدية', type: 'شقة', adv: 68000, rooms: 3, area: 140, baths: 2, furnished: false, kitchen: false, ac: true, parking: 2, cond: 'new', condLabel: 'جديد', description: 'شقة حديثة بمكيفات مركزية، عمر سنتان.', fal: '3456789', lat: 24.8100, lng: 46.6180 },
+  { id: 4, hood: 'العليا', title: 'شقة 2 غرف — حي العليا', type: 'شقة', adv: 52000, rooms: 2, area: 105, baths: 1, furnished: false, kitchen: true, ac: true, parking: 1, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة بموقع مميز في العليا، مطبخ راكب.', fal: '4567890', lat: 24.6877, lng: 46.6853 },
+  { id: 5, hood: 'الملقا', title: 'شقة 3 غرف — حي الملقا', type: 'شقة', adv: 48000, rooms: 3, area: 120, baths: 2, furnished: false, kitchen: false, ac: false, parking: null, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة عائلية في الملقا، عمر سنة.', fal: '5678901', lat: 24.7766, lng: 46.6228 },
+  { id: 6, hood: 'حطين', title: 'استوديو — حي حطين', type: 'استوديو', adv: 50400, rooms: 1, area: 55, baths: 1, furnished: true, kitchen: true, ac: true, parking: 1, cond: 'new', condLabel: 'جديد', description: 'استوديو مؤثث بالكامل قرب البوليفارد.', fal: '6789012', lat: 24.7611, lng: 46.6511 },
+  { id: 7, hood: 'الياسمين', title: 'شقة 2 غرف — الياسمين', type: 'شقة', adv: 48000, rooms: 2, area: 90, baths: 1, furnished: true, kitchen: true, ac: true, parking: 0, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة في الياسمين، عمر 4 سنوات.', fal: '7890123', lat: 24.8196, lng: 46.6402 },
   { id: 8, hood: 'القيروان', title: 'شقة 3 غرف — القيروان', type: 'شقة', adv: 38000, rooms: 3, area: 130, baths: 2, furnished: false, cond: 'old', condLabel: 'يحتاج ترميم', description: 'شقة واسعة في القيروان تحتاج بعض الترميم.', fal: '8901234', lat: 24.8400, lng: 46.6350 },
   { id: 9, hood: 'النخيل', title: 'فيلا — حي النخيل', type: 'فيلا', adv: 140000, rooms: 5, area: 450, baths: 4, furnished: false, cond: 'new', condLabel: 'جديد', description: 'فيلا فاخرة بمسبح في حي النخيل.', fal: '9012345', lat: 24.8300, lng: 46.6100 },
   { id: 10, hood: 'إشبيلية', title: 'شقة 2 غرف — إشبيلية', type: 'شقة', adv: 36000, rooms: 2, area: 80, baths: 1, furnished: false, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة هادئة في إشبيلية، عمر 5 سنوات.', fal: '0123456', lat: 24.7200, lng: 46.6550 },
@@ -78,7 +78,7 @@ const HousePlaceholder = (
 );
 
 export default function Home() {
-  const [page, setPage] = useState<'home' | 'search' | 'indicator' | 'finance' | 'pricing' | 'office' | 'privacy' | 'terms' | 'about'>('home');
+  const [page, setPage] = useState<'home' | 'search' | 'indicator' | 'finance' | 'inquiries' | 'pricing' | 'office' | 'privacy' | 'terms' | 'about'>('home');
   // المساعد الذكي — منطق محلّي بالكلمات المفتاحية (بدون أي استدعاء API)
   const [aiQuery, setAiQuery] = useState('');
   const [aiReply, setAiReply] = useState<string | null>(null);
@@ -89,6 +89,16 @@ export default function Home() {
   const [leadMsg, setLeadMsg] = useState('');
   const [leadSent, setLeadSent] = useState(false);
   const [leadSending, setLeadSending] = useState(false);
+  const [leadErr, setLeadErr] = useState<string | null>(null);
+  // نموذج الاستفسارات (صفحة منفصلة) — يُحفظ في نفس جدول leads
+  const [inqName, setInqName] = useState('');
+  const [inqPhone, setInqPhone] = useState('');
+  const [inqHood, setInqHood] = useState('');
+  const [inqType, setInqType] = useState('');
+  const [inqMsg, setInqMsg] = useState('');
+  const [inqSent, setInqSent] = useState(false);
+  const [inqSending, setInqSending] = useState(false);
+  const [inqErr, setInqErr] = useState<string | null>(null);
   const [selectedListing, setSelectedListing] = useState<UIListing | null>(null);
   const [siZone, setSiZone] = useState('النرجس'); // اسم الحي المختار في "جرّب المؤشر"
   const [siType, setSiType] = useState('شقة'); // نوع الوحدة في "جرّب المؤشر"
@@ -157,18 +167,41 @@ export default function Home() {
 
   const submitLead = async () => {
     if (!leadName.trim() || !leadPhone.trim() || leadSending) return;
-    setLeadSending(true);
+    setLeadSending(true); setLeadErr(null);
     try {
       if (isSupabaseConfigured()) {
         const sb = createClient();
-        await sb.from('leads').insert({ name: leadName.trim(), phone: leadPhone.trim(), message: leadMsg.trim() || null });
+        // نتحقّق من خطأ الإدراج فعلياً (بدل النجاح الصوري) — يكشف حجب RLS إن وُجد.
+        const { error } = await sb.from('leads').insert({ name: leadName.trim(), phone: leadPhone.trim(), message: leadMsg.trim() || null });
+        if (error) { setLeadErr('تعذّر إرسال الرسالة حالياً — حاول لاحقاً.'); setLeadSending(false); return; }
       }
       setLeadSent(true);
       setLeadName(''); setLeadPhone(''); setLeadMsg('');
     } catch {
-      setLeadSent(true);
+      setLeadErr('تعذّر إرسال الرسالة حالياً — حاول لاحقاً.');
     }
     setLeadSending(false);
+  };
+
+  // استفسار ⇒ يُحفظ في leads ليصل لـ /admin (الرسائل والطلبات)
+  const submitInquiry = async () => {
+    if (!inqName.trim() || !inqPhone.trim() || inqSending) return;
+    setInqSending(true); setInqErr(null);
+    // نضمّن الحي/النوع داخل نص الرسالة (جدول leads لا يحوي أعمدة منفصلة لها)
+    const ctx = [inqHood && `الحي: ${inqHood}`, inqType && `النوع: ${inqType}`].filter(Boolean).join(' · ');
+    const message = [ctx, inqMsg.trim()].filter(Boolean).join('\n') || null;
+    try {
+      if (isSupabaseConfigured()) {
+        const sb = createClient();
+        const { error } = await sb.from('leads').insert({ name: inqName.trim(), phone: inqPhone.trim(), message });
+        if (error) { setInqErr('تعذّر إرسال الاستفسار حالياً — حاول لاحقاً.'); setInqSending(false); return; }
+      }
+      setInqSent(true);
+      setInqName(''); setInqPhone(''); setInqHood(''); setInqType(''); setInqMsg('');
+    } catch {
+      setInqErr('تعذّر إرسال الاستفسار حالياً — حاول لاحقاً.');
+    }
+    setInqSending(false);
   };
 
   const clearFilters = () => { setFilterHood(''); setFilterType(''); setFilterBudget(''); };
@@ -230,6 +263,12 @@ export default function Home() {
       if (/(رخيص|أرخص|ارخص|أقل سعر|اقل سعر|رخيصة|ميزانية|بسيط)/.test(q)) score += (200000 - l.adv) / 20000; // الرخص
       if (/(فرص|فرصة|أقل من السوق|اقل من السوق|عادل|تحت السوق)/.test(q) && l.adv < fair) score += 6;          // الفرص
       if (/(قريب|قريبة|خدمات|وسط|مركز)/.test(q) && NEAR_HOODS.has(l.hood)) score += 4;                        // قريبة من الخدمات
+      // ── الخصائص المنظّمة (تُطابَق فقط إن ذكرها الباحث ووفّرها المكتب؛ لا خصم على الغياب) ──
+      if (/غير مفروش/.test(q)) { if (l.furnished === false) score += 5; }                                    // غير مفروشة
+      else if (/مفروش/.test(q)) { if (l.furnished === true) score += 5; }                                    // مفروشة
+      if (/راكب/.test(q) && l.kitchen === true) score += 5;                                                  // مطبخ راكب
+      if (/(مكيّف|مكيف|مكيفات|تكييف|مكيّفة|مكيفة)/.test(q) && l.ac === true) score += 5;                       // مكيّفة
+      if (/(موقف|مواقف|كراج|باركن)/.test(q) && (l.parking ?? 0) >= 1) score += 5;                            // مواقف
       return { id: l.id, score };
     });
     scored.sort((a, b) => b.score - a.score);
@@ -265,10 +304,21 @@ export default function Home() {
   };
 
   // بطاقة إعلان أفقية: عمود صورة (يمين) + شارة الحالة فوق الصورة + معلومات (يسار)
+  // شارات الخصائص المنظّمة الموجبة (تظهر إن ملأها المكتب)
+  const attrChips = (l: UIListing): string[] => {
+    const c: string[] = [];
+    if (l.furnished === true) c.push('مفروشة');
+    if (l.kitchen === true) c.push('مطبخ راكب');
+    if (l.ac === true) c.push('مكيّفة');
+    if ((l.parking ?? 0) >= 1) c.push(`${l.parking} موقف`);
+    return c;
+  };
+
   const renderListing = (l: UIListing, isMatch = false) => {
     const fair = getFair(l);
     const st = getSt(l.adv, fair);
     const img = l.images && l.images.length ? l.images[0] : null;
+    const chips = attrChips(l);
     const vBadge = st === 'hi' ? 'bg-[#fff3e0] text-[#C2410C]' : st === 'lo' ? 'bg-[#e8f7ee] text-[#1f7a44]' : 'bg-[#e6f1fb] text-[#1B6CA8]';
     return (
       <div key={l.id} onClick={() => setSelectedListing(l)}
@@ -301,6 +351,13 @@ export default function Home() {
               <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> م²</span>
               <span><b className="text-[#0f1a28]">{l.baths ?? '—'}</b> حمام</span>
             </div>
+            {chips.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {chips.map((c) => (
+                  <span key={c} className="text-[10px] bg-[#E6F1FB] text-[#1B6CA8] px-2 py-0.5 rounded-md font-medium">{c}</span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -579,6 +636,7 @@ export default function Home() {
                       <input value={leadPhone} onChange={e => setLeadPhone(e.target.value)} placeholder="رقم الجوال" className={inputCls} dir="ltr" />
                     </div>
                     <textarea value={leadMsg} onChange={e => setLeadMsg(e.target.value)} placeholder="رسالتك (اختياري) — مثال: أبحث عن شقة 3 غرف بالنرجس" rows={3} className={inputCls + ' resize-none'} />
+                    {leadErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{leadErr}</div>}
                     <button onClick={submitLead} disabled={leadSending}
                       className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-2.5 rounded-xl font-bold text-sm shadow-md hover:opacity-95 transition-all disabled:opacity-50">
                       {leadSending ? 'جارٍ الإرسال…' : 'إرسال'}
@@ -777,7 +835,10 @@ export default function Home() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${condColor[l.cond] || ''}`}>{l.condLabel || 'الحالة غير محددة'}</span>
-                  {l.furnished && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-purple-100 text-purple-800 border border-purple-200">مؤثثة</span>}
+                  {l.furnished != null && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-purple-100 text-purple-800 border border-purple-200">{l.furnished ? 'مفروشة' : 'غير مفروشة'}</span>}
+                  {l.kitchen != null && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-blue-50 text-blue-800 border border-blue-200">{l.kitchen ? 'مطبخ راكب' : 'مطبخ غير راكب'}</span>}
+                  {l.ac != null && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-cyan-50 text-cyan-800 border border-cyan-200">{l.ac ? 'مكيّفة' : 'غير مكيّفة'}</span>}
+                  {l.parking != null && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-teal-50 text-teal-800 border border-teal-200">{l.parking >= 1 ? `مواقف: ${l.parking}` : 'لا يوجد مواقف'}</span>}
                 </div>
                 {l.description && <p className="text-sm text-gray-700 leading-relaxed">{l.description}</p>}
                 <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">رخصة فال: {l.fal || '—'}</div>
@@ -860,6 +921,63 @@ export default function Home() {
         </div>
       )}
 
+      {/* ═══ الاستفسارات — نموذج يصل لـ /admin عبر جدول leads ═══ */}
+      {page === 'inquiries' && (
+        <div>
+          <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-6 text-center text-white relative">
+            <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#F5F8FB] rounded-t-3xl" />
+            <div className="relative z-10">
+              <h1 className="text-xl font-bold mb-1">الاستفسارات</h1>
+              <p className="text-white/85 text-sm">أرسل استفسارك وسيصل فريق المنصة ونتواصل معك</p>
+            </div>
+          </div>
+          <div className="px-4 pt-4 pb-6 max-w-xl mx-auto">
+            <div className="bg-white rounded-2xl border border-[#cfd9e4] shadow-sm overflow-hidden">
+              <div className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] px-4 py-3">
+                <div className="text-white font-bold text-sm">نموذج استفسار</div>
+                <div className="text-white/80 text-xs">اذكر الحي والنوع إن أردت استفساراً محدّداً</div>
+              </div>
+              <div className="p-4">
+                {inqSent ? (
+                  <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl p-4 text-sm text-center font-medium">
+                    شكراً لك! وصلنا استفسارك وسنتواصل معك قريباً.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <input value={inqName} onChange={e => setInqName(e.target.value)} placeholder="الاسم" className={inputCls} />
+                      <input value={inqPhone} onChange={e => setInqPhone(e.target.value)} placeholder="رقم الجوال" className={inputCls} dir="ltr" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-700 block mb-1 font-semibold">الحي (اختياري)</label>
+                        <select value={inqHood} onChange={e => setInqHood(e.target.value)} className={selectCls}>
+                          <option value="">— غير محدّد —</option>
+                          {Object.keys(mktAvg).map(h => <option key={h} value={h}>{h}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-700 block mb-1 font-semibold">نوع الوحدة (اختياري)</label>
+                        <select value={inqType} onChange={e => setInqType(e.target.value)} className={selectCls}>
+                          <option value="">— غير محدّد —</option>
+                          {['شقة', 'فيلا', 'دور', 'دوبلكس', 'استوديو'].map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <textarea value={inqMsg} onChange={e => setInqMsg(e.target.value)} placeholder="نص الاستفسار — مثال: متى يتوفّر دوبلكس في حطين؟" rows={3} className={inputCls + ' resize-none'} />
+                    {inqErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{inqErr}</div>}
+                    <button onClick={submitInquiry} disabled={inqSending}
+                      className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-2.5 rounded-xl font-bold text-sm shadow-md hover:opacity-95 transition-all disabled:opacity-50">
+                      {inqSending ? 'جارٍ الإرسال…' : 'إرسال الاستفسار'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="bg-white border-t border-gray-200 py-4 px-5 text-center text-xs text-gray-500 mt-4">
         <button onClick={() => { setPage('privacy'); if (typeof window !== 'undefined') window.scrollTo(0, 0); }} className="text-blue-600 font-medium hover:underline">سياسة الخصوصية</button>
@@ -895,7 +1013,11 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [fRooms, setFRooms] = useState('2');
   const [fBaths, setFBaths] = useState('1');
   const [fCond, setFCond] = useState('حالة جيدة');
-  const [fFurnished, setFFurnished] = useState(false);
+  // خصائص منظّمة اختيارية (يملؤها المكتب) — '' = غير محدّد ⇒ لا تُطابَق ولا تُخصم
+  const [fFurniture, setFFurniture] = useState(''); // مفروشة | غير مفروشة
+  const [fKitchen, setFKitchen] = useState('');     // راكب | غير راكب
+  const [fAc, setFAc] = useState('');               // مكيّفة | غير مكيّفة
+  const [fParking, setFParking] = useState('');     // 0 | 1 | 2 | 3
   const [fDesc, setFDesc] = useState('');
   const [fFiles, setFFiles] = useState<File[]>([]);
   const [publishing, setPublishing] = useState(false);
@@ -925,7 +1047,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         title: `${fType} ${fRooms} غرف — ${fHood}`.replace('استوديو 1 غرف','استوديو'),
         hood: fHood, type: fType, advertised: parseInt(fRent) || 0,
         area: fArea ? parseInt(fArea) : null, rooms: parseInt(fRooms) || null,
-        baths: parseInt(fBaths) || null, furnished: fFurnished,
+        baths: parseInt(fBaths) || null,
+        // الخصائص المنظّمة الاختيارية ('' ⇒ null = غير محدّد)
+        furnished: fFurniture === '' ? null : fFurniture === 'مفروشة',
+        kitchen: fKitchen === '' ? null : fKitchen === 'راكب',
+        ac: fAc === '' ? null : fAc === 'مكيّفة',
+        parking: fParking === '' ? null : parseInt(fParking),
         condition: condMap[fCond] || 'good', cond_label: fCond,
         description: fDesc.trim() || null, images: urls, fal_license: falNum || null,
       });
@@ -1133,7 +1260,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                 <div className="font-bold text-gray-900 mb-4">بيانات العقار</div>
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">نوع العقار</label>
-                    <select className={selectCls} value={fType} onChange={e=>setFType(e.target.value)}><option>شقة</option><option>فيلا</option><option>دور</option><option>استوديو</option></select></div>
+                    <select className={selectCls} value={fType} onChange={e=>setFType(e.target.value)}><option>شقة</option><option>فيلا</option><option>دور</option><option>دوبلكس</option><option>استوديو</option></select></div>
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحي</label>
                     <select className={selectCls} value={fHood} onChange={e=>setFHood(e.target.value)}><option>النرجس</option><option>العليا</option><option>الملقا</option><option>حطين</option><option>الياسمين</option><option>القيروان</option><option>النخيل</option><option>إشبيلية</option></select></div>
                 </div>
@@ -1151,9 +1278,18 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحالة</label>
                     <select className={selectCls} value={fCond} onChange={e=>setFCond(e.target.value)}><option>جديد</option><option>حالة جيدة</option><option>يحتاج ترميم</option></select></div>
                 </div>
-                <label className="flex items-center gap-2 text-sm text-gray-700 mb-1 cursor-pointer">
-                  <input type="checkbox" checked={fFurnished} onChange={e=>setFFurnished(e.target.checked)} /> الوحدة مؤثثة
-                </label>
+                {/* خصائص منظّمة اختيارية — تصبح معايير بحث يستخدمها المساعد الذكي */}
+                <div className="text-xs text-gray-500 mb-2">خصائص إضافية (اختيارية) — تساعد المساعد الذكي على مطابقة طلب الباحث بدقّة:</div>
+                <div className="grid grid-cols-2 gap-3 mb-1">
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">الأثاث</label>
+                    <select className={selectCls} value={fFurniture} onChange={e=>setFFurniture(e.target.value)}><option value="">غير محدّد</option><option value="مفروشة">مفروشة</option><option value="غير مفروشة">غير مفروشة</option></select></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">المطبخ</label>
+                    <select className={selectCls} value={fKitchen} onChange={e=>setFKitchen(e.target.value)}><option value="">غير محدّد</option><option value="راكب">راكب</option><option value="غير راكب">غير راكب</option></select></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">المكيفات</label>
+                    <select className={selectCls} value={fAc} onChange={e=>setFAc(e.target.value)}><option value="">غير محدّد</option><option value="مكيّفة">مكيّفة</option><option value="غير مكيّفة">غير مكيّفة</option></select></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">المواقف</label>
+                    <select className={selectCls} value={fParking} onChange={e=>setFParking(e.target.value)}><option value="">غير محدّد</option><option value="0">لا يوجد</option><option value="1">موقف واحد</option><option value="2">موقفان</option><option value="3">ثلاثة فأكثر</option></select></div>
+                </div>
                 <div className="flex gap-2 mt-4">
                   <button onClick={() => setAddStep(3)} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">التالي: الحاسبة</button>
                   <button onClick={() => setAddStep(4)} className="bg-white border border-dashed border-gray-300 text-gray-500 px-5 py-2.5 rounded-xl font-medium text-sm hover:border-gray-400 transition-all">تخطي الحاسبة</button>
