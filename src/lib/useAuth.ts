@@ -122,7 +122,15 @@ export function useAuth() {
       return { ok: false, message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.' };
     }
     const sb = createClient();
-    const { data, error } = await sb.auth.signUp({ email, password });
+    // نمرّر نوع الحساب وبيانات المكتب كـ metadata ليُنشئ trigger القاعدة صف المكتب
+    // بشكل موثوق (security definer يتجاوز RLS/التوقيت) — هذا يفصل المكتب عن الباحث فعلاً.
+    const signupMeta = {
+      role: opts?.role || 'seeker',
+      full_name: opts?.role === 'office' ? (opts.officeName || '').trim() : (opts?.seekerName || '').trim(),
+      office_name: (opts?.officeName || '').trim(),
+      fal: (opts?.fal || '').trim(),
+    };
+    const { data, error } = await sb.auth.signUp({ email, password, options: { data: signupMeta } });
     if (error) {
       const msg = /already registered|already been registered|user already/i.test(error.message)
         ? 'هذا البريد مسجّل مسبقاً — استخدم "تسجيل دخول".'
