@@ -19,7 +19,7 @@ import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 import { useAuth } from '@/lib/useAuth';
 import SiteNav from '../components/SiteNav';
-import { AdminSidebar, StatsSection, ListingsSection, OfficesSection, LeadsSection, type AdminSection } from './sections';
+import { AdminSidebar, StatsSection, ListingsSection, OfficesSection, LeadsSection, ClientsSection, type AdminSection } from './sections';
 
 // خانات الغرف للشقة/الفيلا (4 خانات): غرفة / غرفتين / ثلاث / أربع فأكثر
 const ROOM_LABELS = ['غرفة', 'غرفتين', 'ثلاث غرف', 'أربع غرف فأكثر'];
@@ -586,6 +586,7 @@ export default function AdminPage() {
         {section === 'stats' && <StatsSection sessionAdmin={sessionAdmin} />}
         {section === 'listings' && <ListingsSection sessionAdmin={sessionAdmin} />}
         {section === 'offices' && <OfficesSection sessionAdmin={sessionAdmin} />}
+        {section === 'clients' && <ClientsSection sessionAdmin={sessionAdmin} />}
         {section === 'leads' && <LeadsSection sessionAdmin={sessionAdmin} />}
         </main>
       </div>

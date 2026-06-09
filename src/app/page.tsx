@@ -126,6 +126,11 @@ export default function Home() {
   const [authPass2, setAuthPass2] = useState('');
   const [authMsg, setAuthMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
+  // نوع الحساب عند إنشاء حساب جديد: باحث | مكتب (للربط الحقيقي بصف offices)
+  const [authRole, setAuthRole] = useState<'seeker' | 'office'>('seeker');
+  const [authOfficeName, setAuthOfficeName] = useState('');
+  const [authFal, setAuthFal] = useState('');
+  const [authSeekerName, setAuthSeekerName] = useState('');
 
   const submitAuth = async () => {
     setAuthBusy(true);
@@ -138,7 +143,12 @@ export default function Home() {
         setAuthBusy(false);
         return;
       }
-      r = await signUpWithPassword(email, authPass);
+      if (authRole === 'office' && !authOfficeName.trim()) {
+        setAuthMsg({ ok: false, text: 'أدخل اسم المكتب لإكمال تسجيل المكتب.' });
+        setAuthBusy(false);
+        return;
+      }
+      r = await signUpWithPassword(email, authPass, { role: authRole, officeName: authOfficeName, fal: authFal, seekerName: authSeekerName });
     } else {
       r = await signInWithPassword(email, authPass);
     }
@@ -701,6 +711,22 @@ export default function Home() {
                     </button>
                   </div>
 
+                  {authMode === 'signup' && (
+                    <div className="mb-3">
+                      <label className="text-xs text-gray-700 font-semibold block mb-1">نوع الحساب</label>
+                      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                        <button type="button" onClick={() => setAuthRole('seeker')}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${authRole === 'seeker' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}>
+                          باحث عن إيجار
+                        </button>
+                        <button type="button" onClick={() => setAuthRole('office')}
+                          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${authRole === 'office' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}>
+                          مكتب عقاري
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <label className="text-xs text-gray-700 font-semibold block mb-1">البريد الإلكتروني</label>
                   <input
                     type="email"
@@ -734,6 +760,39 @@ export default function Home() {
                         placeholder="••••••••"
                         className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
                       />
+                      {authRole === 'office' && (
+                        <>
+                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">اسم المكتب</label>
+                          <input
+                            type="text"
+                            value={authOfficeName}
+                            onChange={(e) => setAuthOfficeName(e.target.value)}
+                            placeholder="مثال: مكتب الأفق العقاري"
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
+                          />
+                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">رقم رخصة فال (اختياري)</label>
+                          <input
+                            type="text"
+                            dir="ltr"
+                            value={authFal}
+                            onChange={(e) => setAuthFal(e.target.value)}
+                            placeholder="1100123456"
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
+                          />
+                        </>
+                      )}
+                      {authRole === 'seeker' && (
+                        <>
+                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">الاسم (اختياري)</label>
+                          <input
+                            type="text"
+                            value={authSeekerName}
+                            onChange={(e) => setAuthSeekerName(e.target.value)}
+                            placeholder="اسمك"
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
+                          />
+                        </>
+                      )}
                     </>
                   )}
 
@@ -798,7 +857,7 @@ export default function Home() {
                     </li>
                   ))}
                 </ul>
-                <button onClick={() => plan.popular ? setPage('office') : undefined}
+                <button onClick={() => { setAuthMode('signup'); setAuthRole(plan.popular ? 'office' : 'seeker'); if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${plan.popular ? 'bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white shadow-md hover:opacity-95' : 'bg-white border-2 border-blue-500 text-[#0A3D62] hover:bg-blue-50'}`}>
                   {plan.cta}
                 </button>
@@ -808,9 +867,22 @@ export default function Home() {
         </div>
       )}
 
-      {/* ═══ OFFICE DASHBOARD ═══ */}
+      {/* ═══ OFFICE DASHBOARD — يتطلّب تسجيل دخول حقيقي ═══ */}
       {page === 'office' && (
-        <OfficeDashboard mktAvg={mktAvg} />
+        user ? (
+          <OfficeDashboard mktAvg={mktAvg} />
+        ) : (
+          <div className="max-w-md mx-auto px-5 py-12 text-center">
+            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+              <div className="text-lg font-bold text-gray-900 mb-2">لوحة المكتب تتطلّب تسجيل الدخول</div>
+              <p className="text-sm text-gray-500 mb-5 leading-relaxed">سجّل دخولك بحساب مكتب، أو أنشئ حساب مكتب جديد، للوصول إلى لوحتك وإعلاناتك الحقيقية.</p>
+              <button onClick={() => { setPage('pricing'); setAuthMode('login'); if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
+                تسجيل الدخول / إنشاء حساب
+              </button>
+            </div>
+          </div>
+        )
       )}
 
       {/* تفاصيل الإعلان */}
@@ -1030,6 +1102,29 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [publishing, setPublishing] = useState(false);
   const [publishMsg, setPublishMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // ── بيانات المكتب الحقيقية (مربوطة بالحساب الحالي عبر owner_id) ──
+  const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; verified: boolean; status: string | null } | null>(null);
+  const [myListings, setMyListings] = useState<{ id: string; title: string; advertised: number; status: string; rejection_note: string | null }[]>([]);
+  const [offLoaded, setOffLoaded] = useState(false);
+  const reloadOffice = async () => {
+    if (!isSupabaseConfigured()) { setOffLoaded(true); return; }
+    const sb = createClient();
+    const { data: { user: u } } = await sb.auth.getUser();
+    if (!u) { setMyOffice(null); setOffLoaded(true); return; }
+    const { data: off } = await sb.from('offices').select('id,name,fal_license,verified,status').eq('owner_id', u.id).maybeSingle();
+    setMyOffice((off as typeof myOffice) ?? null);
+    if (off) {
+      const { data: ls } = await sb.from('listings').select('id,title,advertised,status,rejection_note').eq('office_id', off.id).order('created_at', { ascending: false });
+      setMyListings((ls ?? []) as typeof myListings);
+    } else {
+      setMyListings([]);
+    }
+    setOffLoaded(true);
+  };
+  useEffect(() => { reloadOffice(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  const activeCount = myListings.filter((l) => l.status === 'approved').length;
+  const pendingCount = myListings.filter((l) => l.status === 'pending').length;
+
   const condMap: Record<string, string> = { 'جديد': 'new', 'حالة جيدة': 'good', 'يحتاج ترميم': 'old' };
 
   const publishListing = async () => {
@@ -1040,6 +1135,15 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         setPublishMsg({ ok: false, text: 'الاتصال بقاعدة البيانات غير مُفعّل بعد.' }); setPublishing(false); return;
       }
       const sb = createClient();
+      // ── ربط حقيقي: الإعلان يُنشر باسم مكتب المستخدم الحالي ويدخل بحالة «بانتظار» ──
+      const { data: { user: pubUser } } = await sb.auth.getUser();
+      if (!pubUser) {
+        setPublishMsg({ ok: false, text: 'سجّل دخولك بحساب مكتب أولاً لنشر إعلان.' }); setPublishing(false); return;
+      }
+      const { data: myOffice } = await sb.from('offices').select('id').eq('owner_id', pubUser.id).maybeSingle();
+      if (!myOffice) {
+        setPublishMsg({ ok: false, text: 'لا يوجد مكتب مرتبط بحسابك — سجّل مكتبك من صفحة «التسجيل» أولاً.' }); setPublishing(false); return;
+      }
       // رفع الصور إلى التخزين
       const urls: string[] = [];
       for (const file of fFiles) {
@@ -1051,6 +1155,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         }
       }
       const { error } = await sb.from('listings').insert({
+        office_id: myOffice.id, status: 'pending',
         title: `${fType} ${fRooms} غرف — ${fHood}`.replace('استوديو 1 غرف','استوديو'),
         hood: fHood, type: fType, advertised: parseInt(fRent) || 0,
         area: fArea ? parseInt(fArea) : null, rooms: parseInt(fRooms) || null,
@@ -1064,7 +1169,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         description: fDesc.trim() || null, images: urls, fal_license: falNum || null,
       });
       if (error) { setPublishMsg({ ok: false, text: 'تعذّر النشر: ' + error.message }); setPublishing(false); return; }
-      setPublishMsg({ ok: true, text: 'تم نشر الإعلان بنجاح!' });
+      setPublishMsg({ ok: true, text: 'تم إرسال الإعلان — بانتظار موافقة الإدارة قبل الظهور للعامة.' });
       setFRent(''); setFArea(''); setFDesc(''); setFFiles([]);
       setTimeout(() => { setPublishMsg(null); setAddStep(1); setOffPage('listings'); }, 1200);
     } catch {
@@ -1098,19 +1203,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const inputCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
   const selectCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
-  const officeListings = [
-    { id:1, title:'شقة 3 غرف — حي النرجس', price:68000, fair:65000, views:142, inquiries:4, st:'ok' },
-    { id:2, title:'فيلا 5 غرف — حي حطين', price:145000, fair:127600, views:89, inquiries:2, st:'hi' },
-    { id:3, title:'استوديو — حي العليا', price:28000, fair:28600, views:76, inquiries:3, st:'lo' },
-    { id:4, title:'شقة 2 غرف — الياسمين', price:48000, fair:54000, views:54, inquiries:1, st:'ok' },
-  ];
-
-  const stBadge: Record<string,string> = {
-    ok:'bg-blue-100 text-blue-800 border border-blue-200',
-    hi:'bg-orange-100 text-orange-800 border border-orange-200',
-    lo:'bg-green-100 text-green-800 border border-green-200',
+  // حالة اعتماد الإعلان (مربوطة بحقل status الحقيقي في القاعدة)
+  const lsMeta: Record<string, { cls: string; label: string }> = {
+    approved: { cls: 'bg-green-100 text-green-800 border border-green-200', label: 'معتمد' },
+    rejected: { cls: 'bg-red-100 text-red-700 border border-red-200', label: 'مرفوض' },
+    pending: { cls: 'bg-amber-100 text-amber-800 border border-amber-200', label: 'بانتظار الموافقة' },
   };
-  const stLabel: Record<string,string> = { ok:'مناسب', hi:'مرتفع', lo:'فرصة' };
 
   const sideItems = [
     { id:'dashboard', label:'لوحة التحكم' },
@@ -1121,6 +1219,18 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     { id:'profile', label:'ملف المكتب' },
     { id:'settings', label:'الإعدادات' },
   ];
+
+  // حساب مسجّل لكن بلا مكتب مرتبط (باحث أو لم يُكمل تسجيل مكتب) ⇒ لا نعرض لوحة المكتب الوهمية
+  if (offLoaded && !myOffice) {
+    return (
+      <div className="max-w-md mx-auto px-5 py-12 text-center">
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+          <div className="text-lg font-bold text-gray-900 mb-2">لا يوجد مكتب مرتبط بحسابك</div>
+          <p className="text-sm text-gray-500 leading-relaxed">حسابك مسجّل، لكن لا يوجد مكتب عقاري مربوط به. أنشئ حساب «مكتب عقاري» من صفحة التسجيل لتظهر لك لوحة المكتب وإعلاناتك الحقيقية.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -1143,14 +1253,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         {offPage === 'dashboard' && (
           <div>
             <div className="mb-5">
-              <div className="text-xl font-bold text-gray-900 mb-1">مرحباً، مكتب الأرض المباركة</div>
-              <div className="text-sm text-gray-500">ملخص نشاطك خلال آخر 7 أيام</div>
+              <div className="text-xl font-bold text-gray-900 mb-1">مرحباً، {myOffice?.name || 'مكتبك'}</div>
+              <div className="text-sm text-gray-500">{myOffice ? 'ملخص إعلاناتك' : 'لا يوجد مكتب مرتبط بحسابك — سجّل مكتبك من صفحة التسجيل.'}</div>
             </div>
             <div className="grid grid-cols-3 gap-4 mb-5">
               {[
-                { label:'إعلانات نشطة', val:'24', trend:'+3 هذا الأسبوع', color:'text-green-600' },
-                { label:'زوار الإعلانات', val:'847', trend:'+18%', color:'text-green-600' },
-                { label:'استفسارات جديدة', val:'12', trend:'5 تحتاج رد', color:'text-orange-600' },
+                { label:'إعلانات معتمدة', val:String(activeCount), trend:'ظاهرة للعامة', color:'text-green-600' },
+                { label:'بانتظار الموافقة', val:String(pendingCount), trend:pendingCount? 'قيد المراجعة':'لا جديد', color:'text-orange-600' },
+                { label:'إجمالي إعلاناتي', val:String(myListings.length), trend:'كل الحالات', color:'text-[#0A3D62]' },
               ].map(s => (
                 <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                   <div className="text-xs text-gray-500 mb-2 font-medium">{s.label}</div>
@@ -1185,31 +1295,40 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
             <div className="flex justify-between items-center mb-5">
               <div>
                 <div className="text-xl font-bold text-gray-900 mb-1">إعلاناتي</div>
-                <div className="text-sm text-gray-500">24 إعلان نشط · 3 موقوفة</div>
+                <div className="text-sm text-gray-500">{activeCount} معتمد · {pendingCount} بانتظار الموافقة · {myListings.length} الإجمالي</div>
               </div>
               <button onClick={() => { setOffPage('add'); setAddStep(1); }}
                 className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-4 py-2 rounded-xl font-bold text-sm shadow">
                 + إعلان جديد
               </button>
             </div>
+            {myListings.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm">
+                {myOffice ? 'لا توجد إعلانات بعد — أضف أول إعلان لمكتبك.' : 'سجّل مكتبك أولاً من صفحة «التسجيل» لتتمكن من نشر الإعلانات.'}
+              </div>
+            ) : (
             <div className="space-y-3">
-              {officeListings.map(l => (
+              {myListings.map(l => {
+                const m = lsMeta[l.status] ?? lsMeta.pending;
+                return (
                 <div key={l.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-all">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="font-bold text-gray-900 mb-1">{l.title}</div>
-                      <div className="text-sm text-gray-600">{l.price.toLocaleString('ar-SA')} ريال/سنة</div>
-                      <div className="text-xs text-blue-600 mt-0.5">السعر العادل: {l.fair.toLocaleString('ar-SA')}</div>
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-gray-900 mb-1 truncate">{l.title}</div>
+                      <div className="text-sm text-gray-600">{l.advertised.toLocaleString('ar-SA')} ريال/سنة</div>
                     </div>
-                    <span className={`text-xs px-2.5 py-1 rounded-xl font-bold ${stBadge[l.st]}`}>{stLabel[l.st]}</span>
+                    <span className={`text-xs px-2.5 py-1 rounded-xl font-bold whitespace-nowrap ${m.cls}`}>{m.label}</span>
                   </div>
-                  <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
-                    <span><strong className="text-gray-900">{l.views}</strong> زائر</span>
-                    <span><strong className="text-gray-900">{l.inquiries}</strong> استفسار</span>
-                  </div>
+                  {l.status === 'rejected' && l.rejection_note && (
+                    <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-red-700 bg-red-50 rounded-lg p-2.5">
+                      <strong>ملاحظات الإدارة:</strong> {l.rejection_note}
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
+            )}
           </div>
         )}
 
@@ -1249,7 +1368,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                   </div>
                   <div>
                     <label className="text-xs text-gray-700 font-semibold block mb-1">اسم المكتب</label>
-                    <input defaultValue="مكتب الأرض المباركة" className={inputCls} />
+                    <input value={myOffice?.name || ''} readOnly placeholder="—" className={`${inputCls} bg-gray-50`} />
                   </div>
                 </div>
                 {falStatus === 'loading' && <div className="text-sm text-blue-600 bg-blue-50 rounded-xl p-3 mb-3 border border-blue-100">جاري التحقق من منصة فال...</div>}
@@ -1481,29 +1600,30 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
             <div className="text-xl font-bold text-gray-900 mb-5">ملف المكتب</div>
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
               <div className="flex items-center gap-4 mb-5">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] flex items-center justify-center text-white text-2xl font-bold">م</div>
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] flex items-center justify-center text-white text-2xl font-bold">{(myOffice?.name || 'م').slice(0, 1)}</div>
                 <div>
-                  <div className="font-bold text-lg text-gray-900">مكتب الأرض المباركة العقاري</div>
+                  <div className="font-bold text-lg text-gray-900">{myOffice?.name || '— لا يوجد مكتب مرتبط —'}</div>
                   <div className="flex gap-2 mt-1">
-                    <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-lg border border-green-200 font-medium">موثّق بفال</span>
+                    {myOffice?.verified
+                      ? <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-lg border border-green-200 font-medium">موثّق بفال ✓</span>
+                      : <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-lg border border-amber-200 font-medium">غير موثّق بعد</span>}
                     <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-lg border border-gray-200">الرياض</span>
-                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-lg border border-gray-200">منذ 2018</span>
                   </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div><label className="text-xs text-gray-700 font-semibold block mb-1">اسم المكتب</label>
-                  <input defaultValue="مكتب الأرض المباركة العقاري" className={inputCls} /></div>
+                  <input key={myOffice?.id || 'noffice'} defaultValue={myOffice?.name || ''} placeholder="اسم المكتب" className={inputCls} /></div>
                 <div><label className="text-xs text-gray-700 font-semibold block mb-1">رقم رخصة فال</label>
-                  <input defaultValue="1234567" disabled className={`${inputCls} bg-gray-50 text-gray-400`} /></div>
+                  <input key={(myOffice?.id || 'noffice') + '-fal'} defaultValue={myOffice?.fal_license || ''} disabled className={`${inputCls} bg-gray-50 text-gray-400`} /></div>
                 <div><label className="text-xs text-gray-700 font-semibold block mb-1">رقم الجوال</label>
-                  <input defaultValue="0501234567" className={inputCls} /></div>
+                  <input placeholder="05xxxxxxxx" className={inputCls} /></div>
                 <div><label className="text-xs text-gray-700 font-semibold block mb-1">البريد الإلكتروني</label>
-                  <input defaultValue="info@mubaraka.sa" className={inputCls} /></div>
+                  <input placeholder="name@example.com" className={inputCls} /></div>
               </div>
               <div className="mb-4"><label className="text-xs text-gray-700 font-semibold block mb-1">نبذة عن المكتب</label>
-                <textarea rows={3} defaultValue="مكتب عقاري موثوق متخصص في تأجير الشقق والفلل في شمال الرياض منذ 2018." className={`${inputCls} resize-none`} /></div>
-              <button className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">حفظ التغييرات</button>
+                <textarea rows={3} placeholder="نبذة مختصرة عن مكتبك وخدماته…" className={`${inputCls} resize-none`} /></div>
+              <div className="text-xs text-gray-400">بيانات المكتب الأساسية (الاسم والرخصة) مرتبطة بحسابك في القاعدة.</div>
             </div>
           </div>
         )}

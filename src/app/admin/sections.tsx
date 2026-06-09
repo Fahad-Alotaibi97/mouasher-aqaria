@@ -139,6 +139,7 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
 interface ListingRow {
   id: string; title: string; hood: string; type: string; advertised: number;
   status: string; active: boolean; office_id: string | null; created_at: string;
+  rejection_note: string | null;
 }
 export function ListingsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const [rows, setRows] = useState<ListingRow[]>([]);
@@ -152,7 +153,7 @@ export function ListingsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
     setLoading(true); setErr(null);
     const sb = createClient();
     const [lr, or_] = await Promise.all([
-      sb.from('listings').select('id,title,hood,type,advertised,status,active,office_id,created_at').order('created_at', { ascending: false }),
+      sb.from('listings').select('id,title,hood,type,advertised,status,active,office_id,created_at,rejection_note').order('created_at', { ascending: false }),
       sb.from('offices').select('id,name'),
     ]);
     if (lr.error) { setErr(lr.error); setLoading(false); return; }
@@ -185,6 +186,11 @@ export function ListingsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
     const adv = parseInt(edit.advertised, 10);
     await patch(edit.id, { title: edit.title.trim(), advertised: Number.isNaN(adv) ? 0 : adv });
     setEdit(null);
+  };
+  const reject = (id: string) => {
+    const note = typeof window !== 'undefined' ? window.prompt('سبب الرفض / ملاحظات تظهر للمكتب (اختياري):', '') : '';
+    if (note === null) return; // ألغى المدير
+    patch(id, { status: 'rejected', rejection_note: note.trim() || null });
   };
 
   if (!sessionAdmin) return <><SectionHead title="إدارة الإعلانات" /><NeedSession /></>;
@@ -227,14 +233,19 @@ export function ListingsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                       </div>
                       <span className={`text-[11px] px-2.5 py-1 rounded-lg font-bold border whitespace-nowrap ${sm.cls}`}>{sm.label}</span>
                     </div>
+                    {l.status === 'rejected' && l.rejection_note && (
+                      <div className="mt-2 text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg p-2.5">
+                        <strong>ملاحظات الرفض:</strong> {l.rejection_note}
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[#f0f4f8]">
                       {l.status !== 'approved' && (
-                        <button onClick={() => patch(l.id, { status: 'approved' })} disabled={busy === l.id}
+                        <button onClick={() => patch(l.id, { status: 'approved', rejection_note: null })} disabled={busy === l.id}
                           className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-green-700 disabled:opacity-50">اعتماد</button>
                       )}
                       {l.status !== 'rejected' && (
-                        <button onClick={() => patch(l.id, { status: 'rejected' })} disabled={busy === l.id}
-                          className="text-xs bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-lg font-bold hover:bg-orange-200 disabled:opacity-50">رفض</button>
+                        <button onClick={() => reject(l.id)} disabled={busy === l.id}
+                          className="text-xs bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-lg font-bold hover:bg-orange-200 disabled:opacity-50">رفض بملاحظات</button>
                       )}
                       <button onClick={() => setEdit({ id: l.id, title: l.title, advertised: String(l.advertised) })} disabled={busy === l.id}
                         className="text-xs bg-white border border-[#cfd9e4] text-[#0A3D62] px-3 py-1.5 rounded-lg font-bold hover:bg-[#f0f4f8] disabled:opacity-50">تعديل</button>
@@ -255,7 +266,7 @@ export function ListingsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
 // ════════════════════════════════════════════════════════════
 //  4) إدارة المكاتب — مكاتب حقيقية + توثيق/إيقاف + عدد الإعلانات
 // ════════════════════════════════════════════════════════════
-interface OfficeRow { id: string; name: string; fal_license: string | null; verified: boolean; active: boolean; created_at: string }
+interface OfficeRow { id: string; name: string; fal_license: string | null; verified: boolean; active: boolean; status: string; rejection_note: string | null; created_at: string }
 interface MiniListing { id: string; title: string; status: string }
 export function OfficesSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const [rows, setRows] = useState<OfficeRow[]>([]);
@@ -270,7 +281,7 @@ export function OfficesSection({ sessionAdmin }: { sessionAdmin: boolean }) {
     setLoading(true); setErr(null);
     const sb = createClient();
     const [or_, lr] = await Promise.all([
-      sb.from('offices').select('id,name,fal_license,verified,active,created_at').order('created_at', { ascending: false }),
+      sb.from('offices').select('id,name,fal_license,verified,active,status,rejection_note,created_at').order('created_at', { ascending: false }),
       sb.from('listings').select('office_id'),
     ]);
     if (or_.error) { setErr(or_.error); setLoading(false); return; }
@@ -289,6 +300,11 @@ export function OfficesSection({ sessionAdmin }: { sessionAdmin: boolean }) {
     const { error } = await sb.from('offices').update(p).eq('id', id);
     if (error) setErr(error); else await load();
     setBusy(null);
+  };
+  const rejectOffice = (id: string) => {
+    const note = typeof window !== 'undefined' ? window.prompt('سبب رفض المكتب / ملاحظات (اختياري):', '') : '';
+    if (note === null) return;
+    patch(id, { status: 'rejected', rejection_note: note.trim() || null });
   };
   const toggleListings = async (id: string) => {
     if (expanded === id) { setExpanded(null); setExpandList([]); return; }
@@ -312,18 +328,30 @@ export function OfficesSection({ sessionAdmin }: { sessionAdmin: boolean }) {
             <div key={o.id} className={`${card} p-4`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-bold text-[#0f1a28] text-sm flex items-center gap-2">
+                  <div className="font-bold text-[#0f1a28] text-sm flex items-center gap-2 flex-wrap">
                     {o.name}
+                    <span className={`text-[10px] px-2 py-0.5 rounded border font-bold ${(statusMeta[o.status] ?? statusMeta.pending).cls}`}>{(statusMeta[o.status] ?? statusMeta.pending).label}</span>
                     {o.verified && <span className="text-[10px] bg-green-100 text-green-800 border border-green-200 px-2 py-0.5 rounded">موثّق ✓</span>}
                     {!o.active && <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded">موقوف</span>}
                   </div>
                   <div className="text-xs text-[#33414f] mt-0.5">رخصة فال: {o.fal_license || '—'} · {fmtDate(o.created_at)}</div>
                   <div className="text-xs text-[#33414f] mt-0.5">عدد الإعلانات: <b className="text-[#0f1a28]">{fmtNum(counts[o.id] ?? 0)}</b></div>
+                  {o.status === 'rejected' && o.rejection_note && (
+                    <div className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg p-2 mt-1.5"><strong>ملاحظات الرفض:</strong> {o.rejection_note}</div>
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[#f0f4f8]">
+                {o.status !== 'approved' && (
+                  <button onClick={() => patch(o.id, { status: 'approved', rejection_note: null })} disabled={busy === o.id}
+                    className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-green-700 disabled:opacity-50">اعتماد</button>
+                )}
+                {o.status !== 'rejected' && (
+                  <button onClick={() => rejectOffice(o.id)} disabled={busy === o.id}
+                    className="text-xs bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-lg font-bold hover:bg-orange-200 disabled:opacity-50">رفض بملاحظات</button>
+                )}
                 <button onClick={() => patch(o.id, { verified: !o.verified })} disabled={busy === o.id}
-                  className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-green-700 disabled:opacity-50">
+                  className="text-xs bg-white border border-[#cfd9e4] text-[#0A3D62] px-3 py-1.5 rounded-lg font-bold hover:bg-[#f0f4f8] disabled:opacity-50">
                   {o.verified ? 'إلغاء التوثيق' : 'توثيق ✓'}
                 </button>
                 <button onClick={() => patch(o.id, { active: !o.active })} disabled={busy === o.id}
@@ -420,13 +448,80 @@ export function LeadsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   );
 }
 
+// ════════════════════════════════════════════════════════════
+//  6) العملاء — كل الحسابات المسجّلة (مكاتب + باحثين) من جدول profiles
+// ════════════════════════════════════════════════════════════
+interface ClientRow { id: string; full_name: string | null; phone: string | null; role: string; created_at: string }
+export function ClientsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
+  const [rows, setRows] = useState<ClientRow[]>([]);
+  const [err, setErr] = useState<PgErr | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'office' | 'seeker'>('all');
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr(null);
+    const sb = createClient();
+    const { data, error } = await sb.from('profiles').select('id,full_name,phone,role,created_at').order('created_at', { ascending: false });
+    if (error) setErr(error); else setRows((data ?? []) as ClientRow[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { if (!sessionAdmin) { setLoading(false); return; } load(); }, [sessionAdmin, load]);
+
+  if (!sessionAdmin) return <><SectionHead title="العملاء" /><NeedSession /></>;
+
+  const roleMeta: Record<string, { cls: string; label: string }> = {
+    office: { cls: 'bg-blue-100 text-blue-800 border-blue-200', label: 'مكتب' },
+    seeker: { cls: 'bg-gray-100 text-gray-700 border-gray-200', label: 'باحث' },
+  };
+  const shown = rows.filter((r) => (filter === 'all' ? true : r.role === filter));
+  const counts = { all: rows.length, office: rows.filter((r) => r.role === 'office').length, seeker: rows.filter((r) => r.role === 'seeker').length };
+
+  return (
+    <>
+      <SectionHead title="العملاء" subtitle="كل الحسابات المسجّلة (مكاتب + باحثين) من جدول profiles — الأحدث أولاً" onRefresh={load} />
+      {err && <ErrBox e={err} />}
+      <div className="flex gap-2 mb-3">
+        {(['all', 'office', 'seeker'] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)}
+            className={`text-xs px-3 py-1.5 rounded-lg font-bold border ${filter === f ? 'bg-[#0A3D62] text-white border-[#0A3D62]' : 'bg-white text-[#33414f] border-[#cfd9e4] hover:bg-[#f0f4f8]'}`}>
+            {f === 'all' ? 'الكل' : f === 'office' ? 'المكاتب' : 'الباحثين'} ({fmtNum(counts[f])})
+          </button>
+        ))}
+      </div>
+      {loading ? <Loading /> : shown.length === 0 && !err ? (
+        <Empty text="لا توجد حسابات بعد — ستظهر هنا عند تسجيل المكاتب والباحثين." />
+      ) : (
+        <div className="space-y-3">
+          {shown.map((c) => {
+            const rm = roleMeta[c.role] ?? roleMeta.seeker;
+            return (
+              <div key={c.id} className={`${card} p-4`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-bold text-[#0f1a28] text-sm">{c.full_name || '— بلا اسم —'}</div>
+                    {c.phone && <div className="text-xs text-[#1B6CA8] mt-0.5" dir="ltr" style={{ textAlign: 'right' }}>{c.phone}</div>}
+                    <div className="text-[11px] text-[#33414f] mt-1">مسجّل: {fmtDate(c.created_at)}</div>
+                  </div>
+                  <span className={`text-[11px] px-2.5 py-1 rounded-lg font-bold border whitespace-nowrap ${rm.cls}`}>{rm.label}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── الشريط الجانبي لأقسام اللوحة ─────────────────────────────
-export type AdminSection = 'prices' | 'stats' | 'listings' | 'offices' | 'leads';
+export type AdminSection = 'prices' | 'stats' | 'listings' | 'offices' | 'leads' | 'clients';
 const SIDEBAR_ITEMS: { id: AdminSection; label: string }[] = [
   { id: 'prices', label: 'الأسعار والمتوسطات' },
   { id: 'stats', label: 'لوحة الإحصائيات' },
   { id: 'listings', label: 'إدارة الإعلانات' },
   { id: 'offices', label: 'إدارة المكاتب' },
+  { id: 'clients', label: 'العملاء' },
   { id: 'leads', label: 'الرسائل والطلبات' },
 ];
 

@@ -109,7 +109,8 @@ export function useAuth() {
 
   async function signUpWithPassword(
     email: string,
-    password: string
+    password: string,
+    opts?: { role?: 'seeker' | 'office'; officeName?: string; fal?: string; seekerName?: string }
   ): Promise<{ ok: boolean; message: string; isAdmin?: boolean }> {
     if (!isSupabaseConfigured()) {
       return { ok: false, message: 'لم يتم ضبط الاتصال بقاعدة البيانات بعد.' };
@@ -136,6 +137,23 @@ export function useAuth() {
           message:
             'تم إنشاء الحساب، لكن الدخول المباشر يتطلب تعطيل "Confirm email" في إعدادات Supabase ثم تسجيل الدخول.',
         };
+      }
+    }
+    // ── ربط حقيقي: تسجيل المكتب ينشئ ملف المكتب (offices) ويضبط الدور ──
+    //   يتطلب جلسة فعّالة (auth.uid()) ليُمرّر سياسات RLS — متوفّرة بعد الدخول أعلاه.
+    if (data.user) {
+      const uid = data.user.id;
+      if (opts?.role === 'office') {
+        const officeName = (opts.officeName || '').trim() || 'مكتب عقاري';
+        await sb.from('profiles').update({ role: 'office', full_name: officeName }).eq('id', uid);
+        const { data: existing } = await sb.from('offices').select('id').eq('owner_id', uid).maybeSingle();
+        if (!existing) {
+          await sb.from('offices').insert({ owner_id: uid, name: officeName, fal_license: (opts.fal || '').trim() || null });
+        }
+      } else {
+        // باحث: نخزّن اسمه في ملفه ليظهر ضمن «العملاء» في لوحة الأدمن
+        const seekerName = (opts?.seekerName || '').trim();
+        if (seekerName) await sb.from('profiles').update({ role: 'seeker', full_name: seekerName }).eq('id', uid);
       }
     }
     const admin = data.user ? await fetchIsAdmin(sb, data.user.id) : false;
