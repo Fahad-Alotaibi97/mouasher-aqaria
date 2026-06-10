@@ -1103,7 +1103,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [publishMsg, setPublishMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // ── بيانات المكتب الحقيقية (مربوطة بالحساب الحالي عبر owner_id) ──
-  const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; verified: boolean; status: string | null } | null>(null);
+  const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; verified: boolean; status: string | null; active: boolean } | null>(null);
   const [myListings, setMyListings] = useState<{ id: string; title: string; advertised: number; status: string; rejection_note: string | null }[]>([]);
   const [offLoaded, setOffLoaded] = useState(false);
   // نموذج إنشاء المكتب داخل اللوحة (يضمن ربط أي حساب بمكتب بشكل موثوق)
@@ -1123,7 +1123,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     const sb = createClient();
     const uid = await currentUid(sb);
     if (!uid) { setMyOffice(null); setOffLoaded(true); return; }
-    const { data: offs } = await sb.from('offices').select('id,name,fal_license,verified,status').eq('owner_id', uid).order('created_at', { ascending: false }).limit(1);
+    const { data: offs } = await sb.from('offices').select('id,name,fal_license,verified,status,active').eq('owner_id', uid).order('created_at', { ascending: false }).limit(1);
     const off = (offs && offs[0]) || null;
     setMyOffice((off as typeof myOffice) ?? null);
     if (off) {
@@ -1165,9 +1165,15 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         setPublishMsg({ ok: false, text: 'الاتصال بقاعدة البيانات غير مُفعّل بعد.' }); setPublishing(false); return;
       }
       const sb = createClient();
-      // ── ربط حقيقي: الإعلان يُنشر باسم مكتب المستخدم الحالي ويدخل بحالة «بانتظار» ──
+      // ── ربط حقيقي + صلاحيات: النشر يتطلب مكتباً معتمداً ونشطاً ──
       if (!myOffice) {
         setPublishMsg({ ok: false, text: 'أنشئ مكتبك أولاً من لوحة المكتب لنشر إعلان.' }); setPublishing(false); return;
+      }
+      if (myOffice.status !== 'approved') {
+        setPublishMsg({ ok: false, text: 'حسابك بانتظار موافقة الإدارة — لا يمكنك نشر إعلانات حتى يُعتمد مكتبك.' }); setPublishing(false); return;
+      }
+      if (!myOffice.active) {
+        setPublishMsg({ ok: false, text: 'مكتبك موقوف حالياً من الإدارة — لا يمكنك النشر. تواصل مع الإدارة.' }); setPublishing(false); return;
       }
       // رفع الصور إلى التخزين
       const urls: string[] = [];
@@ -1180,7 +1186,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         }
       }
       const { error } = await sb.from('listings').insert({
-        office_id: myOffice.id, status: 'pending',
+        office_id: myOffice.id, status: 'approved',
         title: `${fType} ${fRooms} غرف — ${fHood}`.replace('استوديو 1 غرف','استوديو'),
         hood: fHood, type: fType, advertised: parseInt(fRent) || 0,
         area: fArea ? parseInt(fArea) : null, rooms: parseInt(fRooms) || null,
@@ -1194,7 +1200,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         description: fDesc.trim() || null, images: urls, fal_license: falNum || null,
       });
       if (error) { setPublishMsg({ ok: false, text: 'تعذّر النشر: ' + error.message }); setPublishing(false); return; }
-      setPublishMsg({ ok: true, text: 'تم إرسال الإعلان — بانتظار موافقة الإدارة قبل الظهور للعامة.' });
+      setPublishMsg({ ok: true, text: 'تم نشر الإعلان بنجاح — ظاهر الآن للباحثين.' });
       setFRent(''); setFArea(''); setFDesc(''); setFFiles([]);
       setTimeout(() => { setPublishMsg(null); setAddStep(1); setOffPage('listings'); }, 1200);
     } catch {
@@ -1295,6 +1301,21 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
               <div className="text-xl font-bold text-gray-900 mb-1">مرحباً، {myOffice?.name || 'مكتبك'}</div>
               <div className="text-sm text-gray-500">{myOffice ? 'ملخص إعلاناتك' : 'لا يوجد مكتب مرتبط بحسابك — سجّل مكتبك من صفحة التسجيل.'}</div>
             </div>
+            {myOffice && (
+              <div className={`mb-5 rounded-xl p-4 border text-sm font-medium ${
+                (myOffice.status === 'approved' && myOffice.active) ? 'bg-green-50 border-green-200 text-green-800'
+                : myOffice.status === 'rejected' ? 'bg-red-50 border-red-200 text-red-700'
+                : !myOffice.active ? 'bg-gray-100 border-gray-300 text-gray-700'
+                : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                {(myOffice.status === 'approved' && myOffice.active)
+                  ? '✅ مكتبك معتمد ونشط — تقدر تنشر إعلانات بلا حدود.'
+                  : myOffice.status === 'rejected'
+                  ? '⛔ تم رفض حسابك من الإدارة — تواصل معها.'
+                  : !myOffice.active
+                  ? '⏸️ مكتبك موقوف حالياً من الإدارة — لا يمكنك النشر.'
+                  : '⏳ حسابك بانتظار موافقة الإدارة — لا يمكنك نشر إعلانات حتى الاعتماد.'}
+              </div>
+            )}
             <div className="grid grid-cols-3 gap-4 mb-5">
               {[
                 { label:'إعلانات معتمدة', val:String(activeCount), trend:'ظاهرة للعامة', color:'text-green-600' },
@@ -1373,6 +1394,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
 
         {/* Add Listing */}
         {offPage === 'add' && (
+          (!myOffice || myOffice.status !== 'approved' || !myOffice.active) ? (
+            <div className="max-w-md mx-auto py-12 text-center">
+              <div className="bg-white rounded-2xl border border-amber-200 p-7 shadow-sm">
+                <div className="text-lg font-bold text-amber-700 mb-2">{myOffice?.status === 'rejected' ? 'تم رفض حسابك' : (myOffice && !myOffice.active) ? 'مكتبك موقوف حالياً' : 'حسابك بانتظار موافقة الإدارة'}</div>
+                <p className="text-sm text-gray-500 leading-relaxed">{myOffice?.status === 'rejected' ? 'تواصل مع الإدارة لمعرفة السبب.' : (myOffice && !myOffice.active) ? 'الإدارة أوقفت مكتبك مؤقتاً — تواصل معها لإعادة التفعيل.' : 'لا يمكنك نشر إعلانات حتى تعتمد الإدارة مكتبك. بنراجعك ونعتمدك قريباً، وبعدها تنشر إعلاناتك بلا حدود.'}</p>
+              </div>
+            </div>
+          ) : (
           <div>
             <div className="text-xl font-bold text-gray-900 mb-1">إضافة إعلان جديد</div>
             <div className="text-sm text-gray-500 mb-5">أضف بيانات عقارك بدقة لضمان أفضل ظهور</div>
@@ -1547,6 +1576,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
               </div>
             )}
           </div>
+          )
         )}
 
         {/* Calculator */}
