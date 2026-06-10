@@ -386,18 +386,25 @@ export function OfficesSection({ sessionAdmin }: { sessionAdmin: boolean }) {
 // ════════════════════════════════════════════════════════════
 //  5) الرسائل والطلبات — رسائل «اترك رسالة» الحقيقية + تعليم كمعالَجة
 // ════════════════════════════════════════════════════════════
-interface LeadRow { id: string; name: string; phone: string; message: string | null; handled: boolean; created_at: string }
+interface LeadRow { id: string; name: string; phone: string; message: string | null; handled: boolean; created_at: string; kind?: string | null }
 export function LeadsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const [rows, setRows] = useState<LeadRow[]>([]);
   const [err, setErr] = useState<PgErr | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  // تبويبان منفصلان: استفسارات العملاء / رسائل المكاتب للمنصة (الدعم)
+  const [tab, setTab] = useState<'inquiry' | 'support'>('inquiry');
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
     const sb = createClient();
-    const { data, error } = await sb.from('leads').select('id,name,phone,message,handled,created_at').order('created_at', { ascending: false });
-    if (error) setErr(error); else setRows((data ?? []) as LeadRow[]);
+    // مع عمود kind إن وُجد؛ وإلا (قبل تشغيل leads_support.sql) بالأعمدة الأساسية
+    let r: { data: unknown; error: PgErr | null } =
+      await sb.from('leads').select('id,name,phone,message,handled,created_at,kind').order('created_at', { ascending: false });
+    if (r.error && r.error.code === '42703') {
+      r = await sb.from('leads').select('id,name,phone,message,handled,created_at').order('created_at', { ascending: false });
+    }
+    if (r.error) setErr(r.error); else setRows(((r.data ?? []) as LeadRow[]));
     setLoading(false);
   }, []);
 
@@ -413,19 +420,34 @@ export function LeadsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
 
   if (!sessionAdmin) return <><SectionHead title="الرسائل والطلبات" /><NeedSession /></>;
 
+  const isSupport = (l: LeadRow) => l.kind === 'support';
+  const shown = rows.filter((l) => (tab === 'support' ? isSupport(l) : !isSupport(l)));
+  const counts = { inquiry: rows.filter((l) => !isSupport(l)).length, support: rows.filter(isSupport).length };
+
   return (
     <>
-      <SectionHead title="الرسائل والطلبات" subtitle="رسائل «اترك رسالة» من جدول leads — الأحدث أولاً" onRefresh={load} />
+      <SectionHead title="الرسائل والطلبات" subtitle="من جدول leads — استفسارات العملاء ورسائل دعم المكاتب منفصلة" onRefresh={load} />
       {err && <ErrBox e={err} />}
-      {loading ? <Loading /> : rows.length === 0 && !err ? (
-        <Empty text="لا توجد رسائل بعد." />
+      <div className="flex gap-2 mb-3">
+        {(['inquiry', 'support'] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`text-xs px-3 py-1.5 rounded-lg font-bold border ${tab === t ? 'bg-[#0A3D62] text-white border-[#0A3D62]' : 'bg-white text-[#33414f] border-[#cfd9e4] hover:bg-[#f0f4f8]'}`}>
+            {t === 'inquiry' ? 'استفسارات العملاء' : 'رسائل المكاتب — دعم'} ({fmtNum(counts[t])})
+          </button>
+        ))}
+      </div>
+      {loading ? <Loading /> : shown.length === 0 && !err ? (
+        <Empty text={tab === 'support' ? 'لا توجد رسائل دعم من المكاتب بعد.' : 'لا توجد استفسارات بعد.'} />
       ) : (
         <div className="space-y-3">
-          {rows.map((l) => (
+          {shown.map((l) => (
             <div key={l.id} className={`${card} p-4 ${l.handled ? 'opacity-70' : ''}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-bold text-[#0f1a28] text-sm">{l.name}</div>
+                  <div className="font-bold text-[#0f1a28] text-sm flex items-center gap-2 flex-wrap">
+                    {l.name}
+                    {isSupport(l) && <span className="text-[10px] bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded font-bold">دعم مكتب</span>}
+                  </div>
                   <div className="text-xs text-[#1B6CA8] mt-0.5" dir="ltr" style={{ textAlign: 'right' }}>{l.phone}</div>
                   {l.message && <div className="text-sm text-[#33414f] mt-1.5 leading-relaxed">{l.message}</div>}
                   <div className="text-[11px] text-[#33414f] mt-1.5">{fmtDate(l.created_at)}</div>

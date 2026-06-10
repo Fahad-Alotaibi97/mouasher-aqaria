@@ -133,6 +133,19 @@ export default function Home() {
 
   // تسجيل الدخول — بالإيميل وكلمة المرور (تبويب: دخول / إنشاء حساب)
   const { user, isAdmin, signInWithPassword, signUpWithPassword, signOut, confirmSession } = useAuth();
+
+  // هل الحساب الحالي يملك مكتباً؟ ⇒ زر «لوحة المكتب» الذهبي في الدرج
+  const [hasOffice, setHasOffice] = useState(false);
+  useEffect(() => {
+    if (!user || !isSupabaseConfigured()) { setHasOffice(false); return; }
+    let cancelled = false;
+    (async () => {
+      const sb = createClient();
+      const { data } = await sb.from('offices').select('id').eq('owner_id', user.id).limit(1);
+      if (!cancelled) setHasOffice(!!(data && data.length));
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authEmail, setAuthEmail] = useState('');
   const [authPass, setAuthPass] = useState('');
@@ -428,7 +441,7 @@ export default function Home() {
     <div className="min-h-screen bg-[#F5F8FB]" dir="rtl" style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}>
 
       {/* الشريط العلوي + الدرج الجانبي (مكوّن مشترك على كل الصفحات) */}
-      <SiteNav active={page} onNavigate={go} user={user} isAdmin={isAdmin} onSignOut={signOut} />
+      <SiteNav active={page} onNavigate={go} user={user} isAdmin={isAdmin} isOffice={hasOffice} onSignOut={signOut} />
 
       {/* ═══ HOME — المساعد الذكي + الإعلانات فقط ═══ */}
       {page === 'home' && (
@@ -996,7 +1009,8 @@ export default function Home() {
                   );
                 })()}
                 {l.description && <p className="text-sm text-gray-700 leading-relaxed">{l.description}</p>}
-                <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">رخصة فال: {l.fal || '—'}</div>
+                {/* رخصة المعلن (معلومة عرض فقط — تظهر فقط إن وُجدت؛ الباحث لا يُسأل عن أي رخصة) */}
+                {l.fal && <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">رخصة فال المعلن: <span dir="ltr">{l.fal}</span></div>}
                 {ctSent ? (
                   <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl p-4 text-sm text-center font-medium">تم إرسال طلبك — سيتواصل معك المكتب قريباً.</div>
                 ) : ctOpen ? (
@@ -1161,7 +1175,7 @@ export default function Home() {
 
 // ═══ لوحة تحكم المكتب الكاملة ═══
 function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
-  const [offPage, setOffPage] = useState<'dashboard'|'listings'|'add'|'calc'|'inquiries'|'profile'|'settings'>('dashboard');
+  const [offPage, setOffPage] = useState<'dashboard'|'listings'|'add'|'calc'|'inquiries'|'support'|'profile'|'settings'>('dashboard');
   const [addStep, setAddStep] = useState(1);
   // الحاسبة الذكية: الحي والنوع بالاسم — يُقرأ متوسطهما من /admin (mktAvg) لا من أرقام ثابتة.
   const [cHood, setCHood] = useState(() => Object.keys(mktAvg)[0] ?? 'النرجس');
@@ -1200,8 +1214,15 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   // ── بيانات المكتب الحقيقية (مربوطة بالحساب الحالي عبر owner_id) ──
   const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; verified: boolean; status: string | null; active: boolean } | null>(null);
   const [myListings, setMyListings] = useState<{ id: string; title: string; advertised: number; status: string; rejection_note: string | null }[]>([]);
-  const [myLeads, setMyLeads] = useState<{ id: string; name: string; phone: string; message: string | null; created_at: string }[]>([]);
+  const [myLeads, setMyLeads] = useState<{ id: string; name: string; phone: string; message: string | null; created_at: string; handled?: boolean | null; kind?: string | null }[]>([]);
   const [offLoaded, setOffLoaded] = useState(false);
+  // «تواصل مع المنصة» — رسالة دعم من المكتب لإدارة المنصة (تُحفظ في leads بنوع support)
+  const [supSubject, setSupSubject] = useState('');
+  const [supMsg, setSupMsg] = useState('');
+  const [supSending, setSupSending] = useState(false);
+  const [supSent, setSupSent] = useState(false);
+  const [supErr, setSupErr] = useState('');
+
   // نموذج إنشاء المكتب داخل اللوحة (يضمن ربط أي حساب بمكتب بشكل موثوق)
   const [newOfficeName, setNewOfficeName] = useState('');
   const [newFal, setNewFal] = useState('');
@@ -1226,8 +1247,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       const { data: ls } = await sb.from('listings').select('id,title,advertised,status,rejection_note').eq('office_id', off.id).order('created_at', { ascending: false });
       setMyListings((ls ?? []) as typeof myListings);
       // الاستفسارات الحقيقية الموجّهة لهذا المكتب (تتطلب سياسة leads_office_read)
-      const { data: lds } = await sb.from('leads').select('id,name,phone,message,created_at').eq('office_id', off.id).order('created_at', { ascending: false });
-      setMyLeads((lds ?? []) as typeof myLeads);
+      // نحاول مع عمودي handled/kind، وإن غابا (قبل SQL) نرجع للأساسيات.
+      let lds: { data: unknown; error: { code?: string } | null } =
+        await sb.from('leads').select('id,name,phone,message,created_at,handled,kind').eq('office_id', off.id).order('created_at', { ascending: false });
+      if (lds.error) lds = await sb.from('leads').select('id,name,phone,message,created_at').eq('office_id', off.id).order('created_at', { ascending: false });
+      // رسائل الدعم الموجّهة للمنصة لا تُعرض ضمن استفسارات العملاء
+      setMyLeads(((lds.data ?? []) as typeof myLeads).filter((l) => l.kind !== 'support'));
     } else {
       setMyListings([]);
       setMyLeads([]);
@@ -1249,6 +1274,40 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     setNewOfficeName(''); setNewFal('');
     await reloadOffice();
     setCreatingOffice(false);
+  };
+
+  // إرسال رسالة دعم للمنصة — بيانات المكتب (الاسم/الرخصة/البريد) تُرفق تلقائياً
+  const submitSupport = async () => {
+    if (!supSubject.trim() && !supMsg.trim()) { setSupErr('اكتب موضوعاً أو رسالة أولاً.'); return; }
+    setSupSending(true); setSupErr('');
+    try {
+      const sb = createClient();
+      const { data: { session } } = await sb.auth.getSession();
+      const email = session?.user?.email ?? '—';
+      const message = [
+        supSubject.trim() && `الموضوع: ${supSubject.trim()}`,
+        supMsg.trim(),
+        `البريد: ${email}` + (myOffice?.fal_license ? ` · رخصة فال: ${myOffice.fal_license}` : ''),
+      ].filter(Boolean).join('\n');
+      const row: Record<string, unknown> = { kind: 'support', name: `مكتب: ${myOffice?.name ?? 'بدون مكتب'}`, phone: email, message };
+      if (myOffice?.id) row.office_id = myOffice.id;
+      let { error } = await sb.from('leads').insert(row);
+      if (error && (error.code === 'PGRST204' || error.code === '42703')) {
+        // عمود kind غير موجود بعد (قبل SQL) — تصل الرسالة كرسالة عادية بدل الضياع
+        delete row.kind;
+        ({ error } = await sb.from('leads').insert(row));
+      }
+      if (error) {
+        setSupErr(error.code === '42501'
+          ? 'الإرسال محجوب بسياسة الحماية (RLS) — يلزم تشغيل supabase/leads_support.sql.'
+          : 'تعذّر الإرسال: ' + error.message);
+        setSupSending(false); return;
+      }
+      setSupSent(true);
+    } catch {
+      setSupErr('تعذّر الإرسال حالياً — حاول لاحقاً.');
+    }
+    setSupSending(false);
   };
 
   useEffect(() => { reloadOffice(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -1386,6 +1445,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     { id:'add', label:'إضافة إعلان' },
     { id:'calc', label:'الحاسبة الذكية' },
     { id:'inquiries', label:'الاستفسارات' },
+    { id:'support', label:'تواصل مع المنصة' },
     { id:'profile', label:'ملف المكتب' },
     { id:'settings', label:'الإعدادات' },
   ];
@@ -1422,7 +1482,11 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
           <button key={s.id} onClick={() => { setOffPage(s.id as typeof offPage); if(s.id==='add') setAddStep(1); }}
             className={`w-full text-right px-3 py-2.5 rounded-xl text-sm mb-1 font-medium transition-all ${offPage===s.id ? 'bg-blue-50 text-[#0A3D62] font-bold' : 'text-gray-600 hover:bg-gray-50'}`}>
             {s.label}
-            {s.id==='inquiries' && <span className="float-left bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">5</span>}
+            {/* شارة العدد الحقيقي لاستفسارات العملاء غير المعالجة — لا أرقام ثابتة */}
+            {s.id==='inquiries' && (() => {
+              const n = myLeads.filter((l) => !l.handled).length;
+              return n > 0 ? <span className="float-left bg-red-500 text-white text-xs min-w-4 h-4 px-1 rounded-full flex items-center justify-center">{n.toLocaleString('ar-SA')}</span> : null;
+            })()}
           </button>
         ))}
       </div>
@@ -1799,6 +1863,44 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* تواصل مع المنصة — رسالة دعم تصل لإدارة المنصة في /admin */}
+        {offPage === 'support' && (
+          <div>
+            <div className="text-xl font-bold text-gray-900 mb-1">تواصل مع المنصة</div>
+            <div className="text-sm text-gray-500 mb-5">واجهت مشكلة أو تحدياً؟ راسل إدارة المنصة مباشرة — بيانات مكتبك تُرفق تلقائياً.</div>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm max-w-xl">
+              {supSent ? (
+                <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl p-4 text-sm text-center font-medium">
+                  وصلت رسالتك لإدارة المنصة — سنراجعها ونرد عليك قريباً.
+                  <button onClick={() => { setSupSent(false); setSupSubject(''); setSupMsg(''); }}
+                    className="block mx-auto mt-3 text-xs text-[#0A3D62] underline">إرسال رسالة أخرى</button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-gray-700 font-semibold block mb-1">الموضوع</label>
+                    <input value={supSubject} onChange={(e) => setSupSubject(e.target.value)}
+                      placeholder="مثال: مشكلة في نشر إعلان / استفسار عن التوثيق" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-700 font-semibold block mb-1">الرسالة</label>
+                    <textarea value={supMsg} onChange={(e) => setSupMsg(e.target.value)} rows={4}
+                      placeholder="اشرح المشكلة أو الطلب بالتفصيل…" className={inputCls + ' resize-none'} />
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    يُرفق تلقائياً: {myOffice?.name ?? '—'}{myOffice?.fal_license ? ` · رخصة فال ${myOffice.fal_license}` : ''} · بريد حسابك
+                  </div>
+                  {supErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{supErr}</div>}
+                  <button onClick={submitSupport} disabled={supSending}
+                    className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50">
+                    {supSending ? 'جارٍ الإرسال…' : 'إرسال للمنصة'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

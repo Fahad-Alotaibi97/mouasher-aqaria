@@ -22,6 +22,7 @@ interface SiteNavProps {
   onNavigate?: (id: string) => void;     // معالج التنقّل الداخلي (الصفحة الرئيسية)
   user?: SiteNavUser | null;
   isAdmin?: boolean;
+  isOffice?: boolean;                    // الحساب يملك مكتباً ⇒ زر «لوحة المكتب» الذهبي
   onSignOut?: () => void;
 }
 
@@ -58,7 +59,7 @@ const NAV_ITEMS_SECONDARY: { id: string; label: string; icon: React.ReactNode }[
   { id: 'about', label: 'عن المنصة', icon: I.info },
 ];
 
-export default function SiteNav({ active, onNavigate, user, isAdmin, onSignOut }: SiteNavProps) {
+export default function SiteNav({ active, onNavigate, user, isAdmin, isOffice, onSignOut }: SiteNavProps) {
   const [open, setOpen] = useState(false);
 
   const go = (id: string) => {
@@ -139,8 +140,9 @@ export default function SiteNav({ active, onNavigate, user, isAdmin, onSignOut }
 
         <div className="h-px bg-white/12 mx-6 my-3" />
 
-        {/* روابط ثانوية */}
-        {NAV_ITEMS_SECONDARY.map(item)}
+        {/* روابط ثانوية — «سجّل مكتبك العقاري» للتسجيل الجديد فقط؛
+            المكتب المسجّل دخوله يصل للوحته من الزر الذهبي بالأسفل */}
+        {NAV_ITEMS_SECONDARY.filter((it) => !(isOffice && it.id === 'pricing')).map(item)}
 
         {/* منطقة الحساب */}
         <div className="mt-4 px-6">
@@ -157,6 +159,15 @@ export default function SiteNav({ active, onNavigate, user, isAdmin, onSignOut }
                   <span className="w-4 h-4">{I.shield}</span>
                   لوحة الإدارة
                 </a>
+              )}
+              {isOffice && (
+                <button
+                  onClick={() => go('office')}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#C9A84C] text-[#0A3D62] font-bold text-sm"
+                >
+                  <span className="w-4 h-4">{I.office}</span>
+                  لوحة المكتب
+                </button>
               )}
               {onSignOut && (
                 <button
