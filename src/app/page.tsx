@@ -1106,12 +1106,25 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; verified: boolean; status: string | null } | null>(null);
   const [myListings, setMyListings] = useState<{ id: string; title: string; advertised: number; status: string; rejection_note: string | null }[]>([]);
   const [offLoaded, setOffLoaded] = useState(false);
+  // نموذج إنشاء المكتب داخل اللوحة (يضمن ربط أي حساب بمكتب بشكل موثوق)
+  const [newOfficeName, setNewOfficeName] = useState('');
+  const [newFal, setNewFal] = useState('');
+  const [creatingOffice, setCreatingOffice] = useState(false);
+  const [createOfficeErr, setCreateOfficeErr] = useState('');
+
+  // نستخدم getSession (يقرأ محلياً ويجدّد التوكن المنتهي) بدل getUser الذي يفشل عند انتهاء الصلاحية
+  const currentUid = async (sb: ReturnType<typeof createClient>): Promise<string | null> => {
+    const { data: { session } } = await sb.auth.getSession();
+    return session?.user?.id ?? null;
+  };
+
   const reloadOffice = async () => {
     if (!isSupabaseConfigured()) { setOffLoaded(true); return; }
     const sb = createClient();
-    const { data: { user: u } } = await sb.auth.getUser();
-    if (!u) { setMyOffice(null); setOffLoaded(true); return; }
-    const { data: off } = await sb.from('offices').select('id,name,fal_license,verified,status').eq('owner_id', u.id).maybeSingle();
+    const uid = await currentUid(sb);
+    if (!uid) { setMyOffice(null); setOffLoaded(true); return; }
+    const { data: offs } = await sb.from('offices').select('id,name,fal_license,verified,status').eq('owner_id', uid).order('created_at', { ascending: false }).limit(1);
+    const off = (offs && offs[0]) || null;
     setMyOffice((off as typeof myOffice) ?? null);
     if (off) {
       const { data: ls } = await sb.from('listings').select('id,title,advertised,status,rejection_note').eq('office_id', off.id).order('created_at', { ascending: false });
@@ -1121,6 +1134,23 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     }
     setOffLoaded(true);
   };
+
+  // إنشاء المكتب مباشرة وأنت داخل (جلسة فعّالة ⇒ تتجاوز كل مشاكل التسجيل)
+  const createOffice = async () => {
+    const name = newOfficeName.trim();
+    if (!name) { setCreateOfficeErr('أدخل اسم المكتب'); return; }
+    setCreatingOffice(true); setCreateOfficeErr('');
+    const sb = createClient();
+    const uid = await currentUid(sb);
+    if (!uid) { setCreateOfficeErr('انتهت جلستك — سجّل خروج ثم دخول من جديد.'); setCreatingOffice(false); return; }
+    const { error } = await sb.from('offices').insert({ owner_id: uid, name, fal_license: newFal.trim() || null });
+    if (error) { setCreateOfficeErr('تعذّر الإنشاء: ' + error.message); setCreatingOffice(false); return; }
+    await sb.from('profiles').update({ role: 'office', full_name: name }).eq('id', uid);
+    setNewOfficeName(''); setNewFal('');
+    await reloadOffice();
+    setCreatingOffice(false);
+  };
+
   useEffect(() => { reloadOffice(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const activeCount = myListings.filter((l) => l.status === 'approved').length;
   const pendingCount = myListings.filter((l) => l.status === 'pending').length;
@@ -1136,13 +1166,8 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       }
       const sb = createClient();
       // ── ربط حقيقي: الإعلان يُنشر باسم مكتب المستخدم الحالي ويدخل بحالة «بانتظار» ──
-      const { data: { user: pubUser } } = await sb.auth.getUser();
-      if (!pubUser) {
-        setPublishMsg({ ok: false, text: 'سجّل دخولك بحساب مكتب أولاً لنشر إعلان.' }); setPublishing(false); return;
-      }
-      const { data: myOffice } = await sb.from('offices').select('id').eq('owner_id', pubUser.id).maybeSingle();
       if (!myOffice) {
-        setPublishMsg({ ok: false, text: 'لا يوجد مكتب مرتبط بحسابك — سجّل مكتبك من صفحة «التسجيل» أولاً.' }); setPublishing(false); return;
+        setPublishMsg({ ok: false, text: 'أنشئ مكتبك أولاً من لوحة المكتب لنشر إعلان.' }); setPublishing(false); return;
       }
       // رفع الصور إلى التخزين
       const urls: string[] = [];
@@ -1223,10 +1248,21 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   // حساب مسجّل لكن بلا مكتب مرتبط (باحث أو لم يُكمل تسجيل مكتب) ⇒ لا نعرض لوحة المكتب الوهمية
   if (offLoaded && !myOffice) {
     return (
-      <div className="max-w-md mx-auto px-5 py-12 text-center">
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
-          <div className="text-lg font-bold text-gray-900 mb-2">لا يوجد مكتب مرتبط بحسابك</div>
-          <p className="text-sm text-gray-500 leading-relaxed">حسابك مسجّل، لكن لا يوجد مكتب عقاري مربوط به. أنشئ حساب «مكتب عقاري» من صفحة التسجيل لتظهر لك لوحة المكتب وإعلاناتك الحقيقية.</p>
+      <div className="max-w-md mx-auto px-5 py-12">
+        <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
+          <div className="text-lg font-bold text-gray-900 mb-1">أنشئ مكتبك العقاري</div>
+          <p className="text-sm text-gray-500 mb-5 leading-relaxed">حسابك جاهز — أكمل بيانات مكتبك مرة واحدة وتُفعّل لوحة المكتب وتقدر تنشر إعلاناتك مباشرة.</p>
+          <label className="text-xs text-gray-700 font-semibold block mb-1">اسم المكتب *</label>
+          <input value={newOfficeName} onChange={(e) => setNewOfficeName(e.target.value)} placeholder="مثال: مكتب الأفق العقاري"
+            className="w-full mb-3 px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+          <label className="text-xs text-gray-700 font-semibold block mb-1">رقم رخصة فال (اختياري)</label>
+          <input value={newFal} onChange={(e) => setNewFal(e.target.value)} dir="ltr" placeholder="1100123456"
+            className="w-full mb-4 px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+          {createOfficeErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm mb-3">{createOfficeErr}</div>}
+          <button onClick={createOffice} disabled={creatingOffice}
+            className="w-full bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50">
+            {creatingOffice ? 'جارٍ الإنشاء…' : 'إنشاء المكتب'}
+          </button>
         </div>
       </div>
     );
