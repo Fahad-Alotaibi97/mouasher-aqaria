@@ -2,11 +2,11 @@
 // ════════════════════════════════════════════════════════════
 //  لوحة الأدمن — إدارة متوسطات الأحياء حسب تفصيل خانات الغرف.
 //
-//  • بوّابة كلمة مرور بسيطة مستقلّة تماماً عن Supabase (لا جلسة/كوكيز/تحويل):
-//    تُدخل كلمة المرور مرة واحدة ⇒ تُفتح اللوحة (وتُحفظ الحالة في sessionStorage).
-//    كلمة المرور = NEXT_PUBLIC_ADMIN_GATE وإلا القيمة الافتراضية في الكود.
-//    الحفظ في جدول neighborhoods يتم بمفتاح anon (يتطلب سياسة الكتابة العامة —
-//    راجع supabase/admin_gate_neighborhoods_write.sql).
+//  • الدخول بجلسة المدير الموحّدة فقط (تسجيل دخول من الرئيسية بحساب is_admin).
+//    أُزيلت بوّابة كلمة المرور نهائياً: بعد قفل كتابة neighborhoods على المدير
+//    (supabase/lock_neighborhoods_write.sql) لا يمكن الحفظ إلا بجلسة قاعدة
+//    حقيقية (auth.uid())، فبوّابة بلا جلسة صارت بلا فائدة وكلمتها مكشوفة في
+//    الـ bundle. الحفظ يمرّ عبر عميل المتصفح الموحّد فيحمل جلسة المدير تلقائياً.
 //  • كل حي accordion يُظهر تفصيل الغرف عند التوسعة.
 //  • شقة/فيلا: 4 خانات (غرفة/غرفتين/ثلاث/أربع+) ، استوديو: خانة واحدة.
 //  • المتوسط المعتمد = متوسط الخانات المعبّأة فقط (الفارغة تُتجاهل).
@@ -70,23 +70,15 @@ function approvedAvg(slots: (number | null)[]): number | null {
 const fmt = (n: number | null | undefined) =>
   n == null ? '—' : `${n.toLocaleString('ar-SA')} ريال`;
 
-// كلمة مرور البوّابة: من متغيّر البيئة NEXT_PUBLIC_ADMIN_GATE وإلا القيمة الافتراضية.
-const ADMIN_GATE = process.env.NEXT_PUBLIC_ADMIN_GATE || 'aqaria-admin-2026';
-
 export default function AdminPage() {
-  // ── الدخول الموحّد (المسار الأساسي): جلسة Supabase من الرئيسية + is_admin=true ──
+  // ── الدخول الموحّد (المسار الوحيد): جلسة Supabase من الرئيسية + is_admin=true ──
   //   useAuth يقرأ الجلسة عبر getSession() (كوكي محلّي) ولا يستدعي is_admin داخل
   //   onAuthStateChange (تفادي قفل المصادقة)، ويستخدم عميلاً واحداً (singleton).
   const { user, isAdmin, ready, signOut } = useAuth();
   const sessionAdmin = !!user && isAdmin;
 
-  // ── بوّابة كلمة المرور (احتياطية فقط: تعمل بلا جلسة) ──
-  const [unlocked, setUnlocked] = useState(false);
-  const [gatePass, setGatePass] = useState('');
-  const [gateErr, setGateErr] = useState(false);
-
-  // اللوحة مفتوحة إمّا بجلسة مدير موحّدة، أو ببوّابة كلمة المرور (الاحتياطية).
-  const open = sessionAdmin || unlocked;
+  // اللوحة مفتوحة بجلسة مدير موحّدة فقط — الكتابة في القاعدة تتطلب auth.uid().
+  const open = sessionAdmin;
 
   // القسم المعروض في الشريط الجانبي (الإحصائيات هي صفحة الهبوط بعد الدخول).
   const [section, setSection] = useState<AdminSection>('stats');
@@ -95,29 +87,6 @@ export default function AdminPage() {
   const exitSession = async () => {
     await signOut();
     if (typeof window !== 'undefined') window.location.href = '/';
-  };
-
-  // استعادة حالة الفتح خلال جلسة التبويب (sessionStorage) — لا كوكيز ولا Supabase
-  useEffect(() => {
-    if (typeof window !== 'undefined' && sessionStorage.getItem('admin_gate') === '1') {
-      setUnlocked(true);
-    }
-  }, []);
-
-  const tryUnlock = () => {
-    if (gatePass === ADMIN_GATE) {
-      setUnlocked(true);
-      setGateErr(false);
-      if (typeof window !== 'undefined') sessionStorage.setItem('admin_gate', '1');
-    } else {
-      setGateErr(true);
-    }
-  };
-
-  const lock = () => {
-    setUnlocked(false);
-    setGatePass('');
-    if (typeof window !== 'undefined') sessionStorage.removeItem('admin_gate');
   };
 
   // بيانات الأحياء
@@ -311,40 +280,21 @@ export default function AdminPage() {
   if (!open && isSupabaseConfigured() && !ready)
     return wrap(<div className="text-center text-gray-600">جارٍ التحقّق من جلستك…</div>);
 
-  // ── غير مفتوحة ⇒ بوّابة كلمة المرور (احتياطية؛ المسار الأساسي هو الدخول الموحّد) ──
+  // ── غير مفتوحة ⇒ تتطلّب جلسة المدير الموحّدة (لا بوّابة كلمة مرور بعد الآن) ──
   if (!open)
     return wrap(
-      <div>
-        <div className="flex items-center gap-2 mb-1">
+      <div className="text-center">
+        <div className="flex items-center justify-center gap-2 mb-3">
           <div className="w-9 h-9 rounded-xl bg-[#0A3D62] text-white flex items-center justify-center font-bold">م</div>
-          <div>
-            <div className="font-bold text-gray-900 leading-none">لوحة الأدمن</div>
-            <div className="text-xs text-gray-500 mt-0.5">سجّل دخولك من الرئيسية بحساب مدير، أو أدخل كلمة المرور</div>
-          </div>
+          <div className="font-bold text-gray-900">لوحة الأدمن</div>
         </div>
-        <p className="text-xs text-gray-500 mt-3 mb-4">إن دخلت من الرئيسية بحساب مدير (is_admin) تُفتح اللوحة تلقائياً. وإلا فهذه بوّابة احتياطية بكلمة مرور.</p>
-        <label className="text-xs text-gray-700 font-semibold block mb-1">كلمة المرور</label>
-        <input
-          type="password"
-          dir="ltr"
-          value={gatePass}
-          onChange={(e) => { setGatePass(e.target.value); setGateErr(false); }}
-          onKeyDown={(e) => e.key === 'Enter' && tryUnlock()}
-          placeholder="••••••••"
-          autoFocus
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-        />
-        <button
-          onClick={tryUnlock}
-          className="w-full mt-4 bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-2.5 rounded-xl font-bold text-sm shadow"
-        >
-          دخول
-        </button>
-        {gateErr && (
-          <div className="mt-3 text-sm rounded-xl p-3 border bg-red-50 text-red-700 border-red-200">
-            كلمة المرور غير صحيحة.
-          </div>
-        )}
+        <p className="text-sm text-gray-600 leading-relaxed mb-5">
+          هذه اللوحة تتطلّب <b>تسجيل الدخول بحساب المدير</b> من الصفحة الرئيسية —
+          الحفظ في القاعدة محمي بسياسات تتحقّق من هويتك (is_admin)، فلا تكفي أي كلمة مرور بلا جلسة.
+        </p>
+        <a href="/#pricing" className="inline-block bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
+          الذهاب لتسجيل الدخول
+        </a>
         <a href="/" className="block mt-4 text-center text-blue-600 text-sm font-medium hover:underline">→ العودة للصفحة الرئيسية</a>
       </div>
     );
@@ -373,9 +323,9 @@ export default function AdminPage() {
         <AdminSidebar
           section={section}
           setSection={setSection}
-          userEmail={sessionAdmin ? (user?.email ?? null) : null}
-          onExit={sessionAdmin ? exitSession : lock}
-          exitLabel={sessionAdmin ? 'تسجيل الخروج' : 'قفل اللوحة'}
+          userEmail={user?.email ?? null}
+          onExit={exitSession}
+          exitLabel="تسجيل الخروج"
         />
         <main className="flex-1 w-full min-w-0">
 
