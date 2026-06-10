@@ -825,7 +825,7 @@ export default function Home() {
               {
                 name: 'مكتب عقاري',
                 desc: 'للمكاتب العقارية المرخصة بفال',
-                features: ['حتى 10 إعلانات نشطة', 'التحقق التلقائي من رخصة فال', 'تقييم تلقائي بالسعر العادل', 'لوحة تحكم إحصائية', 'الحاسبة الذكية للأسعار'],
+                features: ['حتى 10 إعلانات نشطة', 'توثيق رخصة فال عبر مراجعة الإدارة', 'تقييم تلقائي بالسعر العادل', 'لوحة تحكم إحصائية', 'الحاسبة الذكية للأسعار'],
                 locked: ['شارة المكتب الموثّق', 'AI لإدارة الردود تلقائياً'],
                 popular: true,
                 cta: 'سجّل مكتبك — مجاناً'
@@ -1219,10 +1219,13 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const minSafe = calcMin();
   const profit = fair - minSafe;
 
+  // تحقّق صادق من صيغة رقم رخصة فال (لا ادّعاء تحقق رسمي — التوثيق يتم من الإدارة يدوياً)
   const verifyFal = () => {
-    if (!falNum) { setFalStatus('error'); return; }
-    setFalStatus('loading');
-    setTimeout(() => { setFalStatus('success'); setTimeout(() => setAddStep(2), 800); }, 1500);
+    const digits = falNum.replace(/\D/g, '');
+    if (digits.length < 6) { setFalStatus('error'); return; }
+    if (digits !== falNum) setFalNum(digits);
+    setFalStatus('success');
+    setTimeout(() => setAddStep(2), 500);
   };
 
   const inputCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -1395,24 +1398,26 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
             {/* Step 1: FAL */}
             {addStep === 1 && (
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                <div className="font-bold text-gray-900 mb-1">التحقق من رخصة فال</div>
-                <div className="text-sm text-gray-500 mb-4">التحقق إلزامي لجميع الإعلانات</div>
+                <div className="font-bold text-gray-900 mb-1">رقم رخصة فال</div>
+                <div className="text-sm text-gray-500 mb-4">إلزامي لكل إعلان — يُراجَع ويُوثَّق من الإدارة قبل الاعتماد.</div>
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
                     <label className="text-xs text-gray-700 font-semibold block mb-1">رقم رخصة فال</label>
-                    <input value={falNum} onChange={e => setFalNum(e.target.value)} placeholder="مثال: 1100123456" className={inputCls} />
+                    <input value={falNum} onChange={e => setFalNum(e.target.value)} placeholder="مثال: 1100123456" className={inputCls} dir="ltr" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-700 font-semibold block mb-1">اسم المكتب</label>
                     <input value={myOffice?.name || ''} readOnly placeholder="—" className={`${inputCls} bg-gray-50`} />
                   </div>
                 </div>
-                {falStatus === 'loading' && <div className="text-sm text-blue-600 bg-blue-50 rounded-xl p-3 mb-3 border border-blue-100">جاري التحقق من منصة فال...</div>}
-                {falStatus === 'success' && <div className="text-sm text-green-700 bg-green-50 rounded-xl p-3 mb-3 border border-green-200">تم التحقق بنجاح — رخصة فال {falNum} سارية</div>}
-                {falStatus === 'error' && <div className="text-sm text-red-700 bg-red-50 rounded-xl p-3 mb-3 border border-red-200">أدخل رقم الرخصة</div>}
-                <button onClick={verifyFal} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
-                  تحقق من الرخصة
-                </button>
+                {falStatus === 'success' && <div className="text-sm text-green-700 bg-green-50 rounded-xl p-3 mb-3 border border-green-200">تم حفظ رقم الرخصة — تُراجَع من الإدارة عند اعتماد الإعلان.</div>}
+                {falStatus === 'error' && <div className="text-sm text-red-700 bg-red-50 rounded-xl p-3 mb-3 border border-red-200">أدخل رقم رخصة فال صحيح (أرقام فقط، 6 خانات على الأقل).</div>}
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <button onClick={verifyFal} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
+                    متابعة
+                  </button>
+                  <a href="https://fal.rega.gov.sa" target="_blank" rel="noopener noreferrer" className="text-xs text-[#1B6CA8] underline">التحقق الرسمي من الرخصة على منصة فال ↗</a>
+                </div>
               </div>
             )}
 
