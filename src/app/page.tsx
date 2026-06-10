@@ -34,19 +34,9 @@ const DEFAULT_MKT_AVG: MktAvg = {
   'النخيل': { avg: 59000 }, 'إشبيلية': { avg: 38000 },
 };
 
-// إعلانات افتراضية (تظهر إذا لم تتوفر بيانات من قاعدة البيانات) — مع إحداثيات للخريطة
-const DEFAULT_LISTINGS: UIListing[] = [
-  { id: 1, hood: 'النرجس', title: 'شقة 3 غرف — حي النرجس', type: 'شقة', adv: 90000, rooms: 3, area: 150, baths: 2, furnished: false, kitchen: true, ac: true, parking: 1, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة عائلية واسعة في حي النرجس، موقف خاص ودخول ذكي.', fal: '1234567', lat: 24.8024, lng: 46.6286 },
-  { id: 2, hood: 'النرجس', title: 'شقة 2 غرف — حي النرجس', type: 'شقة', adv: 42000, rooms: 2, area: 110, baths: 1, furnished: true, kitchen: true, ac: false, parking: 0, cond: 'new', condLabel: 'جديد', description: 'شقة جديدة بمجلس ومطبخ راكب في حي النرجس.', fal: '2345678', lat: 24.8060, lng: 46.6340 },
-  { id: 3, hood: 'النرجس', title: 'شقة 3 غرف — مشروع الماجدية', type: 'شقة', adv: 68000, rooms: 3, area: 140, baths: 2, furnished: false, kitchen: false, ac: true, parking: 2, cond: 'new', condLabel: 'جديد', description: 'شقة حديثة بمكيفات مركزية، عمر سنتان.', fal: '3456789', lat: 24.8100, lng: 46.6180 },
-  { id: 4, hood: 'العليا', title: 'شقة 2 غرف — حي العليا', type: 'شقة', adv: 52000, rooms: 2, area: 105, baths: 1, furnished: false, kitchen: true, ac: true, parking: 1, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة بموقع مميز في العليا، مطبخ راكب.', fal: '4567890', lat: 24.6877, lng: 46.6853 },
-  { id: 5, hood: 'الملقا', title: 'شقة 3 غرف — حي الملقا', type: 'شقة', adv: 48000, rooms: 3, area: 120, baths: 2, furnished: false, kitchen: false, ac: false, parking: null, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة عائلية في الملقا، عمر سنة.', fal: '5678901', lat: 24.7766, lng: 46.6228 },
-  { id: 6, hood: 'حطين', title: 'استوديو — حي حطين', type: 'استوديو', adv: 50400, rooms: 1, area: 55, baths: 1, furnished: true, kitchen: true, ac: true, parking: 1, cond: 'new', condLabel: 'جديد', description: 'استوديو مؤثث بالكامل قرب البوليفارد.', fal: '6789012', lat: 24.7611, lng: 46.6511 },
-  { id: 7, hood: 'الياسمين', title: 'شقة 2 غرف — الياسمين', type: 'شقة', adv: 48000, rooms: 2, area: 90, baths: 1, furnished: true, kitchen: true, ac: true, parking: 0, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة في الياسمين، عمر 4 سنوات.', fal: '7890123', lat: 24.8196, lng: 46.6402 },
-  { id: 8, hood: 'القيروان', title: 'شقة 3 غرف — القيروان', type: 'شقة', adv: 38000, rooms: 3, area: 130, baths: 2, furnished: false, cond: 'old', condLabel: 'يحتاج ترميم', description: 'شقة واسعة في القيروان تحتاج بعض الترميم.', fal: '8901234', lat: 24.8400, lng: 46.6350 },
-  { id: 9, hood: 'النخيل', title: 'فيلا — حي النخيل', type: 'فيلا', adv: 140000, rooms: 5, area: 450, baths: 4, furnished: false, cond: 'new', condLabel: 'جديد', description: 'فيلا فاخرة بمسبح في حي النخيل.', fal: '9012345', lat: 24.8300, lng: 46.6100 },
-  { id: 10, hood: 'إشبيلية', title: 'شقة 2 غرف — إشبيلية', type: 'شقة', adv: 36000, rooms: 2, area: 80, baths: 1, furnished: false, cond: 'good', condLabel: 'حالة جيدة', description: 'شقة هادئة في إشبيلية، عمر 5 سنوات.', fal: '0123456', lat: 24.7200, lng: 46.6550 },
-];
+// لا إعلانات افتراضية/تجريبية: الموقع يعرض إعلانات قاعدة البيانات فقط،
+// وإن لم توجد تظهر حالة فارغة صادقة (لا بيانات وهمية أبداً).
+const NO_LISTINGS: UIListing[] = [];
 
 // دوال نقية لا تعتمد على المتوسطات
 function getSt(adv: number, fair: number) { return adv / fair > 1.12 ? 'hi' : adv / fair < 0.85 ? 'lo' : 'ok'; }
@@ -123,8 +113,8 @@ export default function Home() {
   const [filterBudget, setFilterBudget] = useState('');
   const [searched, setSearched] = useState(false);
 
-  // البيانات الحقيقية من قاعدة البيانات (مع رجوع آمن للافتراضية)
-  const { mktAvg, listings } = useAppData(DEFAULT_MKT_AVG, DEFAULT_LISTINGS);
+  // البيانات الحقيقية من قاعدة البيانات (المتوسطات لها قيم افتراضية؛ الإعلانات لا)
+  const { mktAvg, listings } = useAppData(DEFAULT_MKT_AVG, NO_LISTINGS);
 
   // تسجيل الدخول — بالإيميل وكلمة المرور (تبويب: دخول / إنشاء حساب)
   const { user, isAdmin, signInWithPassword, signUpWithPassword, signOut, confirmSession } = useAuth();
@@ -354,13 +344,14 @@ export default function Home() {
   };
 
   // بطاقة إعلان أفقية: عمود صورة (يمين) + شارة الحالة فوق الصورة + معلومات (يسار)
-  // شارات الخصائص المنظّمة الموجبة (تظهر إن ملأها المكتب)
+  // شارات الخصائص المنظّمة — تظهر كل خاصية عبّأها المكتب (null = غير محدّد ⇒ لا شارة).
+  // هذه نفسها الحقول التي يطابق عليها المساعد الذكي (furnished/kitchen/ac/parking).
   const attrChips = (l: UIListing): string[] => {
     const c: string[] = [];
-    if (l.furnished === true) c.push('مفروشة');
-    if (l.kitchen === true) c.push('مطبخ راكب');
-    if (l.ac === true) c.push('مكيّفة');
-    if ((l.parking ?? 0) >= 1) c.push(`${l.parking} موقف`);
+    if (l.furnished != null) c.push(l.furnished ? 'مفروشة' : 'غير مفروشة');
+    if (l.kitchen != null) c.push(l.kitchen ? 'مطبخ راكب' : 'مطبخ غير راكب');
+    if (l.ac != null) c.push(l.ac ? 'مكيّفة' : 'غير مكيّفة');
+    if (l.parking != null) c.push(l.parking >= 1 ? `${l.parking} موقف` : 'بدون موقف');
     return c;
   };
 
@@ -483,10 +474,12 @@ export default function Home() {
             <div id="listings-section">
               <div className="flex justify-between items-center mb-3 px-1">
                 <h2 className="font-bold text-[#0f1a28] text-lg sec-underline">{searched ? 'نتائج بحثك' : 'الإعلانات'}</h2>
-                <div className="text-xs text-[#33414f] flex items-center gap-1">{Icons.chart} {displayList.length} إعلان · بيانات حقيقية</div>
+                <div className="text-xs text-[#33414f] flex items-center gap-1">{Icons.chart} {displayList.length} إعلان</div>
               </div>
               {displayList.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 text-center text-[#33414f] text-sm">لا توجد نتائج — جرّب تغيير المعايير من البحث بالأعلى.</div>
+                <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 text-center text-[#33414f] text-sm">
+                  {listings.length === 0 ? 'لا توجد إعلانات متاحة حالياً — تُعرض هنا إعلانات المكاتب فور نشرها.' : 'لا توجد نتائج — جرّب تغيير المعايير من البحث بالأعلى.'}
+                </div>
               ) : (
                 <div className="space-y-3">
                   {displayList.map((l) => renderListing(l, aiMatchIds.includes(l.id)))}
@@ -557,7 +550,9 @@ export default function Home() {
                 <span className="text-xs text-[#33414f] mr-auto">{filteredMapPoints.length} عقار على الخريطة</span>
               </div>
               {filteredMapPoints.length === 0 ? (
-                <div className="p-8 text-center text-[#33414f] text-sm">لا توجد عقارات بإحداثيات مطابقة للفلاتر الحالية.</div>
+                <div className="p-8 text-center text-[#33414f] text-sm">
+                  {listings.length === 0 ? 'لا توجد إعلانات متاحة حالياً.' : 'لا توجد عقارات بإحداثيات مطابقة للفلاتر الحالية.'}
+                </div>
               ) : (
                 <MapComponent points={filteredMapPoints} />
               )}
@@ -570,7 +565,9 @@ export default function Home() {
                 <div className="text-xs text-[#33414f] flex items-center gap-1">{Icons.chart} {filtered.length} نتيجة</div>
               </div>
               {filtered.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 text-center text-[#33414f] text-sm">لا توجد نتائج — جرّب توسيع المعايير.</div>
+                <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 text-center text-[#33414f] text-sm">
+                  {listings.length === 0 ? 'لا توجد إعلانات متاحة حالياً — تُعرض هنا إعلانات المكاتب فور نشرها.' : 'لا توجد نتائج — جرّب توسيع المعايير.'}
+                </div>
               ) : (
                 <div className="space-y-3">{filtered.map((l) => renderListing(l))}</div>
               )}
@@ -1237,8 +1234,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
           if (pub?.publicUrl) urls.push(pub.publicUrl);
         }
       }
+      // ── مستوى الثقة: المكتب الموثّق (verified) يُنشر مباشرة؛ غير الموثّق
+      //    يدخل إعلانه «بانتظار الموافقة» ويُعتمد من الإدارة إعلاناً بإعلان.
+      //    القاعدة تفرض القاعدة نفسها بـ trigger مهما أرسل العميل.
+      const autoApproved = !!myOffice.verified;
       const { error } = await sb.from('listings').insert({
-        office_id: myOffice.id, status: 'approved',
+        office_id: myOffice.id, status: autoApproved ? 'approved' : 'pending',
         title: `${fType} ${fRooms} غرف — ${fHood}`.replace('استوديو 1 غرف','استوديو'),
         hood: fHood, type: fType, advertised: parseInt(fRent) || 0,
         area: fArea ? parseInt(fArea) : null, rooms: parseInt(fRooms) || null,
@@ -1252,7 +1253,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         description: fDesc.trim() || null, images: urls, fal_license: falNum || null,
       });
       if (error) { setPublishMsg({ ok: false, text: 'تعذّر النشر: ' + error.message }); setPublishing(false); return; }
-      setPublishMsg({ ok: true, text: 'تم نشر الإعلان بنجاح — ظاهر الآن للباحثين.' });
+      setPublishMsg({
+        ok: true,
+        text: autoApproved
+          ? 'تم نشر الإعلان — ظاهر الآن للباحثين مباشرة (مكتبك موثّق).'
+          : 'تم إرسال الإعلان للمراجعة — يظهر للباحثين فور اعتماد الإدارة له.',
+      });
       setFRent(''); setFArea(''); setFDesc(''); setFFiles([]);
       setTimeout(() => { setPublishMsg(null); setAddStep(1); setOffPage('listings'); }, 1200);
     } catch {
