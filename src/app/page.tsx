@@ -1117,8 +1117,6 @@ export default function Home() {
 function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [offPage, setOffPage] = useState<'dashboard'|'listings'|'add'|'calc'|'inquiries'|'profile'|'settings'>('dashboard');
   const [addStep, setAddStep] = useState(1);
-  const [falNum, setFalNum] = useState('');
-  const [falStatus, setFalStatus] = useState<'idle'|'loading'|'success'|'error'>('idle');
   // الحاسبة الذكية: الحي والنوع بالاسم — يُقرأ متوسطهما من /admin (mktAvg) لا من أرقام ثابتة.
   const [cHood, setCHood] = useState(() => Object.keys(mktAvg)[0] ?? 'النرجس');
   const [cType, setCType] = useState('شقة');
@@ -1238,26 +1236,43 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       //    يدخل إعلانه «بانتظار الموافقة» ويُعتمد من الإدارة إعلاناً بإعلان.
       //    القاعدة تفرض القاعدة نفسها بـ trigger مهما أرسل العميل.
       const autoApproved = !!myOffice.verified;
-      const { error } = await sb.from('listings').insert({
+      // بيانات الإعلان الأساسية — الرخصة تُسحب تلقائياً من سجل المكتب (لا إعادة إدخال)
+      const core: Record<string, unknown> = {
         office_id: myOffice.id, status: autoApproved ? 'approved' : 'pending',
         title: `${fType} ${fRooms} غرف — ${fHood}`.replace('استوديو 1 غرف','استوديو'),
         hood: fHood, type: fType, advertised: parseInt(fRent) || 0,
         area: fArea ? parseInt(fArea) : null, rooms: parseInt(fRooms) || null,
+        condition: condMap[fCond] || 'good', cond_label: fCond,
+        fal_license: myOffice.fal_license || null,
+      };
+      // خصائص اختيارية ('' ⇒ null = غير محدّد) — أعمدتها تُضاف بـ supabase/listing_attributes.sql
+      const attrs: Record<string, unknown> = {
         baths: parseInt(fBaths) || null,
-        // الخصائص المنظّمة الاختيارية ('' ⇒ null = غير محدّد)
         furnished: fFurniture === '' ? null : fFurniture === 'مفروشة',
         kitchen: fKitchen === '' ? null : fKitchen === 'راكب',
         ac: fAc === '' ? null : fAc === 'مكيّفة',
         parking: fParking === '' ? null : parseInt(fParking),
-        condition: condMap[fCond] || 'good', cond_label: fCond,
-        description: fDesc.trim() || null, images: urls, fal_license: falNum || null,
-      });
+        description: fDesc.trim() || null, images: urls,
+      };
+      const payload: Record<string, unknown> = { ...core, ...attrs };
+      const dropped: string[] = [];
+      let { error } = await sb.from('listings').insert(payload);
+      // عمود اختياري مفقود في القاعدة (PGRST204/42703) ⇒ أسقط ذلك العمود وحده
+      // وأعد المحاولة، بدل إفشال النشر كله — يبقى الإعلان الأساسي محفوظاً.
+      while (error && (error.code === 'PGRST204' || error.code === '42703' || /schema cache/i.test(error.message || ''))) {
+        const col = /'([^']+)' column/.exec(error.message || '')?.[1];
+        if (!col || !(col in attrs) || !(col in payload)) break;
+        delete payload[col];
+        dropped.push(col);
+        ({ error } = await sb.from('listings').insert(payload));
+      }
       if (error) { setPublishMsg({ ok: false, text: 'تعذّر النشر: ' + error.message }); setPublishing(false); return; }
       setPublishMsg({
         ok: true,
-        text: autoApproved
+        text: (autoApproved
           ? 'تم نشر الإعلان — ظاهر الآن للباحثين مباشرة (مكتبك موثّق).'
-          : 'تم إرسال الإعلان للمراجعة — يظهر للباحثين فور اعتماد الإدارة له.',
+          : 'تم إرسال الإعلان للمراجعة — يظهر للباحثين فور اعتماد الإدارة له.')
+          + (dropped.length ? ` (لم تُحفظ خصائص: ${dropped.join('، ')} — شغّل supabase/listing_attributes.sql)` : ''),
       });
       setFRent(''); setFArea(''); setFDesc(''); setFFiles([]);
       setTimeout(() => { setPublishMsg(null); setAddStep(1); setOffPage('listings'); }, 1200);
@@ -1282,15 +1297,6 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const fair = calcFair();
   const minSafe = calcMin();
   const profit = fair - minSafe;
-
-  // تحقّق صادق من صيغة رقم رخصة فال (لا ادّعاء تحقق رسمي — التوثيق يتم من الإدارة يدوياً)
-  const verifyFal = () => {
-    const digits = falNum.replace(/\D/g, '');
-    if (digits.length < 6) { setFalStatus('error'); return; }
-    if (digits !== falNum) setFalNum(digits);
-    setFalStatus('success');
-    setTimeout(() => setAddStep(2), 500);
-  };
 
   const inputCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
   const selectCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -1462,54 +1468,32 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
           ) : (
           <div>
             <div className="text-xl font-bold text-gray-900 mb-1">إضافة إعلان جديد</div>
-            <div className="text-sm text-gray-500 mb-5">أضف بيانات عقارك بدقة لضمان أفضل ظهور</div>
+            <div className="text-sm text-gray-500 mb-1">أضف بيانات عقارك بدقة لضمان أفضل ظهور</div>
+            {/* الربط التلقائي: الإعلان يحمل اسم المكتب ورخصته من سجلّه — لا إعادة إدخال */}
+            <div className="text-xs text-[#1B6CA8] mb-5">
+              يُربط الإعلان تلقائياً بمكتبك: <b>{myOffice?.name}</b>
+              {myOffice?.fal_license && <> · رخصة فال <span dir="ltr">{myOffice.fal_license}</span></>}
+            </div>
 
             {/* Steps */}
             <div className="flex items-center gap-2 mb-5 bg-white rounded-xl p-3 border border-gray-200">
               {[
-                { n:1, label:'التحقق من فال' },
-                { n:2, label:'بيانات العقار' },
-                { n:3, label:'الحاسبة (اختياري)' },
-                { n:4, label:'الصور والوصف' },
+                { n:1, label:'بيانات العقار' },
+                { n:2, label:'الحاسبة (اختياري)' },
+                { n:3, label:'الصور والوصف' },
               ].map((s, i) => (
                 <div key={s.n} className="flex items-center gap-2 flex-1">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${addStep > s.n ? 'bg-green-500 text-white' : addStep === s.n ? 'bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] text-white' : 'bg-gray-100 text-gray-400'}`}>
                     {addStep > s.n ? '✓' : s.n}
                   </div>
                   <div className={`text-xs font-medium ${addStep === s.n ? 'text-gray-900' : 'text-gray-400'}`}>{s.label}</div>
-                  {i < 3 && <div className={`flex-1 h-0.5 ${addStep > s.n ? 'bg-green-400' : 'bg-gray-200'}`} />}
+                  {i < 2 && <div className={`flex-1 h-0.5 ${addStep > s.n ? 'bg-green-400' : 'bg-gray-200'}`} />}
                 </div>
               ))}
             </div>
 
-            {/* Step 1: FAL */}
+            {/* Step 1: Property Data */}
             {addStep === 1 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                <div className="font-bold text-gray-900 mb-1">رقم رخصة فال</div>
-                <div className="text-sm text-gray-500 mb-4">إلزامي لكل إعلان — يُراجَع ويُوثَّق من الإدارة قبل الاعتماد.</div>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div>
-                    <label className="text-xs text-gray-700 font-semibold block mb-1">رقم رخصة فال</label>
-                    <input value={falNum} onChange={e => setFalNum(e.target.value)} placeholder="مثال: 1100123456" className={inputCls} dir="ltr" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-700 font-semibold block mb-1">اسم المكتب</label>
-                    <input value={myOffice?.name || ''} readOnly placeholder="—" className={`${inputCls} bg-gray-50`} />
-                  </div>
-                </div>
-                {falStatus === 'success' && <div className="text-sm text-green-700 bg-green-50 rounded-xl p-3 mb-3 border border-green-200">تم حفظ رقم الرخصة — تُراجَع من الإدارة عند اعتماد الإعلان.</div>}
-                {falStatus === 'error' && <div className="text-sm text-red-700 bg-red-50 rounded-xl p-3 mb-3 border border-red-200">أدخل رقم رخصة فال صحيح (أرقام فقط، 6 خانات على الأقل).</div>}
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <button onClick={verifyFal} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
-                    متابعة
-                  </button>
-                  <a href="https://fal.rega.gov.sa" target="_blank" rel="noopener noreferrer" className="text-xs text-[#1B6CA8] underline">التحقق الرسمي من الرخصة على منصة فال ↗</a>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Property Data */}
-            {addStep === 2 && (
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                 <div className="font-bold text-gray-900 mb-4">بيانات العقار</div>
                 <div className="grid grid-cols-2 gap-3 mb-3">
@@ -1545,14 +1529,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                     <select className={selectCls} value={fParking} onChange={e=>setFParking(e.target.value)}><option value="">غير محدّد</option><option value="0">لا يوجد</option><option value="1">موقف واحد</option><option value="2">موقفان</option><option value="3">ثلاثة فأكثر</option></select></div>
                 </div>
                 <div className="flex gap-2 mt-4">
-                  <button onClick={() => setAddStep(3)} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">التالي: الحاسبة</button>
-                  <button onClick={() => setAddStep(4)} className="bg-white border border-dashed border-gray-300 text-gray-500 px-5 py-2.5 rounded-xl font-medium text-sm hover:border-gray-400 transition-all">تخطي الحاسبة</button>
+                  <button onClick={() => setAddStep(2)} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">التالي: الحاسبة</button>
+                  <button onClick={() => setAddStep(3)} className="bg-white border border-dashed border-gray-300 text-gray-500 px-5 py-2.5 rounded-xl font-medium text-sm hover:border-gray-400 transition-all">تخطي الحاسبة</button>
                 </div>
               </div>
             )}
 
-            {/* Step 3: Calculator */}
-            {addStep === 3 && (
+            {/* Step 2: Calculator */}
+            {addStep === 2 && (
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                 <div className="font-bold text-gray-900 mb-1">الحاسبة الذكية</div>
                 <div className="text-sm text-gray-500 mb-4">احسب السعر العادل والربح المتوقع (اختياري)</div>
@@ -1604,14 +1588,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                   </div>
                 </div>
                 <div className="flex gap-3 mt-4">
-                  <button onClick={() => setAddStep(2)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-medium text-sm">السابق</button>
-                  <button onClick={() => setAddStep(4)} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">التالي: الصور</button>
+                  <button onClick={() => setAddStep(1)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-medium text-sm">السابق</button>
+                  <button onClick={() => setAddStep(3)} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">التالي: الصور</button>
                 </div>
               </div>
             )}
 
-            {/* Step 4: Images & Description */}
-            {addStep === 4 && (
+            {/* Step 3: Images & Description */}
+            {addStep === 3 && (
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                 <div className="font-bold text-gray-900 mb-4">الصور والوصف</div>
                 <label className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center mb-3 block cursor-pointer hover:border-blue-400 transition-all">
@@ -1628,7 +1612,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                   <div className={`mt-3 text-sm rounded-xl p-3 border ${publishMsg.ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>{publishMsg.text}</div>
                 )}
                 <div className="flex gap-2 mt-4">
-                  <button onClick={() => setAddStep(3)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-medium text-sm">السابق</button>
+                  <button onClick={() => setAddStep(2)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-medium text-sm">السابق</button>
                   <button onClick={publishListing} disabled={publishing} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50">{publishing ? 'جارٍ النشر…' : 'نشر الإعلان'}</button>
                 </div>
               </div>
