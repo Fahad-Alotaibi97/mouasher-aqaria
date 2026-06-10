@@ -5,6 +5,16 @@ import { useEffect, useState } from 'react';
 import { createClient } from './supabase/client';
 import { isSupabaseConfigured } from './supabase/config';
 
+// الصور المصنّفة حسب الغرفة (عمود images_by_category JSONB)
+export interface ImagesByCategory {
+  facade?: string | null;    // الواجهة
+  hall?: string | null;      // الصالة
+  majlis?: string | null;    // المجلس
+  kitchen?: string | null;   // المطبخ
+  bedrooms?: string[];       // غرف النوم (بعدد الغرف)
+  bathrooms?: string[];      // الحمامات (بعدد دورات المياه)
+}
+
 // شكل الإعلان الموحّد كما تستخدمه الواجهة
 export interface UIListing {
   id: string | number;
@@ -24,6 +34,7 @@ export interface UIListing {
   condLabel: string;
   description?: string;
   images?: string[];
+  imagesByCategory?: ImagesByCategory | null;
   fal: string;
   lat?: number | null;
   lng?: number | null;
@@ -72,8 +83,11 @@ export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) 
         // أعمدة الخصائص) فلا تنكسر القائمة العامة قبل تشغيل SQL.
         const BASE = 'id, office_id, hood, title, type, advertised, rooms, area, baths, furnished, condition, cond_label, description, images, fal_license, lat, lng';
         const FULL = BASE + ', kitchen, ac, parking';
+        const FULL2 = FULL + ', images_by_category';
         const attempts: { sel: string; status: boolean }[] = [
+          { sel: FULL2, status: true },
           { sel: FULL, status: true },
+          { sel: FULL2, status: false },
           { sel: FULL, status: false },
           { sel: BASE, status: true },
           { sel: BASE, status: false },
@@ -105,6 +119,7 @@ export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) 
               condLabel: (r.cond_label as string) || '',
               description: (r.description as string) || '',
               images: Array.isArray(r.images) ? (r.images as string[]) : [],
+              imagesByCategory: (r.images_by_category as ImagesByCategory) ?? null,
               fal: (r.fal_license as string) || '',
               lat: (r.lat as number) ?? null,
               lng: (r.lng as number) ?? null,

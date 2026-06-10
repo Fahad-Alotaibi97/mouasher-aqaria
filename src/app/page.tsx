@@ -67,6 +67,21 @@ function leadErrText(error: { code?: string; message?: string }): string {
   return 'تعذّر الإرسال حالياً — حاول لاحقاً.' + (error.message ? ` (${error.message})` : '');
 }
 
+// خانات الصور المصنّفة لمعالج إضافة الإعلان — بالترتيب المعتمد:
+// الواجهة (إلزامية) ← الصالة ← غرف النوم (بعدد الغرف المختار) ← المجلس ← المطبخ
+// ← الحمامات (بعدد دورات المياه المختار). تتحدّث الخانات فور تغيير الغرف/الحمامات.
+type PhotoSlot = { key: string; label: string; req?: boolean };
+function photoSlots(rooms: number, baths: number): PhotoSlot[] {
+  return [
+    { key: 'facade', label: 'الواجهة', req: true },
+    { key: 'hall', label: 'الصالة' },
+    ...Array.from({ length: rooms }, (_, i) => ({ key: `bed${i}`, label: rooms > 1 ? `غرفة نوم ${i + 1}` : 'غرفة النوم' })),
+    { key: 'majlis', label: 'المجلس' },
+    { key: 'kitchen', label: 'المطبخ' },
+    ...Array.from({ length: baths }, (_, i) => ({ key: `bath${i}`, label: baths > 1 ? `حمام ${i + 1}` : 'الحمام' })),
+  ];
+}
+
 // أيقونة منزل بديلة عند غياب صورة الإعلان
 const HousePlaceholder = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-9 h-9">
@@ -358,7 +373,8 @@ export default function Home() {
   const renderListing = (l: UIListing, isMatch = false) => {
     const fair = getFair(l);
     const st = getSt(l.adv, fair);
-    const img = l.images && l.images.length ? l.images[0] : null;
+    // الصورة الأساسية: الواجهة أولاً، ثم أي صورة متاحة
+    const img = l.imagesByCategory?.facade ?? (l.images && l.images.length ? l.images[0] : null);
     const chips = attrChips(l);
     const vBadge = st === 'hi' ? 'bg-[#fff3e0] text-[#C2410C]' : st === 'lo' ? 'bg-[#e8f7ee] text-[#1f7a44]' : 'bg-[#e6f1fb] text-[#1B6CA8]';
     return (
@@ -949,6 +965,36 @@ export default function Home() {
                   {l.ac != null && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-cyan-50 text-cyan-800 border border-cyan-200">{l.ac ? 'مكيّفة' : 'غير مكيّفة'}</span>}
                   {l.parking != null && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-teal-50 text-teal-800 border border-teal-200">{l.parking >= 1 ? `مواقف: ${l.parking}` : 'لا يوجد مواقف'}</span>}
                 </div>
+                {/* معرض الصور المصنّفة — بطاقات بمسمّيات عربية حسب الغرفة */}
+                {(() => {
+                  const cat = l.imagesByCategory;
+                  const shots: { label: string; url: string }[] = [];
+                  if (cat) {
+                    if (cat.facade) shots.push({ label: 'الواجهة', url: cat.facade });
+                    if (cat.hall) shots.push({ label: 'الصالة', url: cat.hall });
+                    (cat.bedrooms ?? []).forEach((u, i) => shots.push({ label: (cat.bedrooms ?? []).length > 1 ? `غرفة نوم ${i + 1}` : 'غرفة النوم', url: u }));
+                    if (cat.majlis) shots.push({ label: 'المجلس', url: cat.majlis });
+                    if (cat.kitchen) shots.push({ label: 'المطبخ', url: cat.kitchen });
+                    (cat.bathrooms ?? []).forEach((u, i) => shots.push({ label: (cat.bathrooms ?? []).length > 1 ? `حمام ${i + 1}` : 'الحمام', url: u }));
+                  }
+                  // إعلانات قديمة بلا تصنيف: نعرض مصفوفة الصور المسطّحة بلا مسمّيات
+                  if (!shots.length && l.images?.length) l.images.forEach((u, i) => shots.push({ label: `صورة ${i + 1}`, url: u }));
+                  if (!shots.length) return null;
+                  return (
+                    <div>
+                      <div className="text-sm font-bold text-gray-800 mb-2">صور الوحدة</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {shots.map((s, i) => (
+                          <figure key={i} className="relative rounded-xl overflow-hidden border border-gray-200">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={s.url} alt={s.label} className="w-full h-28 object-cover" />
+                            <figcaption className="absolute bottom-0 inset-x-0 bg-black/45 text-white text-[11px] px-2 py-1 text-right">{s.label}</figcaption>
+                          </figure>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {l.description && <p className="text-sm text-gray-700 leading-relaxed">{l.description}</p>}
                 <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">رخصة فال: {l.fal || '—'}</div>
                 {ctSent ? (
@@ -1140,7 +1186,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [fAc, setFAc] = useState('');               // مكيّفة | غير مكيّفة
   const [fParking, setFParking] = useState('');     // 0 | 1 | 2 | 3
   const [fDesc, setFDesc] = useState('');
-  const [fFiles, setFFiles] = useState<File[]>([]);
+  // الصور المصنّفة: المفتاح = خانة (facade/hall/majlis/kitchen/bedN/bathN)
+  const [fPhotos, setFPhotos] = useState<Record<string, { file: File; preview: string } | null>>({});
+  const setPhoto = (key: string, file: File | null) =>
+    setFPhotos((prev) => {
+      const old = prev[key];
+      if (old) URL.revokeObjectURL(old.preview);
+      return { ...prev, [key]: file ? { file, preview: URL.createObjectURL(file) } : null };
+    });
   const [publishing, setPublishing] = useState(false);
   const [publishMsg, setPublishMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -1206,6 +1259,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
 
   const publishListing = async () => {
     if (!fRent.trim()) { setPublishMsg({ ok: false, text: 'أدخل قيمة الإيجار السنوي.' }); return; }
+    if (!fPhotos['facade']) { setPublishMsg({ ok: false, text: 'صورة الواجهة إلزامية — أضفها قبل النشر. بقية الصور اختيارية.' }); return; }
     setPublishing(true); setPublishMsg(null);
     try {
       if (!isSupabaseConfigured()) {
@@ -1222,15 +1276,29 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       if (!myOffice.active) {
         setPublishMsg({ ok: false, text: 'مكتبك موقوف حالياً من الإدارة — لا يمكنك النشر. تواصل مع الإدارة.' }); setPublishing(false); return;
       }
-      // رفع الصور إلى التخزين
-      const urls: string[] = [];
-      for (const file of fFiles) {
-        const path = `${Date.now()}_${Math.random().toString(36).slice(2)}_${file.name}`;
-        const { error: upErr } = await sb.storage.from('listings').upload(path, file);
-        if (!upErr) {
-          const { data: pub } = sb.storage.from('listings').getPublicUrl(path);
-          if (pub?.publicUrl) urls.push(pub.publicUrl);
-        }
+      // ── رفع الصور المصنّفة (الواجهة أولاً) — فشل رفع صورة لا يُفشل النشر ──
+      const slots = photoSlots(parseInt(fRooms) || 1, parseInt(fBaths) || 1);
+      const byCat: { facade: string | null; hall: string | null; majlis: string | null; kitchen: string | null; bedrooms: string[]; bathrooms: string[] } =
+        { facade: null, hall: null, majlis: null, kitchen: null, bedrooms: [], bathrooms: [] };
+      const urls: string[] = []; // مصفوفة مسطّحة متوافقة مع عمود images القديم (الواجهة أولاً)
+      const photoFails: string[] = [];
+      for (const s of slots) {
+        const ph = fPhotos[s.key];
+        if (!ph) continue;
+        const ext = (ph.file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+        const path = `${myOffice.id}/${Date.now()}_${s.key}.${ext}`;
+        const { error: upErr } = await sb.storage.from('listings').upload(path, ph.file);
+        if (upErr) { photoFails.push(s.label); continue; }
+        const { data: pub } = sb.storage.from('listings').getPublicUrl(path);
+        const u = pub?.publicUrl;
+        if (!u) { photoFails.push(s.label); continue; }
+        urls.push(u);
+        if (s.key === 'facade') byCat.facade = u;
+        else if (s.key === 'hall') byCat.hall = u;
+        else if (s.key === 'majlis') byCat.majlis = u;
+        else if (s.key === 'kitchen') byCat.kitchen = u;
+        else if (s.key.startsWith('bed')) byCat.bedrooms.push(u);
+        else if (s.key.startsWith('bath')) byCat.bathrooms.push(u);
       }
       // ── مستوى الثقة: المكتب الموثّق (verified) يُنشر مباشرة؛ غير الموثّق
       //    يدخل إعلانه «بانتظار الموافقة» ويُعتمد من الإدارة إعلاناً بإعلان.
@@ -1253,6 +1321,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         ac: fAc === '' ? null : fAc === 'مكيّفة',
         parking: fParking === '' ? null : parseInt(fParking),
         description: fDesc.trim() || null, images: urls,
+        images_by_category: byCat,
       };
       const payload: Record<string, unknown> = { ...core, ...attrs };
       const dropped: string[] = [];
@@ -1272,9 +1341,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         text: (autoApproved
           ? 'تم نشر الإعلان — ظاهر الآن للباحثين مباشرة (مكتبك موثّق).'
           : 'تم إرسال الإعلان للمراجعة — يظهر للباحثين فور اعتماد الإدارة له.')
-          + (dropped.length ? ` (لم تُحفظ خصائص: ${dropped.join('، ')} — شغّل supabase/listing_attributes.sql)` : ''),
+          + (photoFails.length ? ` (تعذّر رفع صور: ${photoFails.join('، ')})` : '')
+          + (dropped.length ? ` (لم تُحفظ خصائص: ${dropped.join('، ')} — شغّل supabase/storage_listing_images.sql)` : ''),
       });
-      setFRent(''); setFArea(''); setFDesc(''); setFFiles([]);
+      setFRent(''); setFArea(''); setFDesc('');
+      Object.values(fPhotos).forEach((p) => { if (p) URL.revokeObjectURL(p.preview); });
+      setFPhotos({});
       setTimeout(() => { setPublishMsg(null); setAddStep(1); setOffPage('listings'); }, 1200);
     } catch {
       setPublishMsg({ ok: false, text: 'حدث خطأ غير متوقع أثناء النشر.' });
@@ -1597,16 +1669,33 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
             {/* Step 3: Images & Description */}
             {addStep === 3 && (
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                <div className="font-bold text-gray-900 mb-4">الصور والوصف</div>
-                <label className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center mb-3 block cursor-pointer hover:border-blue-400 transition-all">
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => setFFiles(Array.from(e.target.files || []))} />
-                  <div className="text-gray-500 text-sm">{fFiles.length ? `تم اختيار ${fFiles.length} صورة` : 'اضغط لاختيار صور الوحدة'}</div>
-                </label>
-                {fFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {fFiles.map((f, i) => <span key={i} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-lg border border-gray-200">{f.name}</span>)}
-                  </div>
-                )}
+                <div className="font-bold text-gray-900 mb-1">صور الوحدة حسب الغرفة</div>
+                <div className="text-sm text-gray-500 mb-4">
+                  صورة الواجهة إلزامية؛ البقية اختيارية لكنها ترفع فرص تواصل الباحثين.
+                  خانات غرف النوم والحمامات تتبع ما اخترته في «بيانات العقار» ({fRooms} غرف · {fBaths} دورات مياه).
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                  {photoSlots(parseInt(fRooms) || 1, parseInt(fBaths) || 1).map((s) => {
+                    const ph = fPhotos[s.key];
+                    return (
+                      <label key={s.key}
+                        className={`border-2 border-dashed rounded-xl p-2 text-center cursor-pointer transition-all min-h-[110px] flex flex-col items-center justify-center gap-1 ${ph ? 'border-green-400 bg-green-50/40' : s.req ? 'border-[#1B6CA8]/60 hover:border-[#1B6CA8] bg-blue-50/30' : 'border-gray-300 hover:border-gray-400'}`}>
+                        <input type="file" accept="image/*" className="hidden"
+                          onChange={(e) => setPhoto(s.key, e.target.files?.[0] ?? null)} />
+                        {ph ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={ph.preview} alt={s.label} className="w-full h-16 object-cover rounded-lg" />
+                        ) : (
+                          <span className="text-gray-400 text-2xl leading-none">+</span>
+                        )}
+                        <span className="text-xs font-semibold text-gray-700">
+                          {s.label}{s.req && <span className="text-red-500"> *</span>}
+                        </span>
+                        {ph && <span className="text-[10px] text-green-700 truncate max-w-full px-1">{ph.file.name}</span>}
+                      </label>
+                    );
+                  })}
+                </div>
                 <textarea value={fDesc} onChange={e=>setFDesc(e.target.value)} placeholder="وصف العقار..." rows={4} className={inputCls + ' resize-none'} />
                 {publishMsg && (
                   <div className={`mt-3 text-sm rounded-xl p-3 border ${publishMsg.ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>{publishMsg.text}</div>
