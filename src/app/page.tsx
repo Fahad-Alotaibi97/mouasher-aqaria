@@ -107,6 +107,14 @@ export default function Home() {
   const [inqSending, setInqSending] = useState(false);
   const [inqErr, setInqErr] = useState<string | null>(null);
   const [selectedListing, setSelectedListing] = useState<UIListing | null>(null);
+  // نموذج التواصل بخصوص إعلان محدّد — يُحفظ في leads مربوطاً بالمكتب والإعلان
+  const [ctOpen, setCtOpen] = useState(false);
+  const [ctName, setCtName] = useState('');
+  const [ctPhone, setCtPhone] = useState('');
+  const [ctMsg, setCtMsg] = useState('');
+  const [ctSent, setCtSent] = useState(false);
+  const [ctSending, setCtSending] = useState(false);
+  const [ctErr, setCtErr] = useState<string | null>(null);
   const [siZone, setSiZone] = useState('النرجس'); // اسم الحي المختار في "جرّب المؤشر"
   const [siType, setSiType] = useState('شقة'); // نوع الوحدة في "جرّب المؤشر"
   const [siPrice, setSiPrice] = useState('');
@@ -219,6 +227,31 @@ export default function Home() {
       setInqErr('تعذّر إرسال الاستفسار حالياً — حاول لاحقاً.');
     }
     setInqSending(false);
+  };
+
+  // تواصل بخصوص إعلان محدّد ⇒ يُحفظ في leads مربوطاً بالمكتب (office_id) والإعلان
+  // (listing_id) ليصل للمكتب صاحب الإعلان في لوحته، وللأدمن في /admin.
+  const submitListingContact = async () => {
+    const l = selectedListing;
+    if (!l || !ctName.trim() || !ctPhone.trim() || ctSending) return;
+    setCtSending(true); setCtErr(null);
+    const head = `بخصوص الإعلان: ${l.title || l.type} · ${l.type} · ${l.hood} · ${l.adv.toLocaleString('ar-SA')} ريال/سنة`;
+    const message = [head, ctMsg.trim()].filter(Boolean).join('\n') || null;
+    try {
+      if (isSupabaseConfigured()) {
+        const sb = createClient();
+        const row: Record<string, unknown> = { name: ctName.trim(), phone: ctPhone.trim(), message };
+        if (l.office_id) row.office_id = l.office_id;
+        if (typeof l.id === 'string') row.listing_id = l.id; // uuid فقط (الإعلانات الحقيقية)
+        const { error } = await sb.from('leads').insert(row);
+        if (error) { setCtErr(leadErrText(error)); setCtSending(false); return; }
+      }
+      setCtSent(true);
+      setCtName(''); setCtPhone(''); setCtMsg('');
+    } catch {
+      setCtErr('تعذّر إرسال طلب التواصل حالياً — حاول لاحقاً.');
+    }
+    setCtSending(false);
   };
 
   const clearFilters = () => { setFilterHood(''); setFilterType(''); setFilterBudget(''); };
@@ -338,7 +371,7 @@ export default function Home() {
     const chips = attrChips(l);
     const vBadge = st === 'hi' ? 'bg-[#fff3e0] text-[#C2410C]' : st === 'lo' ? 'bg-[#e8f7ee] text-[#1f7a44]' : 'bg-[#e6f1fb] text-[#1B6CA8]';
     return (
-      <div key={l.id} onClick={() => setSelectedListing(l)}
+      <div key={l.id} onClick={() => { setSelectedListing(l); setCtOpen(false); setCtSent(false); setCtErr(null); setCtName(''); setCtPhone(''); setCtMsg(''); }}
         className={`card-fade bg-white rounded-2xl border overflow-hidden cursor-pointer transition-all shadow-sm hover:shadow-lg hover:-translate-y-0.5 ${isMatch ? 'border-[#C9A84C] ring-1 ring-[#C9A84C]/40' : 'border-[#cfd9e4] hover:border-[#1B6CA8]'}`}>
         <div className="flex">
           {/* عمود الصورة (يمين) */}
@@ -629,14 +662,14 @@ export default function Home() {
               <div className="flex justify-center mb-3 text-white opacity-90">{Icons.bank}</div>
               <div className="text-white font-bold text-lg mb-2">تحتاج تمويلاً عقارياً؟</div>
               <div className="text-white/85 text-sm mb-4 leading-relaxed max-w-sm mx-auto">نربطك مباشرة بشركائنا من الجهات التمويلية المعتمدة لتحصل على أفضل عرض يناسبك</div>
-              <button className="bg-white text-[#0A3D62] px-8 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all">
+              <button onClick={() => { if (!leadMsg.trim()) setLeadMsg('أرغب بطلب تمويل عقاري — أرجو التواصل معي.'); document.getElementById('finance-lead-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} className="bg-white text-[#0A3D62] px-8 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all">
                 اطلب التمويل الآن
               </button>
               <div className="text-white/70 text-xs mt-3">خدمة مجانية · ردود سريعة · مقارنة عروض</div>
             </div>
 
             {/* تواصل — اترك رسالة */}
-            <div className="bg-white rounded-2xl overflow-hidden border border-blue-200 shadow-sm">
+            <div id="finance-lead-form" className="bg-white rounded-2xl overflow-hidden border border-blue-200 shadow-sm">
               <div className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] px-4 py-3">
                 <div className="text-white font-bold text-sm">اترك رسالة وسنتواصل معك</div>
                 <div className="text-white/80 text-xs">اكتب طلبك أو استفسارك ونرجع لك قريباً</div>
@@ -921,7 +954,21 @@ export default function Home() {
                 </div>
                 {l.description && <p className="text-sm text-gray-700 leading-relaxed">{l.description}</p>}
                 <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">رخصة فال: {l.fal || '—'}</div>
-                <button onClick={() => { setSelectedListing(null); setPage('search'); }} className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-3 rounded-xl font-bold text-sm">تواصل بخصوص هذا الإعلان</button>
+                {ctSent ? (
+                  <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl p-4 text-sm text-center font-medium">تم إرسال طلبك — سيتواصل معك المكتب قريباً.</div>
+                ) : ctOpen ? (
+                  <div className="space-y-3 pt-1">
+                    <div className="grid grid-cols-2 gap-3">
+                      <input value={ctName} onChange={e => setCtName(e.target.value)} placeholder="الاسم" className={inputCls} />
+                      <input value={ctPhone} onChange={e => setCtPhone(e.target.value)} placeholder="رقم الجوال" className={inputCls} dir="ltr" />
+                    </div>
+                    <textarea value={ctMsg} onChange={e => setCtMsg(e.target.value)} placeholder="رسالتك (اختياري) — مثال: متى أقدر أعاين الوحدة؟" rows={2} className={inputCls + ' resize-none'} />
+                    {ctErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{ctErr}</div>}
+                    <button onClick={submitListingContact} disabled={ctSending} className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-3 rounded-xl font-bold text-sm disabled:opacity-50">{ctSending ? 'جارٍ الإرسال…' : 'إرسال طلب التواصل'}</button>
+                  </div>
+                ) : (
+                  <button onClick={() => setCtOpen(true)} className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-3 rounded-xl font-bold text-sm">تواصل بخصوص هذا الإعلان</button>
+                )}
               </div>
             </div>
           </div>
@@ -1105,6 +1152,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   // ── بيانات المكتب الحقيقية (مربوطة بالحساب الحالي عبر owner_id) ──
   const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; verified: boolean; status: string | null; active: boolean } | null>(null);
   const [myListings, setMyListings] = useState<{ id: string; title: string; advertised: number; status: string; rejection_note: string | null }[]>([]);
+  const [myLeads, setMyLeads] = useState<{ id: string; name: string; phone: string; message: string | null; created_at: string }[]>([]);
   const [offLoaded, setOffLoaded] = useState(false);
   // نموذج إنشاء المكتب داخل اللوحة (يضمن ربط أي حساب بمكتب بشكل موثوق)
   const [newOfficeName, setNewOfficeName] = useState('');
@@ -1129,8 +1177,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     if (off) {
       const { data: ls } = await sb.from('listings').select('id,title,advertised,status,rejection_note').eq('office_id', off.id).order('created_at', { ascending: false });
       setMyListings((ls ?? []) as typeof myListings);
+      // الاستفسارات الحقيقية الموجّهة لهذا المكتب (تتطلب سياسة leads_office_read)
+      const { data: lds } = await sb.from('leads').select('id,name,phone,message,created_at').eq('office_id', off.id).order('created_at', { ascending: false });
+      setMyLeads((lds ?? []) as typeof myLeads);
     } else {
       setMyListings([]);
+      setMyLeads([]);
     }
     setOffLoaded(true);
   };
@@ -1343,7 +1395,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
               <button onClick={() => setOffPage('inquiries')}
                 className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm hover:border-blue-300 transition-all">
                 <div className="text-lg font-bold text-gray-900 mb-1">الردود</div>
-                <div className="text-xs text-gray-500">5 استفسارات بانتظارك</div>
+                <div className="text-xs text-gray-500">{myLeads.length > 0 ? `${myLeads.length.toLocaleString('ar-SA')} استفسار وصلك` : 'لا استفسارات بعد'}</div>
               </button>
             </div>
           </div>
@@ -1638,30 +1690,36 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         {offPage === 'inquiries' && (
           <div>
             <div className="text-xl font-bold text-gray-900 mb-1">الاستفسارات</div>
-            <div className="text-sm text-gray-500 mb-5">5 استفسارات تحتاج رد</div>
-            <div className="space-y-3">
-              {[
-                { name:'أحمد المطيري', time:'قبل 25 دقيقة', property:'شقة 3 غرف — حي النرجس', msg:'السلام عليكم، الشقة لازالت متاحة؟ ممكن نسوي معاينة بكرة؟', unread:true },
-                { name:'سلطان القحطاني', time:'قبل ساعة', property:'فيلا 5 غرف — حي حطين', msg:'هل المسبح فيها مشترك أو خاص؟ وهل يوجد صور إضافية؟', unread:true },
-                { name:'نجلاء الحربي', time:'قبل 3 ساعات', property:'استوديو — حي العليا', msg:'السعر قابل للتفاوض؟ وهل يوجد عقد إيجار 6 أشهر؟', unread:false },
-              ].map((inq, i) => (
-                <div key={i} className={`bg-white rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all ${inq.unread ? 'border-r-4 border-blue-400 bg-blue-50/30' : 'border-gray-200'}`}>
-                  <div className="flex gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700 flex-shrink-0">
-                      {inq.name.slice(0,1)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between mb-1">
-                        <div className="font-bold text-sm text-gray-900">{inq.name}</div>
-                        <div className="text-xs text-gray-400">{inq.time}</div>
+            <div className="text-sm text-gray-500 mb-5">{myLeads.length > 0 ? `${myLeads.length.toLocaleString('ar-SA')} استفسار وصلك` : 'استفسارات الباحثين على إعلاناتك تظهر هنا'}</div>
+            {myLeads.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+                <div className="text-gray-400 text-sm">لا توجد استفسارات بعد. عندما يتواصل باحث بخصوص أحد إعلاناتك، يظهر طلبه هنا مباشرة.</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {myLeads.map((inq) => {
+                  const t = new Date(inq.created_at);
+                  const when = isNaN(t.getTime()) ? '' : t.toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' });
+                  return (
+                    <div key={inq.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-all">
+                      <div className="flex gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700 flex-shrink-0">
+                          {(inq.name || '؟').slice(0,1)}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex justify-between mb-1">
+                            <div className="font-bold text-sm text-gray-900">{inq.name || 'باحث'}</div>
+                            <div className="text-xs text-gray-400">{when}</div>
+                          </div>
+                          <a href={`tel:${inq.phone}`} className="text-xs text-blue-600 font-medium mb-1 inline-block" dir="ltr">{inq.phone}</a>
+                          {inq.message && <div className="text-sm text-gray-600 whitespace-pre-line mt-1">{inq.message}</div>}
+                        </div>
                       </div>
-                      <div className="text-xs text-blue-600 font-medium mb-1">{inq.property}</div>
-                      <div className="text-sm text-gray-600">{inq.msg}</div>
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

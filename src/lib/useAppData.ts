@@ -8,6 +8,7 @@ import { isSupabaseConfigured } from './supabase/config';
 // شكل الإعلان الموحّد كما تستخدمه الواجهة
 export interface UIListing {
   id: string | number;
+  office_id?: string | null;
   hood: string;
   title: string;
   type: string;
@@ -69,7 +70,7 @@ export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) 
         // العامة ترى المعتمد فقط (status='approved') + الخصائص المنظّمة (kitchen/ac/parking).
         // نتدرّج عبر عدة محاولات حتى نتوافق مع أي حالة للقاعدة (مع/بدون status، ومع/بدون
         // أعمدة الخصائص) فلا تنكسر القائمة العامة قبل تشغيل SQL.
-        const BASE = 'id, hood, title, type, advertised, rooms, area, baths, furnished, condition, cond_label, description, images, fal_license, lat, lng';
+        const BASE = 'id, office_id, hood, title, type, advertised, rooms, area, baths, furnished, condition, cond_label, description, images, fal_license, lat, lng';
         const FULL = BASE + ', kitchen, ac, parking';
         const attempts: { sel: string; status: boolean }[] = [
           { sel: FULL, status: true },
@@ -88,6 +89,7 @@ export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) 
           setListings(
             rows.map((r) => ({
               id: r.id as string | number,
+              office_id: (r.office_id as string) ?? null,
               hood: r.hood as string,
               title: r.title as string,
               type: r.type as string,
