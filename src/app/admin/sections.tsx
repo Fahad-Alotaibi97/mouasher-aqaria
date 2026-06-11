@@ -77,58 +77,326 @@ const statusMeta: Record<string, { cls: string; label: string }> = {
 };
 
 // ════════════════════════════════════════════════════════════
-//  2) لوحة الإحصائيات — أعداد حقيقية من COUNT على الجداول الفعلية
+//  2) لوحة التحليلات — كل رقم استعلام/تجميع حقيقي على جداول القاعدة
+//     + جدول analytics_events (تتبّع داخلي خفيف بلا بيانات شخصية:
+//     نقرات الإعلانات، استخدام المؤشر بحكمه، البحث بالفلاتر والمساعد).
+//     لا أرقام وهمية أبداً — كل قسم بلا بيانات يقولها بصراحة.
 // ════════════════════════════════════════════════════════════
+interface AnaListing { id: string; title: string; hood: string; type: string; status: string | null; active: boolean; office_id: string | null }
+interface AnaOffice { id: string; name: string; status: string | null; active: boolean; verified: boolean }
+interface AnaLead { listing_id: string | null; office_id: string | null; kind: string | null; created_at: string }
+interface AnaEvent { type: string; ref_id: string | null; meta: Record<string, unknown> | null; created_at: string }
+
+// التجميعات تُحسب على آخر EVENTS_CAP حدث (الإجماليات تبقى دقيقة لأن الأحدث أولاً)
+const EVENTS_CAP = 5000;
+
+// يجمع تكرارات مفتاح من قائمة، ويرجع الأعلى تكراراً
+function topCounts<T>(items: T[], keyOf: (i: T) => string | null | undefined, limit = 10): { key: string; count: number }[] {
+  const m = new Map<string, number>();
+  for (const it of items) {
+    const k = keyOf(it);
+    if (k) m.set(k, (m.get(k) ?? 0) + 1);
+  }
+  return [...m.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.count - a.count).slice(0, limit);
+}
+
+// شريحة ميزانية البحث — تجميع نطاقات الأسعار المطلوبة
+function budgetBucket(n: number): string {
+  if (n < 30000) return 'أقل من 30 ألف';
+  if (n < 50000) return '30 – 50 ألف';
+  if (n < 70000) return '50 – 70 ألف';
+  if (n < 100000) return '70 – 100 ألف';
+  return 'أكثر من 100 ألف';
+}
+
+function StatCard({ label, val, warn }: { label: string; val: number; warn?: boolean }) {
+  return (
+    <div className={`${card} p-4 ${warn && val > 0 ? 'border-amber-300 bg-amber-50/50' : ''}`}>
+      <div className="text-xs text-[#33414f] mb-2 font-medium">{label}</div>
+      <div className={`text-3xl font-extrabold ${warn && val > 0 ? 'text-amber-700' : 'text-[#0A3D62]'}`}>{fmtNum(val)}</div>
+    </div>
+  );
+}
+
+// بطاقة فرعية موحّدة لأقسام اللوحة
+function SubCard({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className={`${card} p-4`}>
+      <div className="font-bold text-sm text-[#0A3D62]">{title}</div>
+      {hint && <div className="text-[11px] text-[#5b6b7a] mt-0.5 mb-2">{hint}</div>}
+      <div className={hint ? '' : 'mt-2'}>{children}</div>
+    </div>
+  );
+}
+
+function MiniEmpty({ text = 'لا توجد بيانات بعد.' }: { text?: string }) {
+  return <div className="text-xs text-[#5b6b7a] py-4 text-center">{text}</div>;
+}
+
+// قائمة مرتّبة بأشرطة نسبية (الأطول = الأعلى) — بدون مكتبات رسوم
+function RankList({ rows, unit }: { rows: { key: string; label: string; sub?: string; count: number }[]; unit: string }) {
+  if (!rows.length) return <MiniEmpty />;
+  const max = rows[0]?.count || 1;
+  return (
+    <div className="space-y-2">
+      {rows.map((r, i) => (
+        <div key={r.key}>
+          <div className="flex items-center justify-between text-xs mb-0.5 gap-2">
+            <span className="text-[#0f1a28] font-medium truncate">
+              <span className="text-[#C9A84C] font-bold ml-1">{fmtNum(i + 1)}.</span>
+              {r.label}
+              {r.sub && <span className="text-[#5b6b7a] font-normal"> · {r.sub}</span>}
+            </span>
+            <span className="text-[#0A3D62] font-bold whitespace-nowrap">{fmtNum(r.count)} {unit}</span>
+          </div>
+          <div className="h-1.5 bg-[#f0f4f8] rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] rounded-full" style={{ width: `${Math.max(6, (r.count / max) * 100)}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
-  const [stats, setStats] = useState<{ listings: number; offices: number; leads: number; leadsWeek: number } | null>(null);
+  const [listings, setListings] = useState<AnaListing[]>([]);
+  const [offices, setOffices] = useState<AnaOffice[]>([]);
+  const [leads, setLeads] = useState<AnaLead[]>([]);
+  const [events, setEvents] = useState<AnaEvent[]>([]);
+  const [eventsMissing, setEventsMissing] = useState(false); // الجدول غير منشأ بعد (42P01)
   const [err, setErr] = useState<PgErr | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
     const sb = createClient();
-    const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    const [l, o, ld, lw] = await Promise.all([
-      sb.from('listings').select('id', { count: 'exact', head: true }),
-      sb.from('offices').select('id', { count: 'exact', head: true }),
-      sb.from('leads').select('id', { count: 'exact', head: true }),
-      sb.from('leads').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
+    const [lr, or_, ldr, evr] = await Promise.all([
+      sb.from('listings').select('id,title,hood,type,status,active,office_id'),
+      sb.from('offices').select('id,name,status,active,verified'),
+      sb.from('leads').select('listing_id,office_id,kind,created_at'),
+      sb.from('analytics_events').select('type,ref_id,meta,created_at').order('created_at', { ascending: false }).limit(EVENTS_CAP),
     ]);
-    const firstErr = [l, o, ld, lw].find((r) => r.error)?.error;
-    if (firstErr) setErr(firstErr);
-    else setStats({ listings: l.count ?? 0, offices: o.count ?? 0, leads: ld.count ?? 0, leadsWeek: lw.count ?? 0 });
+    // أعمدة leads الموسّعة قد تغيب قبل ترحيلاتها — نتدرّج للأساسي بدل الانكسار
+    let leadRows = (ldr.data ?? []) as AnaLead[];
+    if (ldr.error && ldr.error.code === '42703') {
+      const r2 = await sb.from('leads').select('created_at');
+      leadRows = ((r2.data ?? []) as { created_at: string }[]).map((r) => ({ listing_id: null, office_id: null, kind: null, created_at: r.created_at }));
+    } else if (ldr.error) { setErr(ldr.error); setLoading(false); return; }
+    if (lr.error) { setErr(lr.error); setLoading(false); return; }
+    if (or_.error) { setErr(or_.error); setLoading(false); return; }
+    // جدول الأحداث غير منشأ بعد ⇒ اللوحة تعمل ويظهر تنبيه تشغيل SQL.
+    // ملاحظة مُتحقَّقة حياً: PostgREST يرجع PGRST205 (لا 42P01) للجدول المفقود.
+    if (evr.error) {
+      if (evr.error.code === '42P01' || evr.error.code === 'PGRST205') { setEventsMissing(true); setEvents([]); }
+      else { setErr(evr.error); setLoading(false); return; }
+    } else { setEventsMissing(false); setEvents((evr.data ?? []) as AnaEvent[]); }
+    setListings((lr.data ?? []) as AnaListing[]);
+    setOffices((or_.data ?? []) as AnaOffice[]);
+    setLeads(leadRows);
     setLoading(false);
   }, []);
 
   useEffect(() => { if (!sessionAdmin) { setLoading(false); return; } load(); }, [sessionAdmin, load]);
 
-  if (!sessionAdmin) return <><SectionHead title="لوحة الإحصائيات" /><NeedSession /></>;
+  if (!sessionAdmin) return <><SectionHead title="لوحة التحليلات" /><NeedSession /></>;
 
-  const cards = stats ? [
-    { label: 'إجمالي الإعلانات', val: stats.listings },
-    { label: 'إجمالي المكاتب', val: stats.offices },
-    { label: 'إجمالي الرسائل', val: stats.leads },
-    { label: 'رسائل هذا الأسبوع', val: stats.leadsWeek },
-  ] : [];
+  // ── تجميعات حقيقية من الصفوف المجلوبة ──────────────────────
+  const weekAgo = Date.now() - 7 * 86_400_000;
+  const isSupport = (l: AnaLead) => l.kind === 'support';
+  const inquiries = leads.filter((l) => !isSupport(l));
+  const inquiriesWeek = inquiries.filter((l) => new Date(l.created_at).getTime() >= weekAgo);
+  const stOf = (s: string | null) => s || 'pending';
+  const pendingListings = listings.filter((l) => stOf(l.status) === 'pending');
+  const pendingOffices = offices.filter((o) => stOf(o.status) === 'pending');
+  const activeOffices = offices.filter((o) => o.active);
+  const officeName = new Map(offices.map((o) => [o.id, o.name]));
+  const listingById = new Map(listings.map((l) => [l.id, l]));
+
+  // التفاعل: استفسارات لكل إعلان (من leads.listing_id) + نقرات لكل إعلان (من الأحداث)
+  const listingLabel = (id: string) => {
+    const l = listingById.get(id);
+    return l ? { label: l.title, sub: `${l.type} · ${l.hood}` } : { label: 'إعلان محذوف', sub: undefined };
+  };
+  const inquiredRank = topCounts(inquiries, (l) => l.listing_id).map((r) => ({ ...listingLabel(r.key), ...r }));
+  const clicks = events.filter((e) => e.type === 'listing_click');
+  const viewedRank = topCounts(clicks, (e) => e.ref_id).map((r) => ({ ...listingLabel(r.key), ...r }));
+
+  // المكاتب الأكثر نشاطاً: عدد إعلانات + استفسارات واردة، مرتّبة بالاستفسارات ثم الإعلانات
+  const officeListings = new Map<string, number>();
+  listings.forEach((l) => { if (l.office_id) officeListings.set(l.office_id, (officeListings.get(l.office_id) ?? 0) + 1); });
+  const officeInquiries = new Map<string, number>();
+  inquiries.forEach((l) => { if (l.office_id) officeInquiries.set(l.office_id, (officeInquiries.get(l.office_id) ?? 0) + 1); });
+  const activeOfficesRank = [...new Set([...officeListings.keys(), ...officeInquiries.keys()])]
+    .map((id) => ({ id, name: officeName.get(id) ?? 'مكتب محذوف', listings: officeListings.get(id) ?? 0, inquiries: officeInquiries.get(id) ?? 0 }))
+    .sort((a, b) => b.inquiries - a.inquiries || b.listings - a.listings)
+    .slice(0, 10);
+
+  // سلوك الباحثين: من أحداث البحث (فلاتر + مساعد ذكي)
+  const searches = events.filter((e) => e.type === 'search');
+  const hoodRank = topCounts(searches, (e) => (e.meta?.hood as string) || null, 8).map((r) => ({ ...r, label: r.key }));
+  const typeRank = topCounts(searches, (e) => (e.meta?.type as string) || null, 6).map((r) => ({ ...r, label: r.key }));
+  const budgetRank = topCounts(searches, (e) => { const b = Number(e.meta?.budget); return b > 0 ? budgetBucket(b) : null; }, 6).map((r) => ({ ...r, label: r.key }));
+  const aiQueriesRank = topCounts(searches.filter((e) => e.meta?.source === 'ai'), (e) => ((e.meta?.q as string) || '').trim() || null, 8).map((r) => ({ ...r, label: `«${r.key}»` }));
+
+  // استخدام المؤشر: إجمالي + توزيع الأحكام (يعكس حالة السوق المعروضة للزوار)
+  const indicatorUses = events.filter((e) => e.type === 'indicator_use');
+  const verdictCount = (v: string) => indicatorUses.filter((e) => e.meta?.verdict === v).length;
+  const verdicts = [
+    { key: 'hi', label: 'مرتفع', count: verdictCount('hi'), cls: 'from-orange-500 to-orange-600', txt: 'text-orange-700' },
+    { key: 'ok', label: 'مناسب', count: verdictCount('ok'), cls: 'from-[#1B6CA8] to-[#0A3D62]', txt: 'text-[#0A3D62]' },
+    { key: 'lo', label: 'فرصة', count: verdictCount('lo'), cls: 'from-green-500 to-green-600', txt: 'text-green-700' },
+  ];
+
+  // التحويل: نقرات الإعلانات ← استفسارات مرتبطة بإعلان (منذ تفعيل التتبّع)
+  const linkedInquiries = inquiries.filter((l) => l.listing_id).length;
+  const conversion = clicks.length > 0 ? Math.round((linkedInquiries / clicks.length) * 100) : null;
+
+  const head = (t: string) => <h3 className="font-bold text-[#0A3D62] text-base mt-6 mb-3 sec-underline">{t}</h3>;
 
   return (
     <>
-      <SectionHead title="لوحة الإحصائيات" subtitle="أعداد حقيقية محسوبة مباشرة من جداول القاعدة" onRefresh={load} />
+      <SectionHead title="لوحة التحليلات" subtitle="كل الأرقام استعلامات حقيقية على بيانات المنصة — بلا أي تقدير أو أرقام وهمية" onRefresh={load} />
       {err && <ErrBox e={err} />}
+      {eventsMissing && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-sm mb-3 leading-relaxed">
+          جدول التتبّع <b>analytics_events</b> غير منشأ بعد — شغّل ملف <b>supabase/analytics_events.sql</b> في Supabase → SQL Editor
+          ليبدأ تسجيل نقرات الإعلانات والبحث واستخدام المؤشر. بقية الأرقام أدناه (الإعلانات/المكاتب/الاستفسارات) حقيقية وتعمل الآن.
+        </div>
+      )}
       {loading ? <Loading /> : !err && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {cards.map((c) => (
-              <div key={c.label} className={`${card} p-4`}>
-                <div className="text-xs text-[#33414f] mb-2 font-medium">{c.label}</div>
-                <div className="text-3xl font-extrabold text-[#0A3D62]">{fmtNum(c.val)}</div>
-              </div>
-            ))}
+          {/* ── الملخص العلوي ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <StatCard label="إجمالي الإعلانات" val={listings.length} />
+            <StatCard label="إجمالي المكاتب" val={offices.length} />
+            <StatCard label="إجمالي الاستفسارات" val={inquiries.length} />
+            <StatCard label="استفسارات هذا الأسبوع" val={inquiriesWeek.length} />
+            <StatCard label="إعلانات بانتظار الاعتماد" val={pendingListings.length} warn />
+            <StatCard label="مكاتب بانتظار الاعتماد" val={pendingOffices.length} warn />
           </div>
-          <p className="text-xs text-[#33414f] mt-4 leading-relaxed">
-            ملاحظة: لا تُعرض بطاقة «مشاهدات الصفحات» لأنه لا يوجد مصدر تتبّع حقيقي للمشاهدات بعد — إضافتها تتطلّب جدول
-            أحداث/زيارات فعلي. كل الأرقام أعلاه استعلامات COUNT حقيقية.
-          </p>
+
+          {/* ── صحة المنصة ── */}
+          {head('صحة المنصة')}
+          <div className="grid md:grid-cols-2 gap-3">
+            <SubCard title="بانتظار اعتمادك" hint="إعلانات ومكاتب جديدة تحتاج مراجعتك — من قسمي الإدارة">
+              {pendingListings.length === 0 && pendingOffices.length === 0 ? (
+                <MiniEmpty text="لا شيء بانتظار الاعتماد — كل المراجعات منجزة ✓" />
+              ) : (
+                <div className="space-y-1.5">
+                  {pendingListings.slice(0, 5).map((l) => (
+                    <div key={l.id} className="flex items-center justify-between text-xs">
+                      <span className="text-[#0f1a28] truncate">{l.title} <span className="text-[#5b6b7a]">· {l.hood}</span></span>
+                      <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded whitespace-nowrap">إعلان بانتظار</span>
+                    </div>
+                  ))}
+                  {pendingListings.length > 5 && <div className="text-[11px] text-[#5b6b7a]">+ {fmtNum(pendingListings.length - 5)} إعلانات أخرى في «إدارة الإعلانات»</div>}
+                  {pendingOffices.slice(0, 5).map((o) => (
+                    <div key={o.id} className="flex items-center justify-between text-xs">
+                      <span className="text-[#0f1a28] truncate">{o.name}</span>
+                      <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded whitespace-nowrap">مكتب بانتظار</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SubCard>
+            <SubCard title="حالة المكاتب والتحويل">
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#33414f]">مكاتب نشطة / موقوفة</span>
+                  <span className="font-bold text-[#0f1a28]">{fmtNum(activeOffices.length)} نشط · {fmtNum(offices.length - activeOffices.length)} موقوف</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#33414f]">مكاتب موثّقة</span>
+                  <span className="font-bold text-[#0f1a28]">{fmtNum(offices.filter((o) => o.verified).length)} من {fmtNum(offices.length)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-[#f0f4f8] pt-2">
+                  <span className="text-[#33414f]">التحويل: نقرات إعلانات ← استفسارات</span>
+                  <span className="font-bold text-[#0f1a28]">
+                    {conversion === null ? '—' : `${fmtNum(conversion)}٪`}
+                  </span>
+                </div>
+                <div className="text-[11px] text-[#5b6b7a] leading-relaxed">
+                  {conversion === null
+                    ? eventsMissing ? 'تحتاج تفعيل التتبّع (SQL أعلاه) لقياس النقرات.' : 'لا نقرات مسجّلة بعد — يبدأ القياس مع استخدام الزوار.'
+                    : `${fmtNum(clicks.length)} نقرة إعلان ← ${fmtNum(linkedInquiries)} استفسار مرتبط بإعلان (منذ تفعيل التتبّع).`}
+                </div>
+              </div>
+            </SubCard>
+          </div>
+
+          {/* ── التفاعل مع الإعلانات ── */}
+          {head('التفاعل مع الإعلانات')}
+          <div className="grid md:grid-cols-2 gap-3">
+            <SubCard title="الإعلانات الأكثر استفساراً" hint="من جدول leads — استفسارات مرتبطة بإعلان محدّد">
+              <RankList rows={inquiredRank} unit="استفسار" />
+            </SubCard>
+            <SubCard title="الإعلانات الأكثر مشاهدة" hint="نقرات فتح الإعلان منذ تفعيل التتبّع">
+              {eventsMissing ? <MiniEmpty text="يتطلّب تفعيل التتبّع (شغّل SQL أعلاه)." /> : <RankList rows={viewedRank} unit="نقرة" />}
+            </SubCard>
+          </div>
+          <div className="mt-3">
+            <SubCard title="المكاتب الأكثر نشاطاً" hint="مرتّبة بالاستفسارات الواردة ثم عدد الإعلانات">
+              {activeOfficesRank.length === 0 ? <MiniEmpty /> : (
+                <div className="space-y-1.5">
+                  {activeOfficesRank.map((o, i) => (
+                    <div key={o.id} className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-[#0f1a28] font-medium truncate"><span className="text-[#C9A84C] font-bold ml-1">{fmtNum(i + 1)}.</span>{o.name}</span>
+                      <span className="text-[#33414f] whitespace-nowrap">{fmtNum(o.listings)} إعلان · <b className="text-[#0A3D62]">{fmtNum(o.inquiries)}</b> استفسار</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SubCard>
+          </div>
+
+          {/* ── سلوك الباحثين ── */}
+          {head('سلوك الباحثين')}
+          {eventsMissing ? (
+            <Empty text="يتطلّب هذا القسم تفعيل التتبّع — شغّل supabase/analytics_events.sql ثم ستتجمّع البيانات مع استخدام الزوار." />
+          ) : (
+            <div className="grid md:grid-cols-2 gap-3">
+              <SubCard title="الأحياء الأكثر طلباً" hint="من بحث الفلاتر والمساعد الذكي">
+                <RankList rows={hoodRank} unit="بحث" />
+              </SubCard>
+              <SubCard title="أنواع الوحدات الأكثر طلباً">
+                <RankList rows={typeRank} unit="بحث" />
+              </SubCard>
+              <SubCard title="نطاقات الميزانية المطلوبة" hint="ميزانيات بحث الزوار مجمّعة في شرائح">
+                <RankList rows={budgetRank} unit="بحث" />
+              </SubCard>
+              <SubCard title="أكثر عبارات المساعد الذكي" hint="نص ما يكتبه الزوار حرفياً (مقتطع)">
+                <RankList rows={aiQueriesRank} unit="مرة" />
+              </SubCard>
+            </div>
+          )}
+
+          {/* ── استخدام مؤشر السعر العادل ── */}
+          {head('استخدام مؤشر السعر العادل')}
+          {eventsMissing ? (
+            <Empty text="يتطلّب تفعيل التتبّع — شغّل supabase/analytics_events.sql." />
+          ) : (
+            <SubCard title={`إجمالي الاستخدام: ${fmtNum(indicatorUses.length)} مرة`} hint="كل تقييم سعر فعلي أجراه زائر — وتوزيع الأحكام يعكس واقع الأسعار المعروضة">
+              {indicatorUses.length === 0 ? <MiniEmpty text="لا استخدام مسجّلاً بعد — يبدأ العد مع استخدام الزوار للمؤشر." /> : (
+                <div className="space-y-2">
+                  {verdicts.map((v) => (
+                    <div key={v.key}>
+                      <div className="flex items-center justify-between text-xs mb-0.5">
+                        <span className={`font-bold ${v.txt}`}>{v.label}</span>
+                        <span className="text-[#0f1a28] font-bold">{fmtNum(v.count)} ({fmtNum(Math.round((v.count / indicatorUses.length) * 100))}٪)</span>
+                      </div>
+                      <div className="h-2 bg-[#f0f4f8] rounded-full overflow-hidden">
+                        <div className={`h-full bg-gradient-to-l ${v.cls} rounded-full`} style={{ width: `${Math.max(2, (v.count / indicatorUses.length) * 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SubCard>
+          )}
+
+          {events.length >= EVENTS_CAP && (
+            <p className="text-[11px] text-[#5b6b7a] mt-3">ملاحظة: التجميعات محسوبة على آخر {fmtNum(EVENTS_CAP)} حدث.</p>
+          )}
         </>
       )}
     </>
@@ -590,7 +858,7 @@ export function ClientsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
 export type AdminSection = 'prices' | 'stats' | 'listings' | 'offices' | 'leads' | 'clients';
 const SIDEBAR_ITEMS: { id: AdminSection; label: string }[] = [
   { id: 'prices', label: 'الأسعار والمتوسطات' },
-  { id: 'stats', label: 'لوحة الإحصائيات' },
+  { id: 'stats', label: 'لوحة التحليلات' },
   { id: 'listings', label: 'إدارة الإعلانات' },
   { id: 'offices', label: 'إدارة المكاتب' },
   { id: 'clients', label: 'العملاء' },

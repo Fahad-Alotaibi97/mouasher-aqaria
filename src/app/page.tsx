@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from '@/lib/supabase/config';
 import dynamic from 'next/dynamic';
 import { useAppData, type UIListing, type MktAvg, type ImagesByCategory } from '@/lib/useAppData';
 import { useAuth } from '@/lib/useAuth';
+import { track } from '@/lib/track';
 import { useEffect } from 'react';
 import SiteNav from './components/SiteNav';
 import ContactButtons, { isSaudiMobile } from './components/ContactButtons';
@@ -336,6 +337,36 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── تتبّع داخلي للوحة تحليلات /admin (fire-and-forget، بلا بيانات شخصية) ──
+  // بحث الفلاتر: يُسجَّل بعد استقرار الاختيار (debounce) لا مع كل ضغطة/تغيير،
+  // وفقط حين يوجد فلتر واحد على الأقل — فلا ضجيج ولا تكرار لكل حرف ميزانية.
+  useEffect(() => {
+    if (!filterHood && !filterType && !filterBudget) return;
+    const t = setTimeout(() => {
+      track('search', null, {
+        source: 'filters',
+        hood: filterHood || null,
+        type: filterType || null,
+        budget: parseInt(filterBudget) || null,
+      });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [filterHood, filterType, filterBudget]);
+
+  // استخدام مؤشر السعر العادل: النتيجة تظهر حيّاً أثناء الكتابة، فنسجّل استخداماً
+  // واحداً بعد استقرار الإدخال — مع الحكم الفعلي (hi مرتفع / ok مناسب / lo فرصة).
+  useEffect(() => {
+    const price = parseInt(siPrice) || 0;
+    if (!price) return;
+    const t = setTimeout(() => {
+      const m = mktAvg[siZone];
+      const avg = m ? fairForType(m, siType) : 0;
+      if (!avg) return;
+      track('indicator_use', null, { hood: siZone, type: siType, price, verdict: getSt(price, avg) });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [siZone, siType, siPrice, mktAvg]);
+
   // ── المساعد الذكي: ترتيب/تصفية محلّية بالكلمات المفتاحية (بدون API) ──
   // TODO: لربط ذكاء اصطناعي حقيقي لاحقاً، استبدل منطق النقاط أدناه باستدعاء
   //       واجهة (مثل Anthropic) يُرجع ترتيب المعرّفات؛ تبقى الواجهة كما هي.
@@ -361,6 +392,14 @@ export default function Home() {
     });
     scored.sort((a, b) => b.score - a.score);
     const matches = scored.filter((s) => s.score > 0).slice(0, 2).map((s) => s.id);
+    // تتبّع بحث المساعد الذكي: نص الطلب (مقتطع) + الحي/النوع المستخرجان إن ذُكرا
+    track('search', null, {
+      source: 'ai',
+      q: q.slice(0, 200),
+      hood: Object.keys(mktAvg).find((h) => q.includes(h)) ?? null,
+      type: ['شقة', 'فيلا', 'دوبلكس', 'استوديو', 'دور'].find((t) => q.includes(t)) ?? null,
+      matches: matches.length,
+    });
     setAiOrder(scored.map((s) => s.id));
     setAiMatchIds(matches);
     if (matches.length) {
@@ -411,7 +450,7 @@ export default function Home() {
     const chips = attrChips(l);
     const vBadge = st === 'hi' ? 'bg-[#fff3e0] text-[#C2410C]' : st === 'lo' ? 'bg-[#e8f7ee] text-[#1f7a44]' : 'bg-[#e6f1fb] text-[#1B6CA8]';
     return (
-      <div key={l.id} onClick={() => { setSelectedListing(l); setCtOpen(false); setCtSent(false); setCtErr(null); setCtName(''); setCtPhone(''); setCtMsg(''); }}
+      <div key={l.id} onClick={() => { track('listing_click', String(l.id), { hood: l.hood, type: l.type }); setSelectedListing(l); setCtOpen(false); setCtSent(false); setCtErr(null); setCtName(''); setCtPhone(''); setCtMsg(''); }}
         className={`card-fade bg-white rounded-2xl border overflow-hidden cursor-pointer transition-all shadow-sm hover:shadow-lg hover:-translate-y-0.5 ${isMatch ? 'border-[#C9A84C] ring-1 ring-[#C9A84C]/40' : 'border-[#cfd9e4] hover:border-[#1B6CA8]'}`}>
         <div className="flex">
           {/* عمود الصورة (يمين) */}
