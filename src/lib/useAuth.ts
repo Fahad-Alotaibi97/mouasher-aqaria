@@ -3,6 +3,8 @@
 //  • signInWithPassword: دخول حساب موجود.
 //  • signUpWithPassword: إنشاء حساب جديد ثم دخول مباشر دون انتظار تأكيد الإيميل
 //    (لتجنّب استهلاك حصة الإيميلات — يتطلب تعطيل "Confirm email" في إعدادات Supabase).
+//  • requestPasswordReset: «نسيت كلمة المرور» — يرسل Supabase رابط استرداد للبريد
+//    يفتح /reset-password (يجب إدراجه في Redirect URLs بلوحة Supabase).
 // كما يكشف صلاحية المدير (is_admin) لعرض رابط لوحة /admin.
 import { useEffect, useState } from 'react';
 import { createClient } from './supabase/client';
@@ -181,6 +183,34 @@ export function useAuth() {
     return { ok: true, message: 'تم إنشاء الحساب وتسجيل الدخول ✓', isAdmin: admin };
   }
 
+  // «نسيت كلمة المرور»: يرسل Supabase رابط استرداد لبريد الحساب (أي نوع حساب —
+  // مدير/مكتب/باحث، فكلهم مستخدمو Supabase auth). الرابط يفتح /reset-password
+  // على نفس النطاق الحالي (إنتاج أو محلي) حيث تُعيَّن كلمة المرور الجديدة.
+  // ملاحظة أمان مقصودة من Supabase: البريد غير المسجّل لا يُرجع خطأ (منع تعداد الحسابات).
+  async function requestPasswordReset(email: string): Promise<{ ok: boolean; message: string }> {
+    if (!isSupabaseConfigured()) {
+      return { ok: false, message: 'لم يتم ضبط الاتصال بقاعدة البيانات بعد.' };
+    }
+    if (!email || !EMAIL_RE.test(email)) {
+      return { ok: false, message: 'أدخل بريداً إلكترونياً صحيحاً.' };
+    }
+    const sb = createClient();
+    const redirectTo =
+      (typeof window !== 'undefined' ? window.location.origin : 'https://mouasher-aqaria.vercel.app') +
+      '/reset-password';
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) {
+      const msg = /security purposes|rate limit|too many/i.test(error.message)
+        ? 'طلبات متكررة — انتظر دقيقة ثم أعد المحاولة.'
+        : 'تعذّر إرسال الرابط: ' + error.message;
+      return { ok: false, message: msg };
+    }
+    return {
+      ok: true,
+      message: 'أرسلنا رابط إعادة التعيين إلى بريدك إن كان مسجّلاً لدينا — افتح الرسالة واضغط الرابط (تفقّد مجلد «غير المرغوب» إن لم تصل خلال دقائق).',
+    };
+  }
+
   async function signOut() {
     if (!isSupabaseConfigured()) return;
     const sb = createClient();
@@ -195,6 +225,7 @@ export function useAuth() {
     ready,
     signInWithPassword,
     signUpWithPassword,
+    requestPasswordReset,
     signOut,
     confirmSession: confirmSessionPersisted,
   };

@@ -134,7 +134,7 @@ export default function Home() {
   const { mktAvg, listings } = useAppData(DEFAULT_MKT_AVG, NO_LISTINGS);
 
   // تسجيل الدخول — بالإيميل وكلمة المرور (تبويب: دخول / إنشاء حساب)
-  const { user, isAdmin, signInWithPassword, signUpWithPassword, signOut, confirmSession } = useAuth();
+  const { user, isAdmin, signInWithPassword, signUpWithPassword, requestPasswordReset, signOut, confirmSession } = useAuth();
 
   // هل الحساب الحالي يملك مكتباً؟ ⇒ زر «لوحة المكتب» الذهبي في الدرج
   const [hasOffice, setHasOffice] = useState(false);
@@ -160,6 +160,17 @@ export default function Home() {
   const [authFal, setAuthFal] = useState('');
   const [authPhone, setAuthPhone] = useState(''); // جوال المكتب (إلزامي عند تسجيل مكتب)
   const [authSeekerName, setAuthSeekerName] = useState('');
+  // «نسيت كلمة المرور؟» — نموذج مصغّر يطلب البريد ويرسل رابط الاسترداد (يشارك authEmail/authMsg)
+  const [forgotOpen, setForgotOpen] = useState(false);
+
+  const submitForgot = async () => {
+    if (authBusy) return;
+    setAuthBusy(true);
+    setAuthMsg(null);
+    const r = await requestPasswordReset(authEmail.trim());
+    setAuthMsg({ ok: r.ok, text: r.message });
+    setAuthBusy(false);
+  };
 
   const submitAuth = async () => {
     setAuthBusy(true);
@@ -761,6 +772,43 @@ export default function Home() {
                     دخول لوحة المكتب
                   </button>
                 </div>
+              ) : forgotOpen ? (
+                <div>
+                  {/* «نسيت كلمة المرور؟» — طلب بريد الحساب لإرسال رابط الاسترداد */}
+                  <div className="font-bold text-[#0A3D62] mb-1">إعادة تعيين كلمة المرور</div>
+                  <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+                    أدخل بريد حسابك (مكتب، باحث، أو مدير) وسنرسل لك رابطاً لتعيين كلمة مرور جديدة.
+                  </p>
+                  <label className="text-xs text-gray-700 font-semibold block mb-1">البريد الإلكتروني</label>
+                  <input
+                    type="email"
+                    dir="ltr"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && submitForgot()}
+                    placeholder="name@example.com"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
+                  />
+                  <button
+                    onClick={submitForgot}
+                    disabled={authBusy}
+                    className="w-full mt-4 bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50"
+                  >
+                    {authBusy ? 'جارٍ الإرسال…' : 'إرسال رابط إعادة التعيين'}
+                  </button>
+                  {authMsg && (
+                    <div className={`mt-3 text-sm rounded-xl p-3 border ${authMsg.ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                      {authMsg.text}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setForgotOpen(false); setAuthMsg(null); }}
+                    className="w-full mt-3 text-xs text-gray-500 font-semibold hover:text-[#0A3D62] transition-colors"
+                  >
+                    العودة لتسجيل الدخول
+                  </button>
+                </div>
               ) : (
                 <div>
                   {/* تبويبات: تسجيل دخول / إنشاء حساب */}
@@ -815,6 +863,18 @@ export default function Home() {
                     placeholder="••••••••"
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
                   />
+
+                  {authMode === 'login' && (
+                    <div className="text-left mt-2">
+                      <button
+                        type="button"
+                        onClick={() => { setForgotOpen(true); setAuthMsg(null); }}
+                        className="text-xs text-[#1B6CA8] font-bold hover:underline"
+                      >
+                        نسيت كلمة المرور؟
+                      </button>
+                    </div>
+                  )}
 
                   {authMode === 'signup' && (
                     <>
