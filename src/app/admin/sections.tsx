@@ -388,9 +388,11 @@ export function OfficesSection({ sessionAdmin }: { sessionAdmin: boolean }) {
 // ════════════════════════════════════════════════════════════
 //  5) الرسائل والطلبات — رسائل «اترك رسالة» الحقيقية + تعليم كمعالَجة
 // ════════════════════════════════════════════════════════════
-interface LeadRow { id: string; name: string; phone: string; message: string | null; handled: boolean; created_at: string; kind?: string | null }
+interface LeadRow { id: string; name: string; phone: string; message: string | null; handled: boolean; created_at: string; kind?: string | null; office_id?: string | null }
 export function LeadsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const [rows, setRows] = useState<LeadRow[]>([]);
+  // أسماء المكاتب (id→name) لعرض وجهة الاستفسار في عرض الإشراف
+  const [officeMap, setOfficeMap] = useState<Record<string, string>>({});
   const [err, setErr] = useState<PgErr | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -400,13 +402,20 @@ export function LeadsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
     const sb = createClient();
-    // مع عمود kind إن وُجد؛ وإلا (قبل تشغيل leads_support.sql) بالأعمدة الأساسية
+    // مع عمودي kind/office_id إن وُجدا؛ وإلا (قبل تشغيل ترحيلات leads) بالأعمدة الأساسية
     let r: { data: unknown; error: PgErr | null } =
-      await sb.from('leads').select('id,name,phone,message,handled,created_at,kind').order('created_at', { ascending: false });
+      await sb.from('leads').select('id,name,phone,message,handled,created_at,kind,office_id').order('created_at', { ascending: false });
     if (r.error && r.error.code === '42703') {
       r = await sb.from('leads').select('id,name,phone,message,handled,created_at').order('created_at', { ascending: false });
     }
-    if (r.error) setErr(r.error); else setRows(((r.data ?? []) as LeadRow[]));
+    if (r.error) { setErr(r.error); setLoading(false); return; }
+    setRows((r.data ?? []) as LeadRow[]);
+    // أسماء المكاتب لعرض «موجّه إلى مكتب: …» على صفوف الاستفسارات (قراءة عامة offices_read).
+    // فشل هذه القراءة لا يكسر القائمة — تظهر الأسماء كـ «—» فقط.
+    const or_ = await sb.from('offices').select('id,name');
+    const omap: Record<string, string> = {};
+    ((or_.data ?? []) as { id: string; name: string }[]).forEach((o) => { omap[o.id] = o.name; });
+    setOfficeMap(omap);
     setLoading(false);
   }, []);
 
@@ -438,6 +447,16 @@ export function LeadsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
           </button>
         ))}
       </div>
+      {/* تأطير الدور: في تبويب الاستفسارات الأدمن مُشرف/أرشيف لا المسؤول الأساسي عن الرد */}
+      {tab === 'inquiry' ? (
+        <div className="text-[11px] text-[#33414f] bg-[#f0f6fb] border border-[#dde9f4] rounded-lg p-2.5 mb-3 leading-relaxed">
+          هذه استفسارات الباحثين الموجّهة للمكاتب — دورك هنا <b>إشراف وأرشفة</b> لفهم ما يبحث عنه الناس؛ <b>المكتب</b> هو المسؤول الأساسي عن الرد على عميله.
+        </div>
+      ) : (
+        <div className="text-[11px] text-[#33414f] bg-[#f7f3fb] border border-[#e7ddf2] rounded-lg p-2.5 mb-3 leading-relaxed">
+          هذه رسائل دعم من المكاتب موجّهة <b>لإدارة المنصة</b> — أنت المسؤول عن الرد عليها.
+        </div>
+      )}
       {loading ? <Loading /> : shown.length === 0 && !err ? (
         <Empty text={tab === 'support' ? 'لا توجد رسائل دعم من المكاتب بعد.' : 'لا توجد استفسارات بعد.'} />
       ) : (
@@ -448,9 +467,31 @@ export function LeadsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                 <div className="min-w-0">
                   <div className="font-bold text-[#0f1a28] text-sm flex items-center gap-2 flex-wrap">
                     {l.name}
-                    {isSupport(l) && <span className="text-[10px] bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded font-bold">دعم مكتب</span>}
+                    {isSupport(l) ? (
+                      <span className="text-[10px] bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded font-bold inline-flex items-center gap-1">
+                        {/* مكتب ← منصة (دعم) */}
+                        <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" /></svg>
+                        دعم مكتب ← المنصة
+                      </span>
+                    ) : (
+                      // استفسار باحث — الأدمن مُشرف/أرشيف لا المسؤول الأساسي.
+                      // النص يتكيّف: موجّه لمكتب محدّد ⇒ «من باحث إلى مكتب»، وإلا «من باحث (عام)».
+                      <span className="text-[10px] bg-sky-100 text-sky-800 border border-sky-200 px-2 py-0.5 rounded font-bold inline-flex items-center gap-1">
+                        {/* سهم: من باحث ← إلى مكتب */}
+                        <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>
+                        {l.office_id ? 'من باحث إلى مكتب' : 'من باحث (عام)'}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-[#1B6CA8] mt-0.5" dir="ltr" style={{ textAlign: 'right' }}>{l.phone}</div>
+                  {/* وجهة الاستفسار (إشراف): اسم المكتب المقصود، أو استفسار عام بلا مكتب محدّد */}
+                  {!isSupport(l) && (
+                    <div className="text-[11px] text-[#33414f] mt-1">
+                      {l.office_id
+                        ? <>موجّه إلى مكتب: <b className="text-[#0f1a28]">{officeMap[l.office_id] ?? '—'}</b></>
+                        : <span className="text-[#5b6b7a]">استفسار عام — غير موجّه لمكتب محدّد</span>}
+                    </div>
+                  )}
                   {l.message && <div className="text-sm text-[#33414f] mt-1.5 leading-relaxed">{l.message}</div>}
                   <div className="text-[11px] text-[#33414f] mt-1.5">{fmtDate(l.created_at)}</div>
                 </div>
