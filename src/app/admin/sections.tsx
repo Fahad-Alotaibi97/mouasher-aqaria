@@ -7,6 +7,7 @@
 // ════════════════════════════════════════════════════════════
 import { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import ContactButtons, { emailInText } from '../components/ContactButtons';
 
 // ── أدوات مشتركة ─────────────────────────────────────────────
 interface PgErr { code?: string; message?: string }
@@ -456,7 +457,10 @@ export function LeadsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                   {l.handled ? 'معالَجة' : 'جديدة'}
                 </span>
               </div>
-              <div className="flex gap-2 mt-3 pt-3 border-t border-[#f0f4f8]">
+              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[#f0f4f8]">
+                {/* رد مباشر: استفسار ⇒ تواصل مع العميل، دعم ⇒ تواصل مع المكتب
+                    (رسائل الدعم تحمل بريد المكتب في حقل phone وداخل نص الرسالة) */}
+                <ContactButtons contact={l.phone} email={emailInText(l.message)} />
                 <button onClick={() => setHandled(l.id, !l.handled)} disabled={busy === l.id}
                   className={`text-xs px-3 py-1.5 rounded-lg font-bold border disabled:opacity-50 ${l.handled ? 'bg-white border-[#cfd9e4] text-[#0A3D62] hover:bg-[#f0f4f8]' : 'bg-green-600 text-white border-green-600 hover:bg-green-700'}`}>
                   {l.handled ? 'إرجاع كجديدة' : 'تعليم كمعالَجة'}

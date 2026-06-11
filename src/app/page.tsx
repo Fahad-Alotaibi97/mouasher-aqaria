@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 import dynamic from 'next/dynamic';
-import { useAppData, type UIListing, type MktAvg } from '@/lib/useAppData';
+import { useAppData, type UIListing, type MktAvg, type ImagesByCategory } from '@/lib/useAppData';
 import { useAuth } from '@/lib/useAuth';
 import { useEffect } from 'react';
 import SiteNav from './components/SiteNav';
+import ContactButtons from './components/ContactButtons';
 const MapComponent = dynamic(() => import('./components/Map'), { ssr: false });
 
 // SVG Icons — بدل الإيموجي
@@ -1210,6 +1211,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     });
   const [publishing, setPublishing] = useState(false);
   const [publishMsg, setPublishMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // وضع التعديل: معرّف الإعلان قيد التعديل + صوره المصنّفة الحالية (تبقى ما لم تُستبدل)
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [existingPhotos, setExistingPhotos] = useState<ImagesByCategory | null>(null);
+  const [editLoading, setEditLoading] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [listsErr, setListsErr] = useState('');
 
   // ── بيانات المكتب الحقيقية (مربوطة بالحساب الحالي عبر owner_id) ──
   const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; verified: boolean; status: string | null; active: boolean } | null>(null);
@@ -1258,6 +1265,85 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       setMyLeads([]);
     }
     setOffLoaded(true);
+  };
+
+  // تفريغ نموذج الإعلان (يُستدعى عند فتح «إضافة إعلان» حتى لا تبقى قيم تعديل سابق)
+  const resetListingForm = () => {
+    setFType('شقة'); setFHood('النرجس'); setFRent(''); setFArea('');
+    setFRooms('2'); setFBaths('1'); setFCond('حالة جيدة');
+    setFFurniture(''); setFKitchen(''); setFAc(''); setFParking(''); setFDesc('');
+    Object.values(fPhotos).forEach((p) => { if (p) URL.revokeObjectURL(p.preview); });
+    setFPhotos({});
+    setEditingId(null); setExistingPhotos(null); setPublishMsg(null);
+  };
+
+  // الصورة المصنّفة الحالية لخانة معيّنة (في وضع التعديل) — تُعرض وتُحفظ ما لم تُستبدل
+  const existingUrlFor = (key: string): string | null => {
+    const cat = existingPhotos;
+    if (!cat) return null;
+    if (key === 'facade') return cat.facade ?? null;
+    if (key === 'hall') return cat.hall ?? null;
+    if (key === 'majlis') return cat.majlis ?? null;
+    if (key === 'kitchen') return cat.kitchen ?? null;
+    if (key.startsWith('bed')) return cat.bedrooms?.[parseInt(key.slice(3), 10)] ?? null;
+    if (key.startsWith('bath')) return cat.bathrooms?.[parseInt(key.slice(4), 10)] ?? null;
+    return null;
+  };
+
+  // «تعديل» — يجلب الإعلان كاملاً ويملأ نفس نموذج الإضافة، والحفظ يحدّث الصف القائم.
+  // RLS (listings_owner) يضمن أن المكتب لا يفتح إلا إعلاناته هو.
+  const startEdit = async (id: string) => {
+    setEditLoading(id); setListsErr('');
+    const sb = createClient();
+    // نتدرّج كقراءة useAppData: مع الأعمدة الاختيارية أولاً ثم الأساسية إن غابت
+    let r = await sb.from('listings')
+      .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,kitchen,ac,parking,description,images,images_by_category')
+      .eq('id', id).single();
+    if (r.error) {
+      r = await sb.from('listings')
+        .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,description,images')
+        .eq('id', id).single();
+    }
+    if (r.error || !r.data) {
+      setListsErr('تعذّر فتح الإعلان للتعديل: ' + (r.error?.message ?? 'غير موجود'));
+      setEditLoading(null); return;
+    }
+    const d = r.data as Record<string, unknown>;
+    setFType((d.type as string) || 'شقة');
+    setFHood((d.hood as string) || 'النرجس');
+    setFRent(d.advertised != null ? String(d.advertised) : '');
+    setFArea(d.area != null ? String(d.area) : '');
+    setFRooms(d.rooms != null ? String(d.rooms) : '2');
+    setFBaths(d.baths != null ? String(d.baths) : '1');
+    setFCond((d.cond_label as string) || 'حالة جيدة');
+    setFFurniture(d.furnished == null ? '' : d.furnished ? 'مفروشة' : 'غير مفروشة');
+    setFKitchen(d.kitchen == null ? '' : d.kitchen ? 'راكب' : 'غير راكب');
+    setFAc(d.ac == null ? '' : d.ac ? 'مكيّفة' : 'غير مكيّفة');
+    setFParking(d.parking == null ? '' : String(d.parking));
+    setFDesc((d.description as string) || '');
+    Object.values(fPhotos).forEach((p) => { if (p) URL.revokeObjectURL(p.preview); });
+    setFPhotos({});
+    setExistingPhotos((d.images_by_category as ImagesByCategory) ?? null);
+    setPublishMsg(null);
+    setEditingId(id);
+    setAddStep(1);
+    setOffPage('add');
+    setEditLoading(null);
+  };
+
+  // «حذف» — بتأكيد صريح؛ count يكشف الحجب الصامت بـ RLS (0 صفوف بلا خطأ)
+  const deleteListing = async (id: string) => {
+    if (typeof window !== 'undefined' && !window.confirm('هل أنت متأكد من حذف هذا الإعلان؟')) return;
+    setDeletingId(id); setListsErr('');
+    const sb = createClient();
+    const { error, count } = await sb.from('listings').delete({ count: 'exact' }).eq('id', id);
+    if (error) setListsErr('تعذّر الحذف: ' + error.message);
+    else if (!count) setListsErr('لم يُحذف الإعلان — لا تملك صلاحية حذفه.');
+    else {
+      if (editingId === id) resetListingForm();
+      await reloadOffice();
+    }
+    setDeletingId(null);
   };
 
   // إنشاء المكتب مباشرة وأنت داخل (جلسة فعّالة ⇒ تتجاوز كل مشاكل التسجيل)
@@ -1318,7 +1404,8 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
 
   const publishListing = async () => {
     if (!fRent.trim()) { setPublishMsg({ ok: false, text: 'أدخل قيمة الإيجار السنوي.' }); return; }
-    if (!fPhotos['facade']) { setPublishMsg({ ok: false, text: 'صورة الواجهة إلزامية — أضفها قبل النشر. بقية الصور اختيارية.' }); return; }
+    // في وضع التعديل تكفي صورة الواجهة الحالية ما لم تُستبدل
+    if (!fPhotos['facade'] && !(editingId && existingUrlFor('facade'))) { setPublishMsg({ ok: false, text: 'صورة الواجهة إلزامية — أضفها قبل النشر. بقية الصور اختيارية.' }); return; }
     setPublishing(true); setPublishMsg(null);
     try {
       if (!isSupabaseConfigured()) {
@@ -1341,16 +1428,24 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         { facade: null, hall: null, majlis: null, kitchen: null, bedrooms: [], bathrooms: [] };
       const urls: string[] = []; // مصفوفة مسطّحة متوافقة مع عمود images القديم (الواجهة أولاً)
       const photoFails: string[] = [];
+      const hasNewPhotos = slots.some((s) => !!fPhotos[s.key]);
       for (const s of slots) {
         const ph = fPhotos[s.key];
-        if (!ph) continue;
-        const ext = (ph.file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-        const path = `${myOffice.id}/${Date.now()}_${s.key}.${ext}`;
-        const { error: upErr } = await sb.storage.from('listings').upload(path, ph.file);
-        if (upErr) { photoFails.push(s.label); continue; }
-        const { data: pub } = sb.storage.from('listings').getPublicUrl(path);
-        const u = pub?.publicUrl;
-        if (!u) { photoFails.push(s.label); continue; }
+        let u: string | null = null;
+        if (ph) {
+          const ext = (ph.file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+          const path = `${myOffice.id}/${Date.now()}_${s.key}.${ext}`;
+          const { error: upErr } = await sb.storage.from('listings').upload(path, ph.file);
+          if (upErr) { photoFails.push(s.label); }
+          else {
+            const { data: pub } = sb.storage.from('listings').getPublicUrl(path);
+            u = pub?.publicUrl ?? null;
+            if (!u) photoFails.push(s.label);
+          }
+        }
+        // في وضع التعديل: خانة بلا ملف جديد تحتفظ بصورتها المصنّفة الحالية
+        if (!u && editingId) u = existingUrlFor(s.key);
+        if (!u) continue;
         urls.push(u);
         if (s.key === 'facade') byCat.facade = u;
         else if (s.key === 'hall') byCat.hall = u;
@@ -1365,13 +1460,18 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       const autoApproved = !!myOffice.verified;
       // بيانات الإعلان الأساسية — الرخصة تُسحب تلقائياً من سجل المكتب (لا إعادة إدخال)
       const core: Record<string, unknown> = {
-        office_id: myOffice.id, status: autoApproved ? 'approved' : 'pending',
         title: `${fType} ${fRooms} غرف — ${fHood}`.replace('استوديو 1 غرف','استوديو'),
         hood: fHood, type: fType, advertised: parseInt(fRent) || 0,
         area: fArea ? parseInt(fArea) : null, rooms: parseInt(fRooms) || null,
         condition: condMap[fCond] || 'good', cond_label: fCond,
-        fal_license: myOffice.fal_license || null,
       };
+      if (!editingId) {
+        // إدراج جديد فقط: الربط والحالة والرخصة. عند التعديل لا تُرسل الحالة إطلاقاً —
+        // والقاعدة تجمّدها بـ trigger enforce_listing_status مهما أرسل العميل.
+        core.office_id = myOffice.id;
+        core.status = autoApproved ? 'approved' : 'pending';
+        core.fal_license = myOffice.fal_license || null;
+      }
       // خصائص اختيارية ('' ⇒ null = غير محدّد) — أعمدتها تُضاف بـ supabase/listing_attributes.sql
       const attrs: Record<string, unknown> = {
         baths: parseInt(fBaths) || null,
@@ -1379,12 +1479,20 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         kitchen: fKitchen === '' ? null : fKitchen === 'راكب',
         ac: fAc === '' ? null : fAc === 'مكيّفة',
         parking: fParking === '' ? null : parseInt(fParking),
-        description: fDesc.trim() || null, images: urls,
-        images_by_category: byCat,
+        description: fDesc.trim() || null,
       };
+      // أعمدة الصور: تُكتب دائماً عند الإدراج؛ وعند التعديل فقط إن وُجدت صور جديدة
+      // أو صور مصنّفة قائمة (إعلان قديم بصور مسطّحة غير مصنّفة يُترك كما هو بلا مسح).
+      if (!editingId || hasNewPhotos || existingPhotos) {
+        attrs.images = urls;
+        attrs.images_by_category = byCat;
+      }
       const payload: Record<string, unknown> = { ...core, ...attrs };
       const dropped: string[] = [];
-      let { error } = await sb.from('listings').insert(payload);
+      const exec = () => editingId
+        ? sb.from('listings').update(payload).eq('id', editingId)
+        : sb.from('listings').insert(payload);
+      let { error } = await exec();
       // عمود اختياري مفقود في القاعدة (PGRST204/42703) ⇒ أسقط ذلك العمود وحده
       // وأعد المحاولة، بدل إفشال النشر كله — يبقى الإعلان الأساسي محفوظاً.
       while (error && (error.code === 'PGRST204' || error.code === '42703' || /schema cache/i.test(error.message || ''))) {
@@ -1392,12 +1500,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         if (!col || !(col in attrs) || !(col in payload)) break;
         delete payload[col];
         dropped.push(col);
-        ({ error } = await sb.from('listings').insert(payload));
+        ({ error } = await exec());
       }
-      if (error) { setPublishMsg({ ok: false, text: 'تعذّر النشر: ' + error.message }); setPublishing(false); return; }
+      if (error) { setPublishMsg({ ok: false, text: (editingId ? 'تعذّر حفظ التعديلات: ' : 'تعذّر النشر: ') + error.message }); setPublishing(false); return; }
       setPublishMsg({
         ok: true,
-        text: (autoApproved
+        text: (editingId
+          ? 'تم حفظ التعديلات ✓ — حالة الإعلان تبقى كما هي (التعديل لا يغيّر الاعتماد).'
+          : autoApproved
           ? 'تم نشر الإعلان — ظاهر الآن للباحثين مباشرة (مكتبك موثّق).'
           : 'تم إرسال الإعلان للمراجعة — يظهر للباحثين فور اعتماد الإدارة له.')
           + (photoFails.length ? ` (تعذّر رفع صور: ${photoFails.join('، ')})` : '')
@@ -1406,6 +1516,8 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       setFRent(''); setFArea(''); setFDesc('');
       Object.values(fPhotos).forEach((p) => { if (p) URL.revokeObjectURL(p.preview); });
       setFPhotos({});
+      setEditingId(null); setExistingPhotos(null);
+      await reloadOffice(); // تظهر الإضافة/التعديلات في «إعلاناتي» فوراً
       setTimeout(() => { setPublishMsg(null); setAddStep(1); setOffPage('listings'); }, 1200);
     } catch {
       setPublishMsg({ ok: false, text: 'حدث خطأ غير متوقع أثناء النشر.' });
@@ -1479,7 +1591,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       <div className="w-48 bg-white border-l border-gray-200 flex-shrink-0 py-4 px-3">
         <div className="text-xs text-gray-400 font-bold px-2 mb-2 tracking-wide">القائمة</div>
         {sideItems.map(s => (
-          <button key={s.id} onClick={() => { setOffPage(s.id as typeof offPage); if(s.id==='add') setAddStep(1); }}
+          <button key={s.id} onClick={() => { setOffPage(s.id as typeof offPage); if(s.id==='add') { resetListingForm(); setAddStep(1); } }}
             className={`w-full text-right px-3 py-2.5 rounded-xl text-sm mb-1 font-medium transition-all ${offPage===s.id ? 'bg-blue-50 text-[#0A3D62] font-bold' : 'text-gray-600 hover:bg-gray-50'}`}>
             {s.label}
             {/* شارة العدد الحقيقي لاستفسارات العملاء غير المعالجة — لا أرقام ثابتة */}
@@ -1530,7 +1642,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
               ))}
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <button onClick={() => { setOffPage('add'); setAddStep(1); }}
+              <button onClick={() => { resetListingForm(); setOffPage('add'); setAddStep(1); }}
                 className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white rounded-xl p-4 text-center shadow-md hover:opacity-95 transition-all">
                 <div className="text-lg font-bold mb-1">إعلان جديد</div>
                 <div className="text-xs opacity-80">أضف عقار للنشر</div>
@@ -1557,11 +1669,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                 <div className="text-xl font-bold text-gray-900 mb-1">إعلاناتي</div>
                 <div className="text-sm text-gray-500">{activeCount} معتمد · {pendingCount} بانتظار الموافقة · {myListings.length} الإجمالي</div>
               </div>
-              <button onClick={() => { setOffPage('add'); setAddStep(1); }}
+              <button onClick={() => { resetListingForm(); setOffPage('add'); setAddStep(1); }}
                 className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-4 py-2 rounded-xl font-bold text-sm shadow">
                 + إعلان جديد
               </button>
             </div>
+            {listsErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm mb-3">{listsErr}</div>}
             {myListings.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm">
                 {myOffice ? 'لا توجد إعلانات بعد — أضف أول إعلان لمكتبك.' : 'سجّل مكتبك أولاً من صفحة «التسجيل» لتتمكن من نشر الإعلانات.'}
@@ -1584,6 +1697,18 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                       <strong>ملاحظات الإدارة:</strong> {l.rejection_note}
                     </div>
                   )}
+                  {/* تعديل/حذف — على إعلانات المكتب نفسه فقط (تفرضه سياسة listings_owner)؛
+                      التعديل لا يغيّر حالة الاعتماد (يجمّدها trigger في القاعدة) */}
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                    <button onClick={() => startEdit(l.id)} disabled={editLoading === l.id || deletingId === l.id}
+                      className="text-xs bg-white border border-[#cfd9e4] text-[#0A3D62] px-3 py-1.5 rounded-lg font-bold hover:bg-[#f0f4f8] transition-colors disabled:opacity-50">
+                      {editLoading === l.id ? 'جارٍ الفتح…' : 'تعديل'}
+                    </button>
+                    <button onClick={() => deleteListing(l.id)} disabled={editLoading === l.id || deletingId === l.id}
+                      className="text-xs bg-red-50 border border-red-200 text-red-700 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition-colors disabled:opacity-50">
+                      {deletingId === l.id ? 'جارٍ الحذف…' : 'حذف'}
+                    </button>
+                  </div>
                 </div>
                 );
               })}
@@ -1603,13 +1728,20 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
             </div>
           ) : (
           <div>
-            <div className="text-xl font-bold text-gray-900 mb-1">إضافة إعلان جديد</div>
-            <div className="text-sm text-gray-500 mb-1">أضف بيانات عقارك بدقة لضمان أفضل ظهور</div>
+            <div className="text-xl font-bold text-gray-900 mb-1">{editingId ? 'تعديل الإعلان' : 'إضافة إعلان جديد'}</div>
+            <div className="text-sm text-gray-500 mb-1">{editingId ? 'عدّل بيانات إعلانك ثم احفظ — حالة الاعتماد تبقى كما هي.' : 'أضف بيانات عقارك بدقة لضمان أفضل ظهور'}</div>
             {/* الربط التلقائي: الإعلان يحمل اسم المكتب ورخصته من سجلّه — لا إعادة إدخال */}
-            <div className="text-xs text-[#1B6CA8] mb-5">
+            <div className="text-xs text-[#1B6CA8] mb-2">
               يُربط الإعلان تلقائياً بمكتبك: <b>{myOffice?.name}</b>
               {myOffice?.fal_license && <> · رخصة فال <span dir="ltr">{myOffice.fal_license}</span></>}
             </div>
+            {editingId && (
+              <button onClick={() => { resetListingForm(); setOffPage('listings'); }}
+                className="text-xs text-gray-500 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors mb-3">
+                إلغاء التعديل والعودة لإعلاناتي
+              </button>
+            )}
+            {!editingId && <div className="mb-3" />}
 
             {/* Steps */}
             <div className="flex items-center gap-2 mb-5 bg-white rounded-xl p-3 border border-gray-200">
@@ -1741,14 +1873,19 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
                   {photoSlots(parseInt(fRooms) || 1, parseInt(fBaths) || 1).map((s) => {
                     const ph = fPhotos[s.key];
+                    // في وضع التعديل: الصورة الحالية تُعرض وتبقى ما لم يُختر ملف جديد يستبدلها
+                    const existing = !ph && editingId ? existingUrlFor(s.key) : null;
                     return (
                       <label key={s.key}
-                        className={`border-2 border-dashed rounded-xl p-2 text-center cursor-pointer transition-all min-h-[110px] flex flex-col items-center justify-center gap-1 ${ph ? 'border-green-400 bg-green-50/40' : s.req ? 'border-[#1B6CA8]/60 hover:border-[#1B6CA8] bg-blue-50/30' : 'border-gray-300 hover:border-gray-400'}`}>
+                        className={`border-2 border-dashed rounded-xl p-2 text-center cursor-pointer transition-all min-h-[110px] flex flex-col items-center justify-center gap-1 ${ph || existing ? 'border-green-400 bg-green-50/40' : s.req ? 'border-[#1B6CA8]/60 hover:border-[#1B6CA8] bg-blue-50/30' : 'border-gray-300 hover:border-gray-400'}`}>
                         <input type="file" accept="image/*" className="hidden"
                           onChange={(e) => setPhoto(s.key, e.target.files?.[0] ?? null)} />
                         {ph ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={ph.preview} alt={s.label} className="w-full h-16 object-cover rounded-lg" />
+                        ) : existing ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={existing} alt={s.label} className="w-full h-16 object-cover rounded-lg" />
                         ) : (
                           <span className="text-gray-400 text-2xl leading-none">+</span>
                         )}
@@ -1756,6 +1893,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                           {s.label}{s.req && <span className="text-red-500"> *</span>}
                         </span>
                         {ph && <span className="text-[10px] text-green-700 truncate max-w-full px-1">{ph.file.name}</span>}
+                        {!ph && existing && <span className="text-[10px] text-green-700 px-1">الصورة الحالية — اضغط للاستبدال</span>}
                       </label>
                     );
                   })}
@@ -1766,7 +1904,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                 )}
                 <div className="flex gap-2 mt-4">
                   <button onClick={() => setAddStep(2)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-medium text-sm">السابق</button>
-                  <button onClick={publishListing} disabled={publishing} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50">{publishing ? 'جارٍ النشر…' : 'نشر الإعلان'}</button>
+                  <button onClick={publishListing} disabled={publishing} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50">{publishing ? (editingId ? 'جارٍ الحفظ…' : 'جارٍ النشر…') : (editingId ? 'حفظ التعديلات' : 'نشر الإعلان')}</button>
                 </div>
               </div>
             )}
@@ -1856,6 +1994,10 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                           </div>
                           <a href={`tel:${inq.phone}`} className="text-xs text-blue-600 font-medium mb-1 inline-block" dir="ltr">{inq.phone}</a>
                           {inq.message && <div className="text-sm text-gray-600 whitespace-pre-line mt-1">{inq.message}</div>}
+                          {/* رد مباشر على الباحث بجوّاله المحفوظ — واتساب (برقم سعودي مطبّع) أو اتصال */}
+                          <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
+                            <ContactButtons contact={inq.phone} />
+                          </div>
                         </div>
                       </div>
                     </div>
