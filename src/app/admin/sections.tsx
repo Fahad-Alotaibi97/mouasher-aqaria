@@ -158,12 +158,24 @@ function RankList({ rows, unit }: { rows: { key: string; label: string; sub?: st
   );
 }
 
+// ميزات المنصة المرتّبة في «أكثر الميزات استخداماً» — كل بند يُعدّ بـ COUNT دقيق
+const FEATURES: { key: string; label: string; type: string; feature?: string }[] = [
+  { key: 'listings', label: 'تصفّح الإعلانات (فتح إعلان)', type: 'listing_click' },
+  { key: 'indicator', label: 'مؤشر السعر العادل', type: 'indicator_use' },
+  { key: 'search', label: 'البحث (فلاتر + المساعد الذكي)', type: 'search' },
+  { key: 'finance', label: 'صفحة خيارات تقسيط الإيجار', type: 'feature_use', feature: 'finance' },
+  { key: 'contact', label: 'فتح نموذج التواصل بخصوص إعلان', type: 'feature_use', feature: 'contact' },
+];
+
 export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const [listings, setListings] = useState<AnaListing[]>([]);
   const [offices, setOffices] = useState<AnaOffice[]>([]);
   const [leads, setLeads] = useState<AnaLead[]>([]);
   const [events, setEvents] = useState<AnaEvent[]>([]);
   const [eventsMissing, setEventsMissing] = useState(false); // الجدول غير منشأ بعد (42P01)
+  // زيارات الموقع (تحميلات صفحة) — أعداد COUNT دقيقة، null = تعذّر الجلب
+  const [visits, setVisits] = useState<{ total: number; today: number; week: number } | null>(null);
+  const [featureRank, setFeatureRank] = useState<{ key: string; label: string; count: number }[]>([]);
   const [err, setErr] = useState<PgErr | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -186,10 +198,35 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
     if (or_.error) { setErr(or_.error); setLoading(false); return; }
     // جدول الأحداث غير منشأ بعد ⇒ اللوحة تعمل ويظهر تنبيه تشغيل SQL.
     // ملاحظة مُتحقَّقة حياً: PostgREST يرجع PGRST205 (لا 42P01) للجدول المفقود.
+    let missing = false;
     if (evr.error) {
-      if (evr.error.code === '42P01' || evr.error.code === 'PGRST205') { setEventsMissing(true); setEvents([]); }
+      if (evr.error.code === '42P01' || evr.error.code === 'PGRST205') { missing = true; setEvents([]); }
       else { setErr(evr.error); setLoading(false); return; }
-    } else { setEventsMissing(false); setEvents((evr.data ?? []) as AnaEvent[]); }
+    } else { setEvents((evr.data ?? []) as AnaEvent[]); }
+    setEventsMissing(missing);
+    // أعداد دقيقة (COUNT على القاعدة، لا تتأثر بسقف جلب الأحداث): الزيارات + ترتيب الميزات
+    if (missing) { setVisits(null); setFeatureRank([]); }
+    else {
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const weekAgoIso = new Date(Date.now() - 7 * 86_400_000).toISOString();
+      const evCount = (type: string, opts?: { since?: string; feature?: string }) => {
+        let q = sb.from('analytics_events').select('id', { count: 'exact', head: true }).eq('type', type);
+        if (opts?.since) q = q.gte('created_at', opts.since);
+        if (opts?.feature) q = q.eq('meta->>feature', opts.feature);
+        return q;
+      };
+      const [pvT, pvD, pvW, ...featRes] = await Promise.all([
+        evCount('page_view'),
+        evCount('page_view', { since: todayStart.toISOString() }),
+        evCount('page_view', { since: weekAgoIso }),
+        ...FEATURES.map((f) => evCount(f.type, { feature: f.feature })),
+      ]);
+      setVisits(pvT.error || pvD.error || pvW.error ? null : { total: pvT.count ?? 0, today: pvD.count ?? 0, week: pvW.count ?? 0 });
+      setFeatureRank(
+        FEATURES.map((f, i) => ({ key: f.key, label: f.label, count: featRes[i].error ? 0 : (featRes[i].count ?? 0) }))
+          .sort((a, b) => b.count - a.count)
+      );
+    }
     setListings((lr.data ?? []) as AnaListing[]);
     setOffices((or_.data ?? []) as AnaOffice[]);
     setLeads(leadRows);
@@ -220,6 +257,13 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const inquiredRank = topCounts(inquiries, (l) => l.listing_id).map((r) => ({ ...listingLabel(r.key), ...r }));
   const clicks = events.filter((e) => e.type === 'listing_click');
   const viewedRank = topCounts(clicks, (e) => e.ref_id).map((r) => ({ ...listingLabel(r.key), ...r }));
+
+  // جلسات تقريبية: معرّفات sid عشوائية من sessionStorage (تبويب متصفح ≈ جلسة) —
+  // بلا أي هوية؛ تُحسب من الأحداث المجلوبة (آخر EVENTS_CAP) لا من COUNT.
+  const uniqueSessions = new Set(
+    events.filter((e) => e.type === 'page_view').map((e) => (e.meta?.sid as string) || null).filter(Boolean)
+  ).size;
+  const anyFeatureUse = featureRank.some((f) => f.count > 0);
 
   // المكاتب الأكثر نشاطاً: عدد إعلانات + استفسارات واردة، مرتّبة بالاستفسارات ثم الإعلانات
   const officeListings = new Map<string, number>();
@@ -265,8 +309,29 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
       )}
       {loading ? <Loading /> : !err && (
         <>
+          {/* ── الزيارات (تحميلات صفحة — ليست أشخاصاً فريدين) ── */}
+          {!eventsMissing && (
+            <>
+              {visits === null ? (
+                <Empty text="تعذّر جلب عدادات الزيارات — جرّب «تحديث»." />
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <StatCard label="إجمالي الزيارات" val={visits.total} />
+                  <StatCard label="زيارات اليوم" val={visits.today} />
+                  <StatCard label="زيارات هذا الأسبوع" val={visits.week} />
+                  <StatCard label="جلسات تقريبية" val={uniqueSessions} />
+                </div>
+              )}
+              <p className="text-[11px] text-[#5b6b7a] mt-2 mb-1 leading-relaxed">
+                «الزيارة» = تحميل لصفحة الموقع (يبدأ العدّ من تفعيل تتبّع الزيارات) — ليست عدد أشخاص فريدين.
+                «الجلسات التقريبية» تمييز عشوائي لكل تبويب متصفّح بلا أي هوية أو تخزين دائم.
+                الحسابات المسجّلة الفعلية في قسم «العملاء».
+              </p>
+            </>
+          )}
+
           {/* ── الملخص العلوي ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
             <StatCard label="إجمالي الإعلانات" val={listings.length} />
             <StatCard label="إجمالي المكاتب" val={offices.length} />
             <StatCard label="إجمالي الاستفسارات" val={inquiries.length} />
@@ -274,6 +339,25 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
             <StatCard label="إعلانات بانتظار الاعتماد" val={pendingListings.length} warn />
             <StatCard label="مكاتب بانتظار الاعتماد" val={pendingOffices.length} warn />
           </div>
+
+          {/* ── أكثر الميزات استخداماً ── */}
+          {head('أكثر الميزات استخداماً')}
+          {eventsMissing ? (
+            <Empty text="يتطلّب تفعيل التتبّع — شغّل supabase/analytics_events.sql ثم analytics_page_view.sql." />
+          ) : (
+            <SubCard title="ترتيب ميزات المنصة بالاستخدام الفعلي" hint="أعداد دقيقة (COUNT) من أحداث التتبّع — كل الأنواع منذ تفعيل تتبّع كلٍّ منها">
+              {!anyFeatureUse ? (
+                <MiniEmpty text="لا توجد بيانات بعد — يبدأ الترتيب مع أول استخدام من الزوار." />
+              ) : (
+                <>
+                  <RankList rows={featureRank} unit="استخدام" />
+                  {visits !== null && (
+                    <div className="text-[11px] text-[#5b6b7a] mt-2">للسياق: {fmtNum(visits.total)} زيارة للموقع إجمالاً.</div>
+                  )}
+                </>
+              )}
+            </SubCard>
+          )}
 
           {/* ── صحة المنصة ── */}
           {head('صحة المنصة')}

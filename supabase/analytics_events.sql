@@ -16,11 +16,19 @@
 -- 1) الجدول
 create table if not exists public.analytics_events (
   id          bigint generated always as identity primary key,
-  type        text not null check (type in ('listing_click', 'indicator_use', 'search')),
+  type        text not null,
   ref_id      text,                              -- معرّف مرجعي (مثل id الإعلان للنقرات)
   meta        jsonb not null default '{}'::jsonb, -- تفاصيل الحدث (حي/نوع/حكم/نص بحث…)
   created_at  timestamptz not null default now()
 );
+
+-- قيد الأنواع يُعاد بناؤه دائماً (لا داخل create table) حتى يُحدَّث تلقائياً
+-- عند إعادة تشغيل الملف بعد إضافة أنواع جديدة (page_view/feature_use أُضيفا 2026-06-12).
+alter table public.analytics_events
+  drop constraint if exists analytics_events_type_check;
+alter table public.analytics_events
+  add constraint analytics_events_type_check
+  check (type in ('listing_click', 'indicator_use', 'search', 'page_view', 'feature_use'));
 
 create index if not exists analytics_events_type_time_idx
   on public.analytics_events (type, created_at desc);
@@ -45,7 +53,7 @@ drop policy if exists "analytics_events_insert" on public.analytics_events;
 create policy "analytics_events_insert" on public.analytics_events
   for insert to anon, authenticated
   with check (
-    type in ('listing_click', 'indicator_use', 'search')
+    type in ('listing_click', 'indicator_use', 'search', 'page_view', 'feature_use')
     and (ref_id is null or length(ref_id) <= 64)
     and pg_column_size(meta) <= 2048
   );

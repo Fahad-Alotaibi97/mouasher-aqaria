@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from '@/lib/supabase/config';
 import dynamic from 'next/dynamic';
 import { useAppData, type UIListing, type MktAvg, type ImagesByCategory } from '@/lib/useAppData';
 import { useAuth } from '@/lib/useAuth';
-import { track } from '@/lib/track';
+import { track, trackPageView } from '@/lib/track';
 import { useEffect } from 'react';
 import SiteNav from './components/SiteNav';
 import ContactButtons, { isSaudiMobile } from './components/ContactButtons';
@@ -334,8 +334,16 @@ export default function Home() {
     if (typeof window === 'undefined') return;
     const h = window.location.hash.replace('#', '');
     if (h) go(h);
+    // زيارة واحدة لكل تحميل صفحة (حارس داخل trackPageView ضد التكرار) —
+    // بعد التركيب فقط، بنفس عميل singleton، ولا تمسّ المصادقة بشيء.
+    trackPageView(h || 'home');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // استخدام ميزة «خيارات تقسيط الإيجار»: يُسجَّل عند كل دخول فعلي للصفحة
+  useEffect(() => {
+    if (page === 'finance') track('feature_use', null, { feature: 'finance' });
+  }, [page]);
 
   // ── تتبّع داخلي للوحة تحليلات /admin (fire-and-forget، بلا بيانات شخصية) ──
   // بحث الفلاتر: يُسجَّل بعد استقرار الاختيار (debounce) لا مع كل ضغطة/تغيير،
@@ -1142,7 +1150,7 @@ export default function Home() {
                     <button onClick={submitListingContact} disabled={ctSending} className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-3 rounded-xl font-bold text-sm disabled:opacity-50">{ctSending ? 'جارٍ الإرسال…' : 'إرسال طلب التواصل'}</button>
                   </div>
                 ) : (
-                  <button onClick={() => setCtOpen(true)} className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-3 rounded-xl font-bold text-sm">تواصل بخصوص هذا الإعلان</button>
+                  <button onClick={() => { track('feature_use', null, { feature: 'contact' }); setCtOpen(true); }} className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-3 rounded-xl font-bold text-sm">تواصل بخصوص هذا الإعلان</button>
                 )}
               </div>
             </div>

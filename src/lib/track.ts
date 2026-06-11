@@ -10,7 +10,7 @@
 import { createClient } from './supabase/client';
 import { isSupabaseConfigured } from './supabase/config';
 
-export type TrackType = 'listing_click' | 'indicator_use' | 'search';
+export type TrackType = 'listing_click' | 'indicator_use' | 'search' | 'page_view' | 'feature_use';
 
 export function track(type: TrackType, refId?: string | null, meta?: Record<string, unknown>) {
   try {
@@ -26,4 +26,30 @@ export function track(type: TrackType, refId?: string | null, meta?: Record<stri
   } catch {
     // لا شيء — التتبّع اختياري بطبيعته
   }
+}
+
+// معرّف جلسة عشوائي لتقدير «جلسات تقريبية» في لوحة التحليلات — يعيش في
+// sessionStorage فقط (يزول بإغلاق التبويب)، عشوائي بالكامل، ولا يرتبط بأي
+// هوية أو حساب — مجرد تمييز أن عدة زيارات جاءت من نفس الجلسة.
+function sessionId(): string | null {
+  try {
+    const KEY = 'mw_sid';
+    let sid = sessionStorage.getItem(KEY);
+    if (!sid) {
+      sid = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sessionStorage.setItem(KEY, sid);
+    }
+    return sid;
+  } catch {
+    return null; // sessionStorage محجوب ⇒ تُحسب الزيارة بلا جلسة، ولا شيء ينكسر
+  }
+}
+
+// زيارة واحدة لكل تحميل صفحة: حارس على مستوى الوحدة يمنع التكرار من إعادة
+// التركيب (StrictMode/HMR) — الوحدة تُقيَّم مرة واحدة لكل تحميل فعلي في الإنتاج.
+let pageViewSent = false;
+export function trackPageView(pageName: string) {
+  if (pageViewSent) return;
+  pageViewSent = true;
+  track('page_view', null, { page: pageName, sid: sessionId() });
 }

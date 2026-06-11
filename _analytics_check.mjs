@@ -18,6 +18,8 @@ const TEST_EVENTS = [
   { type: 'listing_click', ref_id: 'check-script', meta: { test: true, hood: 'النرجس', type: 'شقة' } },
   { type: 'indicator_use', ref_id: null, meta: { test: true, hood: 'النرجس', type: 'شقة', price: 65000, verdict: 'ok' } },
   { type: 'search', ref_id: null, meta: { test: true, source: 'ai', q: 'فحص — شقة بالنرجس', hood: 'النرجس' } },
+  { type: 'page_view', ref_id: null, meta: { test: true, page: 'home', sid: 'check-session' } },
+  { type: 'feature_use', ref_id: null, meta: { test: true, feature: 'finance' } },
 ];
 
 // (1) إدراج كزائر anon
@@ -29,6 +31,11 @@ for (const ev of TEST_EVENTS) {
     if (error.code === '42P01' || error.code === 'PGRST205') {
       console.log('✗ جدول analytics_events غير موجود بعد — شغّل supabase/analytics_events.sql في SQL Editor ثم أعد الفحص.');
       process.exit(1);
+    }
+    // 23514 = قيد CHECK يرفض النوع / 42501 = سياسة الإدراج ترفضه ⇒ القائمة لم تُوسَّع بعد
+    if ((ev.type === 'page_view' || ev.type === 'feature_use') && (error.code === '23514' || error.code === '42501')) {
+      console.log(`INSERT ${ev.type}: مرفوض (${error.code}) ⇒ شغّل supabase/analytics_page_view.sql لتوسيع الأنواع ثم أعد الفحص.`);
+      continue;
     }
     console.log(`INSERT ${ev.type}: ERR ${error.code ?? ''} ${error.message}`);
   } else { inserted++; console.log(`INSERT ${ev.type} (anon): OK ✓`); }
@@ -55,4 +62,4 @@ if (!email || !pass) {
     await sb.auth.signOut();
   }
 }
-console.log(`الخلاصة: أُدرج ${inserted}/3 أحداث فحص (معلَّمة meta.test=true).`);
+console.log(`الخلاصة: أُدرج ${inserted}/${TEST_EVENTS.length} أحداث فحص (معلَّمة meta.test=true).`);
