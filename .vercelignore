@@ -1,0 +1,29 @@
+# مهم: وجود هذا الملف يجعل vercel CLI يعتمده بدل .gitignore عند الرفع —
+# لذا يجب أن يبقى شاملاً لكل استثناءات .gitignore (خاصة node_modules و .env*).
+
+# dependencies / build outputs
+/node_modules
+/.next/
+/out/
+/build
+/coverage
+
+# secrets & local files — لا تُرفع أبداً
+.env*
+*.pem
+.vercel
+
+# logs & caches
+*.log
+dev.log
+*.tsbuildinfo
+next-env.d.ts
+
+# local test harnesses (قد تحوي بيانات اعتماد)
+_logintest.mjs
+_admincheck.mjs
+_leadscheck.mjs
+
+# ★ ملفات محذوفة عمداً — تكسر جلسة الأدمن إن نُشرت (انظر tools/guard-no-proxy.mjs)
+src/proxy.ts
+src/app/auth
