@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/useAuth';
 import { useEffect } from 'react';
 import SiteNav from './components/SiteNav';
 import ContactButtons from './components/ContactButtons';
+import ReplyComposer from './components/ReplyComposer';
 const MapComponent = dynamic(() => import('./components/Map'), { ssr: false });
 
 // SVG Icons — بدل الإيموجي
@@ -1994,9 +1995,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                           </div>
                           <a href={`tel:${inq.phone}`} className="text-xs text-blue-600 font-medium mb-1 inline-block" dir="ltr">{inq.phone}</a>
                           {inq.message && <div className="text-sm text-gray-600 whitespace-pre-line mt-1">{inq.message}</div>}
-                          {/* رد مباشر على الباحث بجوّاله المحفوظ — واتساب (برقم سعودي مطبّع) أو اتصال */}
+                          {/* رد مباشر على الباحث بجوّاله المحفوظ — اتصال/إيميل + منشئ رد عبر واتساب.
+                              ملاحظة: لا نعلّم الاستفسار «معالَجاً» هنا لأن المكتب لا يملك سياسة UPDATE
+                              على leads (الصلاحية للمدير فقط) — يحتاج سياسة leads_office_update لو رُغب لاحقاً. */}
                           <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
                             <ContactButtons contact={inq.phone} />
+                            <ReplyComposer phone={inq.phone} />
                           </div>
                         </div>
                       </div>

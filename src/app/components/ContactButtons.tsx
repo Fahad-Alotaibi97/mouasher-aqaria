@@ -52,6 +52,17 @@ export function emailInText(raw: string | null | undefined): string | null {
   return m ? m[0] : null;
 }
 
+// رابط واتساب مع نصّ ردّ مُعبّأ: wa.me/<رقم مطبّع>?text=<نص مُرمّز URL>.
+// النص العربي يُرمّز عبر encodeURIComponent (UTF-8 بنسبة مئوية) ويفكّه واتساب سليماً.
+// يُرجع null إن لم يكن للمستلم رقم واتساب صالح (مثلاً حقل التواصل إيميل في رسائل الدعم).
+// تُستخدم في ReplyComposer — تبقى هنا لتُختبر كدالة نقية (الكود المُختبَر = الكود المشحون).
+export function waLink(phone: string | null | undefined, text?: string | null): string | null {
+  const wa = waNumber(phone);
+  if (!wa) return null;
+  const t = (text ?? '').trim();
+  return t ? `https://wa.me/${wa}?text=${encodeURIComponent(t)}` : `https://wa.me/${wa}`;
+}
+
 // contact = حقل التواصل في الصف (رقم جوال، أو إيميل في رسائل الدعم).
 // email = إيميل إضافي اختياري (مثلاً مستخرج من نص الرسالة) — زر «إيميل» يظهر لأيّهما وُجد.
 // كل زر يظهر فقط إن توفّرت بياناته؛ بلا أي بيانات ⇒ لا شيء يُعرض.

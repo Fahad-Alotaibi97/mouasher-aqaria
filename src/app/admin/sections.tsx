@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import ContactButtons, { emailInText } from '../components/ContactButtons';
+import ReplyComposer from '../components/ReplyComposer';
 
 // ── أدوات مشتركة ─────────────────────────────────────────────
 interface PgErr { code?: string; message?: string }
@@ -461,6 +462,10 @@ export function LeadsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                 {/* رد مباشر: استفسار ⇒ تواصل مع العميل، دعم ⇒ تواصل مع المكتب
                     (رسائل الدعم تحمل بريد المكتب في حقل phone وداخل نص الرسالة) */}
                 <ContactButtons contact={l.phone} email={emailInText(l.message)} />
+                {/* منشئ الرد عبر واتساب — يظهر فقط حين يحمل phone رقماً صالحاً (استفسارات
+                    العملاء). رسائل الدعم تحمل بريداً لا رقماً فلا يظهر المحرّر (يبقى زر الإيميل).
+                    إرسال الرد يعلّم الرسالة معالَجة (المدير يملك سياسة leads_admin_update). */}
+                <ReplyComposer phone={l.phone} onSent={() => { if (!l.handled) setHandled(l.id, true); }} />
                 <button onClick={() => setHandled(l.id, !l.handled)} disabled={busy === l.id}
                   className={`text-xs px-3 py-1.5 rounded-lg font-bold border disabled:opacity-50 ${l.handled ? 'bg-white border-[#cfd9e4] text-[#0A3D62] hover:bg-[#f0f4f8]' : 'bg-green-600 text-white border-green-600 hover:bg-green-700'}`}>
                   {l.handled ? 'إرجاع كجديدة' : 'تعليم كمعالَجة'}
