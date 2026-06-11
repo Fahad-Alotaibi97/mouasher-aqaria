@@ -31,6 +31,12 @@ export function waNumber(raw: string | null | undefined): string | null {
   return null;
 }
 
+// هل النص رقم جوال سعودي صالح؟ (يُطبّع إلى 9665XXXXXXXX) — للتحقّق عند التسجيل/الدعم.
+export function isSaudiMobile(raw: string | null | undefined): boolean {
+  const w = waNumber(raw);
+  return !!w && /^9665\d{8}$/.test(w);
+}
+
 // رقم صالح للاتصال tel: (7 أرقام فأكثر)
 export function telNumber(raw: string | null | undefined): string | null {
   if (!raw) return null;

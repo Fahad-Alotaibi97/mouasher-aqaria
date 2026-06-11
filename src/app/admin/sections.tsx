@@ -500,12 +500,12 @@ export function LeadsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                 </span>
               </div>
               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[#f0f4f8]">
-                {/* رد مباشر: استفسار ⇒ تواصل مع العميل، دعم ⇒ تواصل مع المكتب
-                    (رسائل الدعم تحمل بريد المكتب في حقل phone وداخل نص الرسالة) */}
+                {/* رد مباشر — موحّد للاستفسارات والدعم: phone يحمل جوال الباحث (استفسار)
+                    أو جوال المكتب (دعم، بعد التقاطه عند التسجيل/نموذج الدعم)؛ والإيميل يُستخرج
+                    من نص الرسالة. رسائل دعم قديمة بلا جوال (phone=بريد) ⇒ زر الإيميل فقط (تدرّج آمن). */}
                 <ContactButtons contact={l.phone} email={emailInText(l.message)} />
-                {/* منشئ الرد عبر واتساب — يظهر فقط حين يحمل phone رقماً صالحاً (استفسارات
-                    العملاء). رسائل الدعم تحمل بريداً لا رقماً فلا يظهر المحرّر (يبقى زر الإيميل).
-                    إرسال الرد يعلّم الرسالة معالَجة (المدير يملك سياسة leads_admin_update). */}
+                {/* منشئ الرد عبر واتساب — يظهر حين يحمل phone رقماً صالحاً (استفسار عميل أو
+                    دعم مكتب له جوال). إرسال الرد يعلّم الرسالة معالَجة (المدير يملك leads_admin_update). */}
                 <ReplyComposer phone={l.phone} onSent={() => { if (!l.handled) setHandled(l.id, true); }} />
                 <button onClick={() => setHandled(l.id, !l.handled)} disabled={busy === l.id}
                   className={`text-xs px-3 py-1.5 rounded-lg font-bold border disabled:opacity-50 ${l.handled ? 'bg-white border-[#cfd9e4] text-[#0A3D62] hover:bg-[#f0f4f8]' : 'bg-green-600 text-white border-green-600 hover:bg-green-700'}`}>

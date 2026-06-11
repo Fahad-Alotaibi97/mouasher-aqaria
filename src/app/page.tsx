@@ -8,7 +8,7 @@ import { useAppData, type UIListing, type MktAvg, type ImagesByCategory } from '
 import { useAuth } from '@/lib/useAuth';
 import { useEffect } from 'react';
 import SiteNav from './components/SiteNav';
-import ContactButtons from './components/ContactButtons';
+import ContactButtons, { isSaudiMobile } from './components/ContactButtons';
 import ReplyComposer from './components/ReplyComposer';
 const MapComponent = dynamic(() => import('./components/Map'), { ssr: false });
 
@@ -158,6 +158,7 @@ export default function Home() {
   const [authRole, setAuthRole] = useState<'seeker' | 'office'>('seeker');
   const [authOfficeName, setAuthOfficeName] = useState('');
   const [authFal, setAuthFal] = useState('');
+  const [authPhone, setAuthPhone] = useState(''); // جوال المكتب (إلزامي عند تسجيل مكتب)
   const [authSeekerName, setAuthSeekerName] = useState('');
 
   const submitAuth = async () => {
@@ -176,7 +177,13 @@ export default function Home() {
         setAuthBusy(false);
         return;
       }
-      r = await signUpWithPassword(email, authPass, { role: authRole, officeName: authOfficeName, fal: authFal, seekerName: authSeekerName });
+      // جوال المكتب إلزامي ومُتحقَّق (سعودي) — تستخدمه الإدارة للرد عبر واتساب.
+      if (authRole === 'office' && !isSaudiMobile(authPhone)) {
+        setAuthMsg({ ok: false, text: 'أدخل رقم جوال سعودي صحيح للمكتب (مثال: 05XXXXXXXX).' });
+        setAuthBusy(false);
+        return;
+      }
+      r = await signUpWithPassword(email, authPass, { role: authRole, officeName: authOfficeName, fal: authFal, phone: authPhone, seekerName: authSeekerName });
     } else {
       r = await signInWithPassword(email, authPass);
     }
@@ -831,6 +838,16 @@ export default function Home() {
                             placeholder="مثال: مكتب الأفق العقاري"
                             className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
                           />
+                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">رقم جوال المكتب</label>
+                          <input
+                            type="tel"
+                            dir="ltr"
+                            value={authPhone}
+                            onChange={(e) => setAuthPhone(e.target.value)}
+                            placeholder="05XXXXXXXX"
+                            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
+                          />
+                          <div className="text-[11px] text-gray-400 mt-1">يُستخدم لتواصل إدارة المنصة معك (واتساب) — رقم سعودي.</div>
                           <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">رقم رخصة فال (اختياري)</label>
                           <input
                             type="text"
@@ -1220,13 +1237,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [listsErr, setListsErr] = useState('');
 
   // ── بيانات المكتب الحقيقية (مربوطة بالحساب الحالي عبر owner_id) ──
-  const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; verified: boolean; status: string | null; active: boolean } | null>(null);
+  const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; phone: string | null; verified: boolean; status: string | null; active: boolean } | null>(null);
   const [myListings, setMyListings] = useState<{ id: string; title: string; advertised: number; status: string; rejection_note: string | null }[]>([]);
   const [myLeads, setMyLeads] = useState<{ id: string; name: string; phone: string; message: string | null; created_at: string; handled?: boolean | null; kind?: string | null }[]>([]);
   const [offLoaded, setOffLoaded] = useState(false);
   // «تواصل مع المنصة» — رسالة دعم من المكتب لإدارة المنصة (تُحفظ في leads بنوع support)
   const [supSubject, setSupSubject] = useState('');
   const [supMsg, setSupMsg] = useState('');
+  const [supPhone, setSupPhone] = useState(''); // جوال المكتب للرد عبر واتساب (يُملأ تلقائياً إن كان محفوظاً)
   const [supSending, setSupSending] = useState(false);
   const [supSent, setSupSent] = useState(false);
   const [supErr, setSupErr] = useState('');
@@ -1234,6 +1252,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   // نموذج إنشاء المكتب داخل اللوحة (يضمن ربط أي حساب بمكتب بشكل موثوق)
   const [newOfficeName, setNewOfficeName] = useState('');
   const [newFal, setNewFal] = useState('');
+  const [newPhone, setNewPhone] = useState(''); // جوال المكتب (إلزامي عند الإنشاء داخل اللوحة)
   const [creatingOffice, setCreatingOffice] = useState(false);
   const [createOfficeErr, setCreateOfficeErr] = useState('');
 
@@ -1248,9 +1267,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     const sb = createClient();
     const uid = await currentUid(sb);
     if (!uid) { setMyOffice(null); setOffLoaded(true); return; }
-    const { data: offs } = await sb.from('offices').select('id,name,fal_license,verified,status,active').eq('owner_id', uid).order('created_at', { ascending: false }).limit(1);
-    const off = (offs && offs[0]) || null;
-    setMyOffice((off as typeof myOffice) ?? null);
+    // مع عمود phone إن وُجد؛ وإلا (قبل تشغيل add_office_phone.sql) بالأعمدة الأساسية
+    type OffRow = { id: string; name: string; fal_license: string | null; phone?: string | null; verified: boolean; status: string | null; active: boolean };
+    let offsRes = await sb.from('offices').select('id,name,fal_license,phone,verified,status,active').eq('owner_id', uid).order('created_at', { ascending: false }).limit(1);
+    if (offsRes.error) {
+      offsRes = await sb.from('offices').select('id,name,fal_license,verified,status,active').eq('owner_id', uid).order('created_at', { ascending: false }).limit(1) as typeof offsRes;
+    }
+    const off = ((offsRes.data && offsRes.data[0]) || null) as OffRow | null;
+    setMyOffice(off ? { ...off, phone: off.phone ?? null } : null);
     if (off) {
       const { data: ls } = await sb.from('listings').select('id,title,advertised,status,rejection_note').eq('office_id', off.id).order('created_at', { ascending: false });
       setMyListings((ls ?? []) as typeof myListings);
@@ -1351,32 +1375,54 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const createOffice = async () => {
     const name = newOfficeName.trim();
     if (!name) { setCreateOfficeErr('أدخل اسم المكتب'); return; }
+    // جوال المكتب إلزامي ومُتحقَّق — تستخدمه الإدارة للرد عبر واتساب.
+    if (!isSaudiMobile(newPhone)) { setCreateOfficeErr('أدخل رقم جوال سعودي صحيح للمكتب (مثال: 05XXXXXXXX).'); return; }
     setCreatingOffice(true); setCreateOfficeErr('');
     const sb = createClient();
     const uid = await currentUid(sb);
     if (!uid) { setCreateOfficeErr('انتهت جلستك — سجّل خروج ثم دخول من جديد.'); setCreatingOffice(false); return; }
-    const { error } = await sb.from('offices').insert({ owner_id: uid, name, fal_license: newFal.trim() || null });
+    const phone = newPhone.trim();
+    // نتدرّج بأمان: مع phone ثم بدونه إن كان العمود غير موجود بعد (قبل add_office_phone.sql).
+    let { error } = await sb.from('offices').insert({ owner_id: uid, name, fal_license: newFal.trim() || null, phone });
+    if (error && (error.code === 'PGRST204' || error.code === '42703')) {
+      ({ error } = await sb.from('offices').insert({ owner_id: uid, name, fal_license: newFal.trim() || null }));
+    }
     if (error) { setCreateOfficeErr('تعذّر الإنشاء: ' + error.message); setCreatingOffice(false); return; }
     await sb.from('profiles').update({ role: 'office', full_name: name }).eq('id', uid);
-    setNewOfficeName(''); setNewFal('');
+    setNewOfficeName(''); setNewFal(''); setNewPhone('');
     await reloadOffice();
     setCreatingOffice(false);
   };
 
-  // إرسال رسالة دعم للمنصة — بيانات المكتب (الاسم/الرخصة/البريد) تُرفق تلقائياً
+  // إرسال رسالة دعم للمنصة — بيانات المكتب (الاسم/الرخصة/الجوال/البريد) تُرفق تلقائياً
   const submitSupport = async () => {
     if (!supSubject.trim() && !supMsg.trim()) { setSupErr('اكتب موضوعاً أو رسالة أولاً.'); return; }
+    // الجوال اختياري في الدعم: إن أُدخل وجب أن يكون صحيحاً؛ وإن تُرك فارغاً نرجع للبريد (رد بالإيميل فقط).
+    const phoneInput = supPhone.trim();
+    if (phoneInput && !isSaudiMobile(phoneInput)) {
+      setSupErr('رقم الجوال غير صحيح — أدخل رقماً سعودياً (مثال: 05XXXXXXXX) أو اتركه فارغاً.');
+      return;
+    }
     setSupSending(true); setSupErr('');
     try {
       const sb = createClient();
       const { data: { session } } = await sb.auth.getSession();
       const email = session?.user?.email ?? '—';
+      // جوال المكتب المعتمد للرد: المُدخل إن وُجد، وإلا المحفوظ على صف المكتب.
+      const officePhone = phoneInput || (myOffice?.phone ?? '');
+      // احفظ الجوال على صف المكتب إن كان جديداً/مختلفاً (يفيد الرسائل القادمة) — فشل غياب العمود يُتجاهل.
+      if (phoneInput && myOffice?.id && phoneInput !== (myOffice?.phone ?? '')) {
+        await sb.from('offices').update({ phone: phoneInput }).eq('id', myOffice.id);
+      }
       const message = [
         supSubject.trim() && `الموضوع: ${supSubject.trim()}`,
         supMsg.trim(),
-        `البريد: ${email}` + (myOffice?.fal_license ? ` · رخصة فال: ${myOffice.fal_license}` : ''),
+        `البريد: ${email}`
+          + (myOffice?.fal_license ? ` · رخصة فال: ${myOffice.fal_license}` : '')
+          + (officePhone ? ` · جوال: ${officePhone}` : ''),
       ].filter(Boolean).join('\n');
-      const row: Record<string, unknown> = { kind: 'support', name: `مكتب: ${myOffice?.name ?? 'بدون مكتب'}`, phone: email, message };
+      // phone للصف: جوال المكتب إن توفّر (ليرد الأدمن عبر واتساب) وإلا البريد (احتياط — زر إيميل فقط).
+      const row: Record<string, unknown> = { kind: 'support', name: `مكتب: ${myOffice?.name ?? 'بدون مكتب'}`, phone: officePhone || email, message };
       if (myOffice?.id) row.office_id = myOffice.id;
       let { error } = await sb.from('leads').insert(row);
       if (error && (error.code === 'PGRST204' || error.code === '42703')) {
@@ -1398,6 +1444,8 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   };
 
   useEffect(() => { reloadOffice(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  // تعبئة حقل جوال الدعم تلقائياً من جوال المكتب المحفوظ (auto-use) — وإن لم يكن محفوظاً يبقى فارغاً ليُطلب.
+  useEffect(() => { if (myOffice?.phone) setSupPhone(myOffice.phone); }, [myOffice?.phone]);
   const activeCount = myListings.filter((l) => l.status === 'approved').length;
   const pendingCount = myListings.filter((l) => l.status === 'pending').length;
 
@@ -1573,6 +1621,10 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
           <label className="text-xs text-gray-700 font-semibold block mb-1">اسم المكتب *</label>
           <input value={newOfficeName} onChange={(e) => setNewOfficeName(e.target.value)} placeholder="مثال: مكتب الأفق العقاري"
             className="w-full mb-3 px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+          <label className="text-xs text-gray-700 font-semibold block mb-1">رقم جوال المكتب *</label>
+          <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} dir="ltr" type="tel" placeholder="05XXXXXXXX"
+            className="w-full mb-1 px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+          <div className="text-[11px] text-gray-400 mb-3">يُستخدم لتواصل إدارة المنصة معك (واتساب) — رقم سعودي.</div>
           <label className="text-xs text-gray-700 font-semibold block mb-1">رقم رخصة فال (اختياري)</label>
           <input value={newFal} onChange={(e) => setNewFal(e.target.value)} dir="ltr" placeholder="1100123456"
             className="w-full mb-4 px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
@@ -2036,8 +2088,16 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                     <textarea value={supMsg} onChange={(e) => setSupMsg(e.target.value)} rows={4}
                       placeholder="اشرح المشكلة أو الطلب بالتفصيل…" className={inputCls + ' resize-none'} />
                   </div>
+                  <div>
+                    <label className="text-xs text-gray-700 font-semibold block mb-1">رقم جوال المكتب (للرد عبر واتساب)</label>
+                    <input value={supPhone} onChange={(e) => setSupPhone(e.target.value)} dir="ltr" type="tel"
+                      placeholder="05XXXXXXXX" className={inputCls} />
+                    <div className="text-[11px] text-gray-400 mt-1">
+                      {myOffice?.phone ? 'مُعبّأ من جوال مكتبك المحفوظ — عدّله إن لزم.' : 'أدخل جوالك ليتمكّن فريق المنصة من الرد عبر واتساب (اختياري — وإلا نرد بالإيميل).'}
+                    </div>
+                  </div>
                   <div className="text-xs text-gray-400">
-                    يُرفق تلقائياً: {myOffice?.name ?? '—'}{myOffice?.fal_license ? ` · رخصة فال ${myOffice.fal_license}` : ''} · بريد حسابك
+                    يُرفق تلقائياً: {myOffice?.name ?? '—'}{myOffice?.fal_license ? ` · رخصة فال ${myOffice.fal_license}` : ''}{supPhone.trim() ? ` · جوال ${supPhone.trim()}` : ''} · بريد حسابك
                   </div>
                   {supErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{supErr}</div>}
                   <button onClick={submitSupport} disabled={supSending}

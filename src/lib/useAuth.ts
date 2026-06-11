@@ -110,7 +110,7 @@ export function useAuth() {
   async function signUpWithPassword(
     email: string,
     password: string,
-    opts?: { role?: 'seeker' | 'office'; officeName?: string; fal?: string; seekerName?: string }
+    opts?: { role?: 'seeker' | 'office'; officeName?: string; fal?: string; seekerName?: string; phone?: string }
   ): Promise<{ ok: boolean; message: string; isAdmin?: boolean }> {
     if (!isSupabaseConfigured()) {
       return { ok: false, message: 'لم يتم ضبط الاتصال بقاعدة البيانات بعد.' };
@@ -129,6 +129,7 @@ export function useAuth() {
       full_name: opts?.role === 'office' ? (opts.officeName || '').trim() : (opts?.seekerName || '').trim(),
       office_name: (opts?.officeName || '').trim(),
       fal: (opts?.fal || '').trim(),
+      phone: (opts?.phone || '').trim(), // جوال المكتب (يلتقطه trigger إن حُدّث؛ وإلا يحفظه العميل أدناه)
     };
     const { data, error } = await sb.auth.signUp({ email, password, options: { data: signupMeta } });
     if (error) {
@@ -153,10 +154,22 @@ export function useAuth() {
       const uid = data.user.id;
       if (opts?.role === 'office') {
         const officeName = (opts.officeName || '').trim() || 'مكتب عقاري';
+        const fal = (opts.fal || '').trim() || null;
+        const phone = (opts.phone || '').trim() || null;
         await sb.from('profiles').update({ role: 'office', full_name: officeName }).eq('id', uid);
         const { data: existing } = await sb.from('offices').select('id').eq('owner_id', uid).maybeSingle();
+        // عمود phone قد لا يكون موجوداً بعد (قبل تشغيل add_office_phone.sql) — نتدرّج
+        // بأمان فلا تنكسر التسجيل: نحاول مع phone ثم بدونه عند خطأ غياب العمود.
+        const colMissing = (e: { code?: string } | null) => !!e && (e.code === 'PGRST204' || e.code === '42703');
         if (!existing) {
-          await sb.from('offices').insert({ owner_id: uid, name: officeName, fal_license: (opts.fal || '').trim() || null });
+          const { error } = await sb.from('offices').insert({ owner_id: uid, name: officeName, fal_license: fal, phone });
+          if (colMissing(error)) {
+            await sb.from('offices').insert({ owner_id: uid, name: officeName, fal_license: fal });
+          }
+        } else if (phone) {
+          // المكتب أُنشئ بواسطة trigger التسجيل (بلا جوال) ⇒ نحفظ الجوال بتحديث المالك.
+          // مسموح بـ offices_owner، وتجميد الثقة لا يمسّ عمود phone. فشل غياب العمود يُتجاهل.
+          await sb.from('offices').update({ phone }).eq('id', existing.id);
         }
       } else {
         // باحث: نخزّن اسمه في ملفه ليظهر ضمن «العملاء» في لوحة الأدمن
