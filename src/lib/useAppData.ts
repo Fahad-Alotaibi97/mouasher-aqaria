@@ -38,6 +38,7 @@ export interface UIListing {
   fal: string;
   lat?: number | null;
   lng?: number | null;
+  maps_url?: string | null; // رابط خرائط Google الملصوق (للروابط المختصرة غير القابلة للتحليل)
 }
 
 // avg = متوسط الشقة (الأساس) ، villa/studio/floor/duplex متوسطات اختيارية لكل نوع
@@ -84,9 +85,12 @@ export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) 
         const BASE = 'id, office_id, hood, title, type, advertised, rooms, area, baths, furnished, condition, cond_label, description, images, fal_license, lat, lng';
         const FULL = BASE + ', kitchen, ac, parking';
         const FULL2 = FULL + ', images_by_category';
+        const FULL3 = FULL2 + ', maps_url'; // مع رابط الموقع (بعد تشغيل listing_location.sql)
         const attempts: { sel: string; status: boolean }[] = [
+          { sel: FULL3, status: true },
           { sel: FULL2, status: true },
           { sel: FULL, status: true },
+          { sel: FULL3, status: false },
           { sel: FULL2, status: false },
           { sel: FULL, status: false },
           { sel: BASE, status: true },
@@ -123,6 +127,7 @@ export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) 
               fal: (r.fal_license as string) || '',
               lat: (r.lat as number) ?? null,
               lng: (r.lng as number) ?? null,
+              maps_url: (r.maps_url as string) ?? null,
             }))
           );
           setLoadedFromDB(true);

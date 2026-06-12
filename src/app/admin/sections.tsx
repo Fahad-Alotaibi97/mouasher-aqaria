@@ -120,13 +120,49 @@ function StatCard({ label, val, warn }: { label: string; val: number; warn?: boo
   );
 }
 
-// بطاقة فرعية موحّدة لأقسام اللوحة
-function SubCard({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+// ── شارات الأيقونات الملوّنة: مربع صغير معبّأ بلون من عائلة المنصة، الأيقونة
+//    بيضاء فوقه (والذهبي بأيقونة داكنة للتباين) — تعيين ثابت لكل قسم، لا عشوائية.
+const TONES: Record<string, { bg: string; fg: string }> = {
+  navy: { bg: '#0A3D62', fg: '#ffffff' },
+  blue: { bg: '#1B6CA8', fg: '#ffffff' },
+  steel: { bg: '#13496E', fg: '#ffffff' },
+  green: { bg: '#0F6E56', fg: '#ffffff' },
+  gold: { bg: '#C9A84C', fg: '#3A2E0A' },
+};
+const AIcon: Record<string, React.ReactNode> = {
+  star: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>),
+  shield: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>),
+  building: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21h18M9 21V7l6-4v18M9 7H3v14"/><path d="M13 11h2M13 15h2M5 11h2M5 15h2"/></svg>),
+  search: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>),
+  chart: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 4 4-8"/></svg>),
+  chat: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>),
+  eye: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>),
+  pin: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>),
+  home: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>),
+  coins: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/><path d="M16 3H8"/></svg>),
+  list: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>),
+};
+function IconBadge({ icon, tone }: { icon: string; tone: string }) {
+  const t = TONES[tone] ?? TONES.navy;
+  return (
+    <span className="w-8 h-8 rounded-[10px] flex items-center justify-center flex-shrink-0" style={{ backgroundColor: t.bg, color: t.fg }}>
+      {AIcon[icon] ?? AIcon.chart}
+    </span>
+  );
+}
+
+// بطاقة فرعية موحّدة لأقسام اللوحة — أيقونتها على خلفية معبّأة (لا خلفيات بيضاء)
+function SubCard({ title, hint, icon, tone, children }: { title: string; hint?: string; icon?: string; tone?: string; children: React.ReactNode }) {
   return (
     <div className={`${card} p-4`}>
-      <div className="font-bold text-sm text-[#0A3D62]">{title}</div>
-      {hint && <div className="text-[11px] text-[#5b6b7a] mt-0.5 mb-2">{hint}</div>}
-      <div className={hint ? '' : 'mt-2'}>{children}</div>
+      <div className="flex items-center gap-2.5">
+        {icon && <IconBadge icon={icon} tone={tone ?? 'navy'} />}
+        <div className="min-w-0">
+          <div className="font-bold text-sm text-[#0A3D62]">{title}</div>
+          {hint && <div className="text-[11px] text-[#5b6b7a] mt-0.5">{hint}</div>}
+        </div>
+      </div>
+      <div className="mt-2.5">{children}</div>
     </div>
   );
 }
@@ -319,7 +355,13 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const linkedInquiries = inquiries.filter((l) => l.listing_id).length;
   const conversion = clicks.length > 0 ? Math.round((linkedInquiries / clicks.length) * 100) : null;
 
-  const head = (t: string) => <h3 className="font-bold text-[#0A3D62] text-base mt-6 mb-3 sec-underline">{t}</h3>;
+  // عناوين أقسام اللوحة — أيقونة على خلفية معبّأة بلون ثابت لكل قسم (تمييز بصري هادئ)
+  const head = (t: string, icon: string, tone: string) => (
+    <h3 className="font-bold text-[#0A3D62] text-base mt-6 mb-3 flex items-center gap-2.5">
+      <IconBadge icon={icon} tone={tone} />
+      {t}
+    </h3>
+  );
 
   return (
     <>
@@ -393,11 +435,11 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
           </div>
 
           {/* ── أكثر الميزات استخداماً ── */}
-          {head('أكثر الميزات استخداماً')}
+          {head('أكثر الميزات استخداماً', 'star', 'steel')}
           {eventsMissing ? (
             <Empty text="يتطلّب تفعيل التتبّع — شغّل supabase/analytics_events.sql ثم analytics_page_view.sql." />
           ) : (
-            <SubCard title="ترتيب ميزات المنصة بالاستخدام الفعلي" hint="أعداد دقيقة (COUNT) من أحداث التتبّع — كل الأنواع منذ تفعيل تتبّع كلٍّ منها">
+            <SubCard title="ترتيب ميزات المنصة بالاستخدام الفعلي" hint="أعداد دقيقة (COUNT) من أحداث التتبّع — كل الأنواع منذ تفعيل تتبّع كلٍّ منها" icon="star" tone="steel">
               {!anyFeatureUse ? (
                 <MiniEmpty text="لا توجد بيانات بعد — يبدأ الترتيب مع أول استخدام من الزوار." />
               ) : (
@@ -412,9 +454,9 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
           )}
 
           {/* ── صحة المنصة ── */}
-          {head('صحة المنصة')}
+          {head('صحة المنصة', 'shield', 'green')}
           <div className="grid md:grid-cols-2 gap-3">
-            <SubCard title="بانتظار اعتمادك" hint="إعلانات ومكاتب جديدة تحتاج مراجعتك — من قسمي الإدارة">
+            <SubCard title="بانتظار اعتمادك" hint="إعلانات ومكاتب جديدة تحتاج مراجعتك — من قسمي الإدارة" icon="list" tone="gold">
               {pendingListings.length === 0 && pendingOffices.length === 0 ? (
                 <MiniEmpty text="لا شيء بانتظار الاعتماد — كل المراجعات منجزة ✓" />
               ) : (
@@ -435,7 +477,7 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                 </div>
               )}
             </SubCard>
-            <SubCard title="حالة المكاتب والتحويل">
+            <SubCard title="حالة المكاتب والتحويل" icon="building" tone="steel">
               <div className="space-y-2 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-[#33414f]">مكاتب نشطة / موقوفة</span>
@@ -461,17 +503,17 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
           </div>
 
           {/* ── التفاعل مع الإعلانات ── */}
-          {head('التفاعل مع الإعلانات')}
+          {head('التفاعل مع الإعلانات', 'building', 'navy')}
           <div className="grid md:grid-cols-2 gap-3">
-            <SubCard title="الإعلانات الأكثر استفساراً" hint="من جدول leads — استفسارات مرتبطة بإعلان محدّد">
+            <SubCard title="الإعلانات الأكثر استفساراً" hint="من جدول leads — استفسارات مرتبطة بإعلان محدّد" icon="chat" tone="navy">
               <RankList rows={inquiredRank} unit="استفسار" />
             </SubCard>
-            <SubCard title="الإعلانات الأكثر مشاهدة" hint="نقرات فتح الإعلان منذ تفعيل التتبّع">
+            <SubCard title="الإعلانات الأكثر مشاهدة" hint="نقرات فتح الإعلان منذ تفعيل التتبّع" icon="eye" tone="blue">
               {eventsMissing ? <MiniEmpty text="يتطلّب تفعيل التتبّع (شغّل SQL أعلاه)." /> : <RankList rows={viewedRank} unit="نقرة" />}
             </SubCard>
           </div>
           <div className="mt-3">
-            <SubCard title="المكاتب الأكثر نشاطاً" hint="مرتّبة بالاستفسارات الواردة ثم عدد الإعلانات">
+            <SubCard title="المكاتب الأكثر نشاطاً" hint="مرتّبة بالاستفسارات الواردة ثم عدد الإعلانات" icon="building" tone="green">
               {activeOfficesRank.length === 0 ? <MiniEmpty /> : (
                 <div className="space-y-1.5">
                   {activeOfficesRank.map((o, i) => (
@@ -486,32 +528,32 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
           </div>
 
           {/* ── سلوك الباحثين ── */}
-          {head('سلوك الباحثين')}
+          {head('سلوك الباحثين', 'search', 'blue')}
           {eventsMissing ? (
             <Empty text="يتطلّب هذا القسم تفعيل التتبّع — شغّل supabase/analytics_events.sql ثم ستتجمّع البيانات مع استخدام الزوار." />
           ) : (
             <div className="grid md:grid-cols-2 gap-3">
-              <SubCard title="الأحياء الأكثر طلباً" hint="من بحث الفلاتر والمساعد الذكي">
+              <SubCard title="الأحياء الأكثر طلباً" hint="من بحث الفلاتر والمساعد الذكي" icon="pin" tone="navy">
                 <RankList rows={hoodRank} unit="بحث" />
               </SubCard>
-              <SubCard title="أنواع الوحدات الأكثر طلباً">
+              <SubCard title="أنواع الوحدات الأكثر طلباً" icon="home" tone="steel">
                 <RankList rows={typeRank} unit="بحث" />
               </SubCard>
-              <SubCard title="نطاقات الميزانية المطلوبة" hint="ميزانيات بحث الزوار مجمّعة في شرائح">
+              <SubCard title="نطاقات الميزانية المطلوبة" hint="ميزانيات بحث الزوار مجمّعة في شرائح" icon="coins" tone="green">
                 <RankList rows={budgetRank} unit="بحث" />
               </SubCard>
-              <SubCard title="أكثر عبارات المساعد الذكي" hint="نص ما يكتبه الزوار حرفياً (مقتطع)">
+              <SubCard title="أكثر عبارات المساعد الذكي" hint="نص ما يكتبه الزوار حرفياً (مقتطع)" icon="chat" tone="blue">
                 <RankList rows={aiQueriesRank} unit="مرة" />
               </SubCard>
             </div>
           )}
 
           {/* ── استخدام مؤشر السعر العادل ── */}
-          {head('استخدام مؤشر السعر العادل')}
+          {head('استخدام مؤشر السعر العادل', 'chart', 'gold')}
           {eventsMissing ? (
             <Empty text="يتطلّب تفعيل التتبّع — شغّل supabase/analytics_events.sql." />
           ) : (
-            <SubCard title={`إجمالي الاستخدام: ${fmtNum(indicatorUses.length)} مرة`} hint="كل تقييم سعر فعلي أجراه زائر — وتوزيع الأحكام يعكس واقع الأسعار المعروضة">
+            <SubCard title={`إجمالي الاستخدام: ${fmtNum(indicatorUses.length)} مرة`} hint="كل تقييم سعر فعلي أجراه زائر — وتوزيع الأحكام يعكس واقع الأسعار المعروضة" icon="chart" tone="gold">
               {indicatorUses.length === 0 ? <MiniEmpty text="لا استخدام مسجّلاً بعد — يبدأ العد مع استخدام الزوار للمؤشر." /> : (
                 <div className="space-y-2">
                   {verdicts.map((v) => (

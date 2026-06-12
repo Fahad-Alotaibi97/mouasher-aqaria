@@ -11,7 +11,10 @@ import { useEffect } from 'react';
 import SiteNav from './components/SiteNav';
 import ContactButtons, { isSaudiMobile } from './components/ContactButtons';
 import ReplyComposer from './components/ReplyComposer';
+import { parseMapsUrl, isMapsUrl, mapsHref } from '@/lib/mapsLocation';
 const MapComponent = dynamic(() => import('./components/Map'), { ssr: false });
+// منتقي موقع الوحدة في نموذج المكتب (Leaflet — عميل فقط مثل الخريطة الرئيسية)
+const LocationPicker = dynamic(() => import('./components/Map').then((m) => m.LocationPicker), { ssr: false });
 
 // SVG Icons — بدل الإيموجي
 const Icons = {
@@ -28,7 +31,11 @@ const Icons = {
   okCircle: (<svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>),
   building: (<svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 21h18M9 21V7l6-4v18M9 7H3v14"/><path d="M13 11h2M13 15h2M5 11h2M5 15h2"/></svg>),
   news: (<svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8M10 10h8"/></svg>),
+  pin: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>),
 };
+
+// رابط فتح موقع الوحدة في خرائط Google (إحداثيات إن وُجدت وإلا الرابط المخزّن)
+const listingMapsHref = (l: UIListing): string | null => mapsHref(l.lat, l.lng, l.maps_url);
 
 // المتوسطات الافتراضية (تُستبدل بالبيانات الحقيقية من قاعدة البيانات إن توفّرت)
 const DEFAULT_MKT_AVG: MktAvg = {
@@ -495,6 +502,19 @@ export default function Home() {
                 ))}
               </div>
             )}
+            {/* موقع الوحدة — يفتح خرائط Google في تبويب جديد (لا يفتح تفاصيل الإعلان) */}
+            {listingMapsHref(l) && (
+              <a
+                href={listingMapsHref(l)!}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1.5 mt-2.5 bg-[#0F6E56] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+              >
+                {Icons.pin}
+                الموقع على الخريطة
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -532,7 +552,7 @@ export default function Home() {
             {/* المساعد الذكي — فوق الإعلانات (منطق محلّي بدون API) */}
             <div className="bg-gradient-to-b from-white to-[#f7fafd] border-[1.5px] border-[#c2d2e2] rounded-2xl p-5 shadow-[0_8px_28px_rgba(10,61,98,0.13)]">
               <div className="flex items-center gap-3 mb-3.5">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] flex items-center justify-center text-white flex-shrink-0">{Icons.ai}</div>
+                <div className="w-10 h-10 rounded-[10px] bg-[#0A3D62] flex items-center justify-center text-white flex-shrink-0">{Icons.ai}</div>
                 <div>
                   <div className="font-bold text-[15px] text-[#0A3D62]">المساعد الذكي</div>
                   <div className="text-xs text-[#33414f]">اكتب رغبتك وسأرتّب لك الإعلانات الأنسب</div>
@@ -601,7 +621,7 @@ export default function Home() {
             {/* الفلاتر — مصدر الحقيقة الذي يغذّي الخريطة والقائمة معاً */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-700">
+                <div className="w-9 h-9 rounded-[10px] bg-[#1B6CA8] flex items-center justify-center text-white">
                   {Icons.search}
                 </div>
                 <div>
@@ -685,7 +705,7 @@ export default function Home() {
           <div className="px-4 pt-4 pb-6 max-w-xl mx-auto">
             <div className="bg-white rounded-2xl border border-orange-200 shadow-sm overflow-hidden">
               <div className="bg-gradient-to-l from-orange-50 to-white px-4 py-3 border-b border-orange-100 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
+                <div className="w-9 h-9 rounded-[10px] bg-[#C9A84C] flex items-center justify-center text-[#3A2E0A]">
                   {Icons.chart}
                 </div>
                 <div>
@@ -1135,6 +1155,18 @@ export default function Home() {
                   );
                 })()}
                 {l.description && <p className="text-sm text-gray-700 leading-relaxed">{l.description}</p>}
+                {/* موقع الوحدة — زر بارز يفتح خرائط Google على موقع الوحدة مباشرة */}
+                {listingMapsHref(l) && (
+                  <a
+                    href={listingMapsHref(l)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center justify-center gap-2 bg-[#0F6E56] text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-opacity"
+                  >
+                    {Icons.pin}
+                    الموقع على الخريطة — افتح في خرائط Google
+                  </a>
+                )}
                 {/* رخصة المعلن (معلومة عرض فقط — تظهر فقط إن وُجدت؛ الباحث لا يُسأل عن أي رخصة) */}
                 {l.fal && <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">رخصة فال المعلن: <span dir="ltr">{l.fal}</span></div>}
                 {ctSent ? (
@@ -1326,6 +1358,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [fAc, setFAc] = useState('');               // مكيّفة | غير مكيّفة
   const [fParking, setFParking] = useState('');     // 0 | 1 | 2 | 3
   const [fDesc, setFDesc] = useState('');
+  // موقع الوحدة (اختياري): طريقتان — لصق رابط خرائط Google أو تحديد على الخريطة.
+  // الإحداثيات تُستخرج من الرابط إن أمكن؛ الرابط المختصر غير القابل للفك يُخزَّن كما هو.
+  const [fLocMethod, setFLocMethod] = useState<'link' | 'map'>('link');
+  const [fMapsLink, setFMapsLink] = useState('');
+  const [fLat, setFLat] = useState<number | null>(null);
+  const [fLng, setFLng] = useState<number | null>(null);
   // الصور المصنّفة: المفتاح = خانة (facade/hall/majlis/kitchen/bedN/bathN)
   const [fPhotos, setFPhotos] = useState<Record<string, { file: File; preview: string } | null>>({});
   const setPhoto = (key: string, file: File | null) =>
@@ -1404,6 +1442,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     setFType('شقة'); setFHood('النرجس'); setFRent(''); setFArea('');
     setFRooms('2'); setFBaths('1'); setFCond('حالة جيدة');
     setFFurniture(''); setFKitchen(''); setFAc(''); setFParking(''); setFDesc('');
+    setFLocMethod('link'); setFMapsLink(''); setFLat(null); setFLng(null);
     Object.values(fPhotos).forEach((p) => { if (p) URL.revokeObjectURL(p.preview); });
     setFPhotos({});
     setEditingId(null); setExistingPhotos(null); setPublishMsg(null);
@@ -1429,8 +1468,13 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     const sb = createClient();
     // نتدرّج كقراءة useAppData: مع الأعمدة الاختيارية أولاً ثم الأساسية إن غابت
     let r = await sb.from('listings')
-      .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,kitchen,ac,parking,description,images,images_by_category')
+      .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,kitchen,ac,parking,description,images,images_by_category,lat,lng,maps_url')
       .eq('id', id).single();
+    if (r.error) {
+      r = await sb.from('listings')
+        .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,kitchen,ac,parking,description,images,images_by_category,lat,lng')
+        .eq('id', id).single();
+    }
     if (r.error) {
       r = await sb.from('listings')
         .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,description,images')
@@ -1453,6 +1497,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     setFAc(d.ac == null ? '' : d.ac ? 'مكيّفة' : 'غير مكيّفة');
     setFParking(d.parking == null ? '' : String(d.parking));
     setFDesc((d.description as string) || '');
+    // الموقع المحفوظ: إحداثيات ⇒ نعرض الخريطة بدبوسها؛ رابط فقط ⇒ وضع اللصق
+    const hasCoords = typeof d.lat === 'number' && typeof d.lng === 'number';
+    setFLat(hasCoords ? (d.lat as number) : null);
+    setFLng(hasCoords ? (d.lng as number) : null);
+    setFMapsLink((d.maps_url as string) || '');
+    setFLocMethod(hasCoords && !d.maps_url ? 'map' : 'link');
     Object.values(fPhotos).forEach((p) => { if (p) URL.revokeObjectURL(p.preview); });
     setFPhotos({});
     setExistingPhotos((d.images_by_category as ImagesByCategory) ?? null);
@@ -1636,6 +1686,11 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         ac: fAc === '' ? null : fAc === 'مكيّفة',
         parking: fParking === '' ? null : parseInt(fParking),
         description: fDesc.trim() || null,
+        // موقع الوحدة: الإحداثيات (من الخريطة أو من تحليل الرابط) + الرابط الملصوق
+        // كما هو (للروابط المختصرة) — زر «الموقع على الخريطة» يفضّل الإحداثيات.
+        lat: fLat,
+        lng: fLng,
+        maps_url: isMapsUrl(fMapsLink) ? fMapsLink.trim() : null,
       };
       // أعمدة الصور: تُكتب دائماً عند الإدراج؛ وعند التعديل فقط إن وُجدت صور جديدة
       // أو صور مصنّفة قائمة (إعلان قديم بصور مسطّحة غير مصنّفة يُترك كما هو بلا مسح).
@@ -1956,6 +2011,70 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">المواقف</label>
                     <select className={selectCls} value={fParking} onChange={e=>setFParking(e.target.value)}><option value="">غير محدّد</option><option value="0">لا يوجد</option><option value="1">موقف واحد</option><option value="2">موقفان</option><option value="3">ثلاثة فأكثر</option></select></div>
                 </div>
+
+                {/* ── موقع الوحدة (اختياري لكنه مهم للباحث) — طريقتان: رابط أو خريطة ── */}
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <span className="w-8 h-8 rounded-[10px] bg-[#0F6E56] text-white flex items-center justify-center flex-shrink-0">{Icons.pin}</span>
+                    <div>
+                      <div className="text-sm font-bold text-gray-900">موقع الوحدة على الخريطة</div>
+                      <div className="text-[11px] text-gray-500">اختياري — يضيف للإعلان زراً يفتح موقع الوحدة في خرائط Google للباحث</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-3 max-w-md">
+                    <button type="button" onClick={() => setFLocMethod('link')}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${fLocMethod === 'link' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}>
+                      ألصق رابط خرائط Google
+                    </button>
+                    <button type="button" onClick={() => setFLocMethod('map')}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${fLocMethod === 'map' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}>
+                      حدّد على الخريطة
+                    </button>
+                  </div>
+                  {fLocMethod === 'link' ? (
+                    <div>
+                      <input
+                        dir="ltr"
+                        value={fMapsLink}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setFMapsLink(v);
+                          const c = parseMapsUrl(v);
+                          if (c) { setFLat(c.lat); setFLng(c.lng); }
+                        }}
+                        placeholder="https://maps.app.goo.gl/… أو الرابط من شريط العنوان"
+                        className={inputCls + ' text-left'}
+                      />
+                      <div className={`text-[11px] mt-1.5 leading-relaxed ${!fMapsLink.trim() ? 'text-gray-400' : parseMapsUrl(fMapsLink) || isMapsUrl(fMapsLink) ? 'text-green-700' : 'text-orange-600'}`}>
+                        {!fMapsLink.trim()
+                          ? 'افتح خرائط Google، ضع دبوساً على الوحدة، انسخ الرابط والصقه هنا.'
+                          : parseMapsUrl(fMapsLink)
+                            ? `تم استخراج الإحداثيات ✓ (${fLat?.toFixed(5)}, ${fLng?.toFixed(5)})`
+                            : isMapsUrl(fMapsLink)
+                              ? 'رابط خرائط مختصر — سيُحفظ كما هو ويفتح موقع الوحدة مباشرة ✓'
+                              : 'هذا لا يبدو رابط خرائط Google — انسخه من تطبيق أو موقع الخرائط.'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="rounded-xl overflow-hidden border border-gray-200">
+                        <LocationPicker lat={fLat} lng={fLng} onPick={(la, ln) => { setFLat(la); setFLng(ln); }} />
+                      </div>
+                      <div className={`text-[11px] mt-1.5 ${fLat != null ? 'text-green-700' : 'text-gray-400'}`}>
+                        {fLat != null && fLng != null
+                          ? `الموقع المحدّد ✓ (${fLat.toFixed(5)}, ${fLng.toFixed(5)})`
+                          : 'انقر على موقع الوحدة في الخريطة لوضع الدبوس.'}
+                      </div>
+                    </div>
+                  )}
+                  {(fLat != null || fMapsLink.trim() !== '') && (
+                    <button type="button" onClick={() => { setFLat(null); setFLng(null); setFMapsLink(''); }}
+                      className="text-[11px] text-red-600 font-semibold mt-1.5 hover:underline">
+                      إزالة الموقع
+                    </button>
+                  )}
+                </div>
+
                 <div className="flex gap-2 mt-4">
                   <button onClick={() => setAddStep(2)} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">التالي: الحاسبة</button>
                   <button onClick={() => setAddStep(3)} className="bg-white border border-dashed border-gray-300 text-gray-500 px-5 py-2.5 rounded-xl font-medium text-sm hover:border-gray-400 transition-all">تخطي الحاسبة</button>
@@ -2144,7 +2263,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                   return (
                     <div key={inq.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-all">
                       <div className="flex gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-700 flex-shrink-0">
+                        <div className="w-10 h-10 rounded-[10px] bg-[#13496E] flex items-center justify-center font-bold text-white flex-shrink-0">
                           {(inq.name || '؟').slice(0,1)}
                         </div>
                         <div className="flex-1">

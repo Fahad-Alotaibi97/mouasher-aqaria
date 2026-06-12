@@ -21,6 +21,26 @@ function getL(): Leaflet | null {
   return w.L ?? null;
 }
 
+// مُحمّل Leaflet مشترك (CSS + JS مرة واحدة) — يدعم أكثر من خريطة في الجلسة:
+// لو السكربت قيد التحميل من مكوّن آخر نصغي لـ load بدل حقن نسخة ثانية.
+function ensureLeaflet(onReady: () => void) {
+  if (!document.getElementById('leaflet-css')) {
+    const link = document.createElement('link');
+    link.id = 'leaflet-css';
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+  }
+  if (getL()) { onReady(); return; }
+  const existing = document.getElementById('leaflet-js') as HTMLScriptElement | null;
+  if (existing) { existing.addEventListener('load', onReady); return; }
+  const script = document.createElement('script');
+  script.id = 'leaflet-js';
+  script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  script.addEventListener('load', onReady);
+  document.head.appendChild(script);
+}
+
 export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObj = useRef<ReturnType<Leaflet['map']> | null>(null);
@@ -31,15 +51,7 @@ export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
   useEffect(() => {
     let active = true;
 
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id = 'leaflet-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
-
-    const init = () => {
+    ensureLeaflet(() => {
       const L = getL();
       if (!L || !mapRef.current || mapObj.current) return;
       const map = L.map(mapRef.current, { center: [24.77, 46.65], zoom: 11 });
@@ -48,16 +60,7 @@ export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
       }).addTo(map);
       mapObj.current = map;
       if (active) setReady(true);
-    };
-
-    if (getL()) {
-      init();
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      script.onload = init;
-      document.head.appendChild(script);
-    }
+    });
 
     return () => {
       active = false;
@@ -106,4 +109,59 @@ export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
   }, [points, ready]);
 
   return <div ref={mapRef} style={{ height: '480px', width: '100%' }} />;
+}
+
+// ── منتقي موقع الوحدة (لنموذج المكتب): نقرة على الخريطة = دبوس + إحداثيات ──
+// يُحدَّث الدبوس أيضاً من الخارج (lat/lng props) عندما يلصق المكتب رابطاً يُحلَّل.
+export function LocationPicker({ lat, lng, onPick }: {
+  lat?: number | null;
+  lng?: number | null;
+  onPick: (lat: number, lng: number) => void;
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapObj = useRef<ReturnType<Leaflet['map']> | null>(null);
+  const markerRef = useRef<ReturnType<Leaflet['marker']> | null>(null);
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
+  const [ready, setReady] = useState(false);
+
+  const setPin = (la: number, ln: number, pan: boolean) => {
+    const L = getL();
+    const map = mapObj.current;
+    if (!L || !map) return;
+    if (markerRef.current) markerRef.current.setLatLng([la, ln]);
+    else markerRef.current = L.marker([la, ln]).addTo(map);
+    if (pan) map.setView([la, ln], Math.max(map.getZoom(), 15));
+  };
+
+  useEffect(() => {
+    let active = true;
+    ensureLeaflet(() => {
+      const L = getL();
+      if (!L || !mapRef.current || mapObj.current) return;
+      const hasInit = typeof lat === 'number' && typeof lng === 'number';
+      const map = L.map(mapRef.current, {
+        center: hasInit ? [lat as number, lng as number] : [24.77, 46.65],
+        zoom: hasInit ? 15 : 11,
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+      map.on('click', (e: { latlng: { lat: number; lng: number } }) => {
+        setPin(e.latlng.lat, e.latlng.lng, false);
+        onPickRef.current(e.latlng.lat, e.latlng.lng);
+      });
+      mapObj.current = map;
+      if (hasInit) setPin(lat as number, lng as number, false);
+      if (active) setReady(true);
+    });
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // مزامنة الدبوس مع الإحداثيات القادمة من الخارج (لصق رابط مُحلَّل / فتح تعديل)
+  useEffect(() => {
+    if (!ready) return;
+    if (typeof lat === 'number' && typeof lng === 'number') setPin(lat, lng, true);
+  }, [lat, lng, ready]);
+
+  return <div ref={mapRef} style={{ height: '280px', width: '100%', borderRadius: '12px' }} />;
 }
