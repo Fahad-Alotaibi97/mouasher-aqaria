@@ -17,6 +17,8 @@ function errHint(e: PgErr | null | undefined): string {
   if (!e) return '';
   if (e.code === '42703')
     return 'الأعمدة الجديدة غير موجودة بعد — شغّل ملف supabase/admin_dashboard.sql في Supabase ثم أعد المحاولة.';
+  if (e.code === '42P17' || /infinite recursion/i.test(e.message || ''))
+    return 'سياسة RLS متكرّرة (recursion) على profiles — شغّل supabase/admin_clients.sql بنسخته الآمنة (is_admin_user) لإزالة السياسة القديمة المتكرّرة.';
   if (e.code === '42501' || /permission|policy|rls|denied/i.test(e.message || ''))
     return 'صلاحية مرفوضة — تأكّد من تسجيل الدخول بحساب المدير ومن تطبيق سياسات RLS (admin_dashboard.sql).';
   return e.message || 'حدث خطأ غير متوقع.';
@@ -176,18 +178,29 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   // زيارات الموقع (تحميلات صفحة) — أعداد COUNT دقيقة، null = تعذّر الجلب
   const [visits, setVisits] = useState<{ total: number; today: number; week: number } | null>(null);
   const [featureRank, setFeatureRank] = useState<{ key: string; label: string; count: number }[]>([]);
+  // المستخدمون المسجّلون (profiles) — null = تعذّرت القراءة (يُعرض سبب مفهوم بدل أرقام خاطئة)
+  const [profilesRows, setProfilesRows] = useState<{ role: string | null; is_admin: boolean | null; created_at: string }[] | null>(null);
+  const [profilesErr, setProfilesErr] = useState<PgErr | null>(null);
   const [err, setErr] = useState<PgErr | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
     const sb = createClient();
-    const [lr, or_, ldr, evr] = await Promise.all([
+    const [lr, or_, ldr, evr, pr0] = await Promise.all([
       sb.from('listings').select('id,title,hood,type,status,active,office_id'),
       sb.from('offices').select('id,name,status,active,verified'),
       sb.from('leads').select('listing_id,office_id,kind,created_at'),
       sb.from('analytics_events').select('type,ref_id,meta,created_at').order('created_at', { ascending: false }).limit(EVENTS_CAP),
+      sb.from('profiles').select('role,is_admin,created_at'),
     ]);
+    // المستخدمون المسجّلون — قراءة غير قاتلة: فشلها لا يُسقط اللوحة (تظهر رسالة مفهومة)
+    let pr = pr0;
+    if (pr.error && pr.error.code === '42703') {
+      pr = await sb.from('profiles').select('role,created_at') as typeof pr0;
+    }
+    if (pr.error) { setProfilesRows(null); setProfilesErr(pr.error); }
+    else { setProfilesRows((pr.data ?? []) as { role: string | null; is_admin: boolean | null; created_at: string }[]); setProfilesErr(null); }
     // أعمدة leads الموسّعة قد تغيب قبل ترحيلاتها — نتدرّج للأساسي بدل الانكسار
     let leadRows = (ldr.data ?? []) as AnaLead[];
     if (ldr.error && ldr.error.code === '42703') {
@@ -265,6 +278,17 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   ).size;
   const anyFeatureUse = featureRank.some((f) => f.count > 0);
 
+  // المستخدمون المسجّلون: أشخاص بحسابات فعلية (بعكس الزيارات المجهولة).
+  // المدير لا يُحسب ضمن «الباحثين» — له شارة خاصة في قسم العملاء.
+  const registered = profilesRows === null ? null : {
+    total: profilesRows.length,
+    seekers: profilesRows.filter((p) => (p.role ?? 'seeker') === 'seeker' && !p.is_admin).length,
+    offices: profilesRows.filter((p) => p.role === 'office').length,
+    week: profilesRows.filter((p) => new Date(p.created_at).getTime() >= weekAgo).length,
+  };
+  // كل مكتب له صف profiles حتماً ⇒ ملفات أقل من المكاتب = سياسة قراءة المدير ناقصة
+  const profilesIncomplete = registered !== null && registered.total < offices.length;
+
   // المكاتب الأكثر نشاطاً: عدد إعلانات + استفسارات واردة، مرتّبة بالاستفسارات ثم الإعلانات
   const officeListings = new Map<string, number>();
   listings.forEach((l) => { if (l.office_id) officeListings.set(l.office_id, (officeListings.get(l.office_id) ?? 0) + 1); });
@@ -309,6 +333,34 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
       )}
       {loading ? <Loading /> : !err && (
         <>
+          {/* ── المستخدمون المسجّلون (حسابات فعلية معروفة — بعكس الزيارات المجهولة) ── */}
+          {registered === null ? (
+            profilesErr && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-sm mb-3 leading-relaxed">
+                تعذّرت قراءة المستخدمين المسجّلين: {errHint(profilesErr)}
+              </div>
+            )
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <StatCard label="المستخدمون المسجّلون" val={registered.total} />
+                <StatCard label="باحثون مسجّلون" val={registered.seekers} />
+                <StatCard label="مكاتب مسجّلة" val={registered.offices} />
+                <StatCard label="مسجّلون جدد هذا الأسبوع" val={registered.week} />
+              </div>
+              <p className="text-[11px] text-[#5b6b7a] mt-2 mb-1 leading-relaxed">
+                «المسجّلون» أشخاص أنشؤوا حسابات فعلية على المنصة (تفاصيلهم في قسم «العملاء») —
+                بخلاف «الزيارات» أدناه: تحميلات صفحة تشمل الزوار المجهولين بلا حسابات.
+              </p>
+              {profilesIncomplete && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-sm mb-2 leading-relaxed">
+                  أرقام المسجّلين ناقصة ({fmtNum(registered.total)} ملفاً مقابل {fmtNum(offices.length)} مكتباً) —
+                  شغّل <b>supabase/admin_clients.sql</b> (سياسة profiles_admin_read الآمنة) ثم «تحديث».
+                </div>
+              )}
+            </>
+          )}
+
           {/* ── الزيارات (تحميلات صفحة — ليست أشخاصاً فريدين) ── */}
           {!eventsMissing && (
             <>
@@ -875,9 +927,12 @@ export function LeadsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
 // ════════════════════════════════════════════════════════════
 //  6) العملاء — كل الحسابات المسجّلة (مكاتب + باحثين) من جدول profiles
 // ════════════════════════════════════════════════════════════
-interface ClientRow { id: string; full_name: string | null; phone: string | null; role: string; created_at: string }
+interface ClientRow { id: string; full_name: string | null; phone: string | null; role: string; created_at: string; is_admin?: boolean | null }
 export function ClientsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const [rows, setRows] = useState<ClientRow[]>([]);
+  // عدد المكاتب (قراءة عامة) — مؤشر صادق على نقص سياسة profiles_admin_read:
+  // كل مكتب له صف profiles حتماً، فإن ظهر مكاتب أكثر من الملفات فالسياسة ناقصة.
+  const [officesCount, setOfficesCount] = useState(0);
   const [err, setErr] = useState<PgErr | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'office' | 'seeker'>('all');
@@ -885,8 +940,14 @@ export function ClientsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
     const sb = createClient();
-    const { data, error } = await sb.from('profiles').select('id,full_name,phone,role,created_at').order('created_at', { ascending: false });
-    if (error) setErr(error); else setRows((data ?? []) as ClientRow[]);
+    // is_admin مع تدرّج آمن إن غاب العمود (قبل تشغيل ترحيلاته)
+    let r = await sb.from('profiles').select('id,full_name,phone,role,created_at,is_admin').order('created_at', { ascending: false });
+    if (r.error && r.error.code === '42703') {
+      r = (await sb.from('profiles').select('id,full_name,phone,role,created_at').order('created_at', { ascending: false })) as unknown as typeof r;
+    }
+    if (r.error) setErr(r.error); else setRows((r.data ?? []) as ClientRow[]);
+    const oc = await sb.from('offices').select('id', { count: 'exact', head: true });
+    setOfficesCount(oc.count ?? 0);
     setLoading(false);
   }, []);
 
@@ -903,8 +964,14 @@ export function ClientsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
 
   return (
     <>
-      <SectionHead title="العملاء" subtitle="كل الحسابات المسجّلة (مكاتب + باحثين) من جدول profiles — الأحدث أولاً" onRefresh={load} />
+      <SectionHead title="العملاء" subtitle="كل الحسابات المسجّلة (مكاتب + باحثين) من جدول profiles — الأحدث أولاً، للعرض فقط" onRefresh={load} />
       {err && <ErrBox e={err} />}
+      {!err && !loading && rows.length < officesCount && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-sm mb-3 leading-relaxed">
+          القائمة ناقصة: يظهر {fmtNum(rows.length)} ملفاً بينما المكاتب وحدها {fmtNum(officesCount)} — سياسة قراءة المدير غير مفعّلة بعد.
+          شغّل <b>supabase/admin_clients.sql</b> (النسخة الآمنة عبر is_admin_user — بلا recursion) ثم اضغط «تحديث».
+        </div>
+      )}
       <div className="flex gap-2 mb-3">
         {(['all', 'office', 'seeker'] as const).map((f) => (
           <button key={f} onClick={() => setFilter(f)}
@@ -923,7 +990,12 @@ export function ClientsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
               <div key={c.id} className={`${card} p-4`}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-bold text-[#0f1a28] text-sm">{c.full_name || '— بلا اسم —'}</div>
+                    <div className="font-bold text-[#0f1a28] text-sm flex items-center gap-2 flex-wrap">
+                      {c.full_name || '— بلا اسم —'}
+                      {c.is_admin && (
+                        <span className="text-[10px] bg-[#C9A84C] text-[#0A3D62] px-2 py-0.5 rounded font-bold">مدير المنصة</span>
+                      )}
+                    </div>
                     {c.phone && <div className="text-xs text-[#1B6CA8] mt-0.5" dir="ltr" style={{ textAlign: 'right' }}>{c.phone}</div>}
                     <div className="text-[11px] text-[#33414f] mt-1">مسجّل: {fmtDate(c.created_at)}</div>
                   </div>
