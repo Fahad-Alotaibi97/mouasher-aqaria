@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
 import dynamic from 'next/dynamic';
@@ -124,6 +124,9 @@ export default function Home() {
   const [selectedListing, setSelectedListing] = useState<UIListing | null>(null);
   // بيانات المكتب المعلِن للإعلان المفتوح (حقيقية من جدول offices عبر office_id)
   const [selectedOffice, setSelectedOffice] = useState<{ name: string; fal_license: string | null; verified: boolean } | null>(null);
+  // معرض الصور بملء الشاشة (lightbox): قائمة كل صور الوحدة بالترتيب + المؤشر الحالي.
+  const [lightbox, setLightbox] = useState<{ shots: { label: string; url: string }[]; idx: number } | null>(null);
+  const lbTouch = useRef<number | null>(null); // نقطة بدء اللمس لاكتشاف السحب (swipe)
   // نموذج التواصل بخصوص إعلان محدّد — يُحفظ في leads مربوطاً بالمكتب والإعلان
   const [ctOpen, setCtOpen] = useState(false);
   const [ctName, setCtName] = useState('');
@@ -176,6 +179,23 @@ export default function Home() {
     })();
     return () => { cancelled = true; };
   }, [selectedListing?.office_id]);
+
+  // تنقّل المعرض (دائري مع لفّ عند الأطراف) — dir: ‎+1‎ التالي، ‎-1‎ السابق.
+  const lbGo = (dir: number) =>
+    setLightbox((lb) => (lb ? { ...lb, idx: (lb.idx + dir + lb.shots.length) % lb.shots.length } : lb));
+
+  // مفاتيح المعرض: Esc يغلق، الأسهم تتنقّل (RTL: يسار=التالي، يمين=السابق).
+  const lbOpen = !!lightbox;
+  useEffect(() => {
+    if (!lbOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightbox(null);
+      else if (e.key === 'ArrowLeft') lbGo(1);
+      else if (e.key === 'ArrowRight') lbGo(-1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lbOpen]);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authEmail, setAuthEmail] = useState('');
   const [authPass, setAuthPass] = useState('');
@@ -1191,13 +1211,17 @@ export default function Home() {
                   if (!shots.length) return null;
                   return (
                     <div>
-                      <div className="text-sm font-bold text-gray-800 mb-2">صور الوحدة</div>
+                      <div className="text-sm font-bold text-gray-800 mb-2">صور الوحدة <span className="text-xs font-normal text-gray-400">(اضغط الصورة للتكبير)</span></div>
                       <div className="grid grid-cols-2 gap-2">
                         {shots.map((s, i) => (
-                          <figure key={i} className="relative rounded-xl overflow-hidden border border-gray-200">
+                          <figure key={i} onClick={() => setLightbox({ shots, idx: i })}
+                            className="relative rounded-xl overflow-hidden border border-gray-200 cursor-pointer group">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={s.url} alt={s.label} className="w-full h-28 object-cover" />
+                            <img src={s.url} alt={s.label} className="w-full h-28 object-cover transition-transform group-hover:scale-[1.04]" />
                             <figcaption className="absolute bottom-0 inset-x-0 bg-black/45 text-white text-[11px] px-2 py-1 text-right">{s.label}</figcaption>
+                            <span className="absolute top-1.5 left-1.5 bg-black/45 text-white rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                            </span>
                           </figure>
                         ))}
                       </div>
@@ -1252,6 +1276,68 @@ export default function Home() {
                 )}
               </div>
             </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══ معرض الصور بملء الشاشة (lightbox) — فوق بطاقة التفاصيل، بلا مكتبة خارجية ═══ */}
+      {lightbox && (() => {
+        const { shots, idx } = lightbox;
+        const cur = shots[idx];
+        const many = shots.length > 1;
+        return (
+          <div
+            dir="rtl"
+            onClick={() => setLightbox(null)}
+            onTouchStart={(e) => { lbTouch.current = e.touches[0]?.clientX ?? null; }}
+            onTouchEnd={(e) => {
+              const start = lbTouch.current;
+              if (start == null || !many) return;
+              const dx = (e.changedTouches[0]?.clientX ?? start) - start;
+              if (Math.abs(dx) > 45) lbGo(dx < 0 ? 1 : -1); // سحب لليسار = التالي
+              lbTouch.current = null;
+            }}
+            className="fixed inset-0 z-[2100] bg-black/90 flex items-center justify-center select-none"
+          >
+            {/* شريط علوي: التسمية + العدّاد + إغلاق */}
+            <div className="absolute top-0 inset-x-0 flex items-center justify-between px-4 py-3 text-white" onClick={(e) => e.stopPropagation()}>
+              <div className="text-sm font-bold flex items-center gap-2">
+                <span>{cur.label}</span>
+                {many && <span className="text-white/70 text-xs">{(idx + 1).toLocaleString('ar-SA')} / {shots.length.toLocaleString('ar-SA')}</span>}
+              </div>
+              <button onClick={() => setLightbox(null)} aria-label="إغلاق"
+                className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-2xl leading-none flex items-center justify-center transition-colors">×</button>
+            </div>
+
+            {/* الصورة — تحجيم contain (بلا قص) */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={cur.url} alt={cur.label} onClick={(e) => e.stopPropagation()}
+              className="max-w-[92vw] max-h-[78vh] object-contain rounded-lg shadow-2xl" />
+
+            {/* أسهم التنقّل (RTL: يمين = السابق، يسار = التالي) */}
+            {many && (
+              <>
+                <button onClick={(e) => { e.stopPropagation(); lbGo(-1); }} aria-label="السابق"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center transition-colors">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 6l6 6-6 6" /></svg>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); lbGo(1); }} aria-label="التالي"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 hover:bg-white/30 text-white flex items-center justify-center transition-colors">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 6l-6 6 6 6" /></svg>
+                </button>
+              </>
+            )}
+
+            {/* شريط مصغّرات سفلي — قفزة مباشرة لأي صورة */}
+            {many && (
+              <div className="absolute bottom-3 inset-x-0 flex gap-2 justify-center overflow-x-auto px-4" onClick={(e) => e.stopPropagation()}>
+                {shots.map((s, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={s.url} alt={s.label} onClick={() => setLightbox({ shots, idx: i })}
+                    className={`h-12 w-16 object-cover rounded-md cursor-pointer flex-shrink-0 border-2 transition-all ${i === idx ? 'border-white' : 'border-transparent opacity-60 hover:opacity-100'}`} />
+                ))}
+              </div>
+            )}
           </div>
         );
       })()}
