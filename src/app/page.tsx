@@ -665,12 +665,15 @@ export default function Home() {
                 <span className="font-bold text-sm text-gray-900">الخريطة التفاعلية</span>
                 <span className="text-xs text-[#33414f] mr-auto">{filteredMapPoints.length} عقار على الخريطة</span>
               </div>
-              {filteredMapPoints.length === 0 ? (
-                <div className="p-8 text-center text-[#33414f] text-sm">
-                  {listings.length === 0 ? 'لا توجد إعلانات متاحة حالياً.' : 'لا توجد عقارات بإحداثيات مطابقة للفلاتر الحالية.'}
+              {/* الخريطة تُعرض دائماً وتفاعلية (تحمّل Leaflet دائماً) — الإعلانات بلا
+                  إحداثيات لا تضع دبوساً فقط، والخريطة تبقى تعمل (تصفّح/تكبير). */}
+              <MapComponent points={filteredMapPoints} />
+              {filteredMapPoints.length === 0 && (
+                <div className="px-4 py-3 text-center text-[#33414f] text-xs border-t border-gray-100">
+                  {listings.length === 0
+                    ? 'لا توجد إعلانات متاحة حالياً — تصفّح الخريطة، وتظهر الدبابيس فور نشر المكاتب لإعلاناتها بمواقعها.'
+                    : 'لا توجد عقارات بإحداثيات ضمن الفلاتر الحالية — تصفّح الخريطة، وتظهر الدبابيس للإعلانات التي حُدّد موقعها على الخريطة.'}
                 </div>
-              ) : (
-                <MapComponent points={filteredMapPoints} />
               )}
             </div>
 

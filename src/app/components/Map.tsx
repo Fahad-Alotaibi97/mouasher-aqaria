@@ -114,8 +114,17 @@ export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
     // لا نكبّر مع كل إعادة رسم حتى لا نُلغي تحريك/تكبير المستخدم اليدوي بين الفلاتر.
     const sig = points.map((p) => p.id).join('|');
     if (points.length && sig !== fitSigRef.current) {
-      const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]));
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+      try {
+        if (points.length === 1) {
+          // نقطة واحدة: لا bounds لها مساحة — نضبط المركز بزووم آمن بدل fitBounds.
+          map.setView([points[0].lat, points[0].lng], 15);
+        } else {
+          const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]));
+          if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+        }
+      } catch {
+        // تكبير الخريطة كماليّ — أي خطأ هنا لا يجوز أن يكسر عرض الخريطة نفسها.
+      }
     }
     fitSigRef.current = sig;
   }, [points, ready]);
