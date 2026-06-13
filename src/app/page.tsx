@@ -227,14 +227,27 @@ export default function Home() {
     const m = mktAvg[l.hood];
     return m ? fairForType(m, l.type) : l.adv; // الرجوع للسعر المُعلن إن لم يوجد متوسط للحي
   };
-  // نقاط الخريطة من أي قائمة (الإعلانات التي لها إحداثيات فقط)
-  const toPoints = (list: UIListing[]) =>
-    list
-      .filter((l) => typeof l.lat === 'number' && typeof l.lng === 'number')
-      .map((l) => {
-        const fair = getFair(l);
-        return { id: l.id, lat: l.lat as number, lng: l.lng as number, title: l.title, adv: l.adv, fair, st: getSt(l.adv, fair) };
-      });
+  // نقاط الخريطة من أي قائمة. مصدر الإحداثيات بالأولوية:
+  //  1) عمودا lat/lng الرقميان (من منتقي الخريطة أو من تحليل سابق).
+  //  2) اشتقاقها من maps_url إن كان رابطاً كاملاً يحوي إحداثيات (@lat,lng / !3d!4d /
+  //     ?q=lat,lng …) — فتُضاء الإعلانات القديمة على الخريطة بلا إعادة إدخال.
+  // الروابط المختصرة (maps.app.goo.gl) لا تحوي إحداثيات في نصّها فلا يمكن فكّها من
+  // المتصفح ⇒ لا دبوس لها (يبقى زر «الموقع على الخريطة» يعمل عبر الرابط نفسه).
+  const toPoints = (list: UIListing[]) => {
+    const pts: { id: string | number; lat: number; lng: number; title: string; adv: number; fair: number; st: string }[] = [];
+    for (const l of list) {
+      let lat = typeof l.lat === 'number' ? l.lat : null;
+      let lng = typeof l.lng === 'number' ? l.lng : null;
+      if ((lat === null || lng === null) && l.maps_url) {
+        const c = parseMapsUrl(l.maps_url);
+        if (c) { lat = c.lat; lng = c.lng; }
+      }
+      if (lat === null || lng === null) continue;
+      const fair = getFair(l);
+      pts.push({ id: l.id, lat, lng, title: l.title, adv: l.adv, fair, st: getSt(l.adv, fair) });
+    }
+    return pts;
+  };
 
   const submitLead = async () => {
     if (!leadName.trim() || !leadPhone.trim() || leadSending) return;
@@ -1691,8 +1704,10 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         description: fDesc.trim() || null,
         // موقع الوحدة: الإحداثيات (من الخريطة أو من تحليل الرابط) + الرابط الملصوق
         // كما هو (للروابط المختصرة) — زر «الموقع على الخريطة» يفضّل الإحداثيات.
-        lat: fLat,
-        lng: fLng,
+        // تحليل احتياطي وقت الحفظ: إن لم تُضبط الإحداثيات بعد لكن الرابط الملصوق
+        // رابط كامل يحوي إحداثيات، نستخرجها ونخزّنها رقمياً ليظهر الدبوس مباشرة.
+        lat: fLat ?? parseMapsUrl(fMapsLink)?.lat ?? null,
+        lng: fLng ?? parseMapsUrl(fMapsLink)?.lng ?? null,
         maps_url: isMapsUrl(fMapsLink) ? fMapsLink.trim() : null,
       };
       // أعمدة الصور: تُكتب دائماً عند الإدراج؛ وعند التعديل فقط إن وُجدت صور جديدة
@@ -2051,13 +2066,13 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                         placeholder="https://maps.app.goo.gl/… أو الرابط من شريط العنوان"
                         className={inputCls + ' text-left'}
                       />
-                      <div className={`text-[11px] mt-1.5 leading-relaxed ${!fMapsLink.trim() ? 'text-gray-400' : parseMapsUrl(fMapsLink) || isMapsUrl(fMapsLink) ? 'text-green-700' : 'text-orange-600'}`}>
+                      <div className={`text-[11px] mt-1.5 leading-relaxed ${!fMapsLink.trim() ? 'text-gray-400' : parseMapsUrl(fMapsLink) ? 'text-green-700' : isMapsUrl(fMapsLink) ? 'text-amber-600' : 'text-orange-600'}`}>
                         {!fMapsLink.trim()
                           ? 'افتح خرائط Google، ضع دبوساً على الوحدة، انسخ الرابط والصقه هنا.'
                           : parseMapsUrl(fMapsLink)
-                            ? `تم استخراج الإحداثيات ✓ (${fLat?.toFixed(5)}, ${fLng?.toFixed(5)})`
+                            ? `تم استخراج الإحداثيات ✓ (${fLat?.toFixed(5)}, ${fLng?.toFixed(5)}) — سيظهر دبوس الوحدة على خريطة البحث.`
                             : isMapsUrl(fMapsLink)
-                              ? 'رابط خرائط مختصر — سيُحفظ كما هو ويفتح موقع الوحدة مباشرة ✓'
+                              ? 'رابط مختصر (goo.gl) لا يحوي إحداثيات — زر «الموقع على الخريطة» سيعمل، لكن لن يظهر دبوس على خريطة البحث. لإظهار الدبوس استخدم «حدّد على الخريطة» أعلاه، أو الصق الرابط الكامل من شريط عنوان خرائط Google (يحوي ‎@lat,lng‎).'
                               : 'هذا لا يبدو رابط خرائط Google — انسخه من تطبيق أو موقع الخرائط.'}
                       </div>
                     </div>

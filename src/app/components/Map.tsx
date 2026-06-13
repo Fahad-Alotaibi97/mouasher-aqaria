@@ -129,7 +129,8 @@ export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
     fitSigRef.current = sig;
   }, [points, ready]);
 
-  return <div ref={mapRef} style={{ height: '480px', width: '100%' }} />;
+  // ارتفاع متجاوب: ~300px جوال / ~350px سطح المكتب — لا يطغى على الصفحة ولا يُحجب بالدرج.
+  return <div ref={mapRef} className="w-full h-[300px] md:h-[350px]" />;
 }
 
 // ── منتقي موقع الوحدة (لنموذج المكتب): نقرة على الخريطة = دبوس + إحداثيات ──
