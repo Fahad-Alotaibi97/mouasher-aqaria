@@ -1448,7 +1448,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [listsErr, setListsErr] = useState('');
 
   // ── بيانات المكتب الحقيقية (مربوطة بالحساب الحالي عبر owner_id) ──
-  const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; phone: string | null; verified: boolean; status: string | null; active: boolean } | null>(null);
+  const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; phone: string | null; email: string | null; bio: string | null; verified: boolean; status: string | null; active: boolean } | null>(null);
   const [myListings, setMyListings] = useState<{ id: string; title: string; advertised: number; status: string; rejection_note: string | null }[]>([]);
   const [myLeads, setMyLeads] = useState<{ id: string; name: string; phone: string; message: string | null; created_at: string; handled?: boolean | null; kind?: string | null }[]>([]);
   const [offLoaded, setOffLoaded] = useState(false);
@@ -1459,6 +1459,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [supSending, setSupSending] = useState(false);
   const [supSent, setSupSent] = useState(false);
   const [supErr, setSupErr] = useState('');
+
+  // «ملف المكتب» — حقول قابلة للتعديل تُحفظ فعلاً في offices (الاسم/الجوال/البريد/النبذة).
+  const [pfName, setPfName] = useState('');
+  const [pfPhone, setPfPhone] = useState('');
+  const [pfEmail, setPfEmail] = useState('');
+  const [pfBio, setPfBio] = useState('');
+  const [pfSaving, setPfSaving] = useState(false);
+  const [pfMsg, setPfMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // نموذج إنشاء المكتب داخل اللوحة (يضمن ربط أي حساب بمكتب بشكل موثوق)
   const [newOfficeName, setNewOfficeName] = useState('');
@@ -1478,14 +1486,18 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     const sb = createClient();
     const uid = await currentUid(sb);
     if (!uid) { setMyOffice(null); setOffLoaded(true); return; }
-    // مع عمود phone إن وُجد؛ وإلا (قبل تشغيل add_office_phone.sql) بالأعمدة الأساسية
-    type OffRow = { id: string; name: string; fal_license: string | null; phone?: string | null; verified: boolean; status: string | null; active: boolean };
-    let offsRes = await sb.from('offices').select('id,name,fal_license,phone,verified,status,active').eq('owner_id', uid).order('created_at', { ascending: false }).limit(1);
+    // نتدرّج: مع phone+email+bio إن وُجدت (بعد office_profile_fields.sql)، ثم مع phone
+    // فقط (بعد add_office_phone.sql)، وإلا بالأعمدة الأساسية — فلا تنكسر القراءة قبل SQL.
+    type OffRow = { id: string; name: string; fal_license: string | null; phone?: string | null; email?: string | null; bio?: string | null; verified: boolean; status: string | null; active: boolean };
+    let offsRes = await sb.from('offices').select('id,name,fal_license,phone,email,bio,verified,status,active').eq('owner_id', uid).order('created_at', { ascending: false }).limit(1);
+    if (offsRes.error) {
+      offsRes = await sb.from('offices').select('id,name,fal_license,phone,verified,status,active').eq('owner_id', uid).order('created_at', { ascending: false }).limit(1) as typeof offsRes;
+    }
     if (offsRes.error) {
       offsRes = await sb.from('offices').select('id,name,fal_license,verified,status,active').eq('owner_id', uid).order('created_at', { ascending: false }).limit(1) as typeof offsRes;
     }
     const off = ((offsRes.data && offsRes.data[0]) || null) as OffRow | null;
-    setMyOffice(off ? { ...off, phone: off.phone ?? null } : null);
+    setMyOffice(off ? { ...off, phone: off.phone ?? null, email: off.email ?? null, bio: off.bio ?? null } : null);
     if (off) {
       const { data: ls } = await sb.from('listings').select('id,title,advertised,status,rejection_note').eq('office_id', off.id).order('created_at', { ascending: false });
       setMyListings((ls ?? []) as typeof myListings);
@@ -1669,6 +1681,50 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   useEffect(() => { reloadOffice(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   // تعبئة حقل جوال الدعم تلقائياً من جوال المكتب المحفوظ (auto-use) — وإن لم يكن محفوظاً يبقى فارغاً ليُطلب.
   useEffect(() => { if (myOffice?.phone) setSupPhone(myOffice.phone); }, [myOffice?.phone]);
+  // تعبئة نموذج «ملف المكتب» بالقيم المحفوظة عند تحميل المكتب (لا قيم ثابتة — من القاعدة).
+  useEffect(() => {
+    if (!myOffice) return;
+    setPfName(myOffice.name || '');
+    setPfPhone(myOffice.phone || '');
+    setPfEmail(myOffice.email || '');
+    setPfBio(myOffice.bio || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myOffice?.id]);
+
+  // حفظ ملف المكتب — يحدّث الأعمدة غير المتعلّقة بالثقة فقط (name/phone/email/bio).
+  // الـ trigger enforce_office_trust يجمّد status/verified/active، فلا يتغيّر التوثيق.
+  const saveProfile = async () => {
+    if (!myOffice) return;
+    const name = pfName.trim();
+    if (!name) { setPfMsg({ ok: false, text: 'أدخل اسم المكتب.' }); return; }
+    const phone = pfPhone.trim();
+    // الجوال = نفس رقم واتساب لردود الإدارة ⇒ يجب أن يبقى سعودياً صحيحاً.
+    if (!isSaudiMobile(phone)) { setPfMsg({ ok: false, text: 'أدخل رقم جوال سعودي صحيح (مثال: 05XXXXXXXX) — يُستخدم لردود الإدارة عبر واتساب.' }); return; }
+    const email = pfEmail.trim();
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setPfMsg({ ok: false, text: 'البريد الإلكتروني غير صحيح.' }); return; }
+    const bio = pfBio.trim();
+    setPfSaving(true); setPfMsg(null);
+    try {
+      const sb = createClient();
+      const payload: Record<string, unknown> = { name, phone, email: email || null, bio: bio || null };
+      let { error } = await sb.from('offices').update(payload).eq('id', myOffice.id);
+      // تدرّج آمن: عمود اختياري مفقود (قبل office_profile_fields.sql) ⇒ أسقطه وأعد المحاولة.
+      while (error && (error.code === 'PGRST204' || error.code === '42703')) {
+        const col = /'([^']+)' column/.exec(error.message || '')?.[1];
+        if (col && col in payload) { delete payload[col]; ({ error } = await sb.from('offices').update(payload).eq('id', myOffice.id)); }
+        else break;
+      }
+      if (error) {
+        setPfMsg({ ok: false, text: error.code === '42501' ? 'الحفظ محجوب بسياسة الحماية (RLS).' : 'تعذّر الحفظ: ' + error.message });
+        setPfSaving(false); return;
+      }
+      setPfMsg({ ok: true, text: 'تم حفظ بيانات المكتب ✓' });
+      await reloadOffice(); // إعادة قراءة القيم المحفوظة من القاعدة لتظهر بعد التحديث
+    } catch {
+      setPfMsg({ ok: false, text: 'تعذّر الحفظ حالياً — حاول لاحقاً.' });
+    }
+    setPfSaving(false);
+  };
   const activeCount = myListings.filter((l) => l.status === 'approved').length;
   const pendingCount = myListings.filter((l) => l.status === 'pending').length;
 
@@ -2426,17 +2482,26 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
               </div>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div><label className="text-xs text-gray-700 font-semibold block mb-1">اسم المكتب</label>
-                  <input key={myOffice?.id || 'noffice'} defaultValue={myOffice?.name || ''} placeholder="اسم المكتب" className={inputCls} /></div>
+                  <input value={pfName} onChange={(e) => setPfName(e.target.value)} placeholder="اسم المكتب" className={inputCls} /></div>
                 <div><label className="text-xs text-gray-700 font-semibold block mb-1">رقم رخصة فال</label>
-                  <input key={(myOffice?.id || 'noffice') + '-fal'} defaultValue={myOffice?.fal_license || ''} disabled className={`${inputCls} bg-gray-50 text-gray-400`} /></div>
+                  <input value={myOffice?.fal_license || ''} disabled placeholder="—" className={`${inputCls} bg-gray-50 text-gray-400`} />
+                  <div className="text-[11px] text-gray-400 mt-1">الرخصة مرتبطة بالتوثيق ولا تُعدّل من هنا.</div></div>
                 <div><label className="text-xs text-gray-700 font-semibold block mb-1">رقم الجوال</label>
-                  <input placeholder="05xxxxxxxx" className={inputCls} /></div>
+                  <input value={pfPhone} onChange={(e) => setPfPhone(e.target.value)} dir="ltr" type="tel" placeholder="05xxxxxxxx" className={`${inputCls} text-left`} />
+                  <div className="text-[11px] text-gray-400 mt-1">يُستخدم لردود إدارة المنصة عبر واتساب.</div></div>
                 <div><label className="text-xs text-gray-700 font-semibold block mb-1">البريد الإلكتروني</label>
-                  <input placeholder="name@example.com" className={inputCls} /></div>
+                  <input value={pfEmail} onChange={(e) => setPfEmail(e.target.value)} dir="ltr" type="email" placeholder="name@example.com" className={`${inputCls} text-left`} /></div>
               </div>
               <div className="mb-4"><label className="text-xs text-gray-700 font-semibold block mb-1">نبذة عن المكتب</label>
-                <textarea rows={3} placeholder="نبذة مختصرة عن مكتبك وخدماته…" className={`${inputCls} resize-none`} /></div>
-              <div className="text-xs text-gray-400">بيانات المكتب الأساسية (الاسم والرخصة) مرتبطة بحسابك في القاعدة.</div>
+                <textarea value={pfBio} onChange={(e) => setPfBio(e.target.value)} rows={3} maxLength={400} placeholder="نبذة مختصرة عن مكتبك وخدماته…" className={`${inputCls} resize-none`} />
+                <div className="text-[11px] text-gray-400 mt-1">{pfBio.length}/400</div></div>
+              {pfMsg && (
+                <div className={`mb-3 text-sm rounded-xl p-3 border ${pfMsg.ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>{pfMsg.text}</div>
+              )}
+              <button onClick={saveProfile} disabled={pfSaving || !myOffice}
+                className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50">
+                {pfSaving ? 'جارٍ الحفظ…' : 'حفظ'}
+              </button>
             </div>
           </div>
         )}
@@ -2446,12 +2511,11 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
           <div>
             <div className="text-xl font-bold text-gray-900 mb-5">الإعدادات</div>
             <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm mb-4">
-              <div className="font-bold text-gray-900 mb-4">الإشعارات</div>
-              <div className="space-y-3">
-                <div><label className="text-xs text-gray-700 font-semibold block mb-1">إشعارات الاستفسارات</label>
-                  <select className={selectCls}><option>فورياً</option><option>كل ساعة</option><option>يومياً</option><option>إيقاف</option></select></div>
-                <div><label className="text-xs text-gray-700 font-semibold block mb-1">تقارير الإحصائيات</label>
-                  <select className={selectCls}><option>أسبوعياً</option><option>شهرياً</option><option>إيقاف</option></select></div>
+              <div className="font-bold text-gray-900 mb-1">الإشعارات</div>
+              {/* لا نظام إشعارات/بريد دوري بعد — لا نعرض مفاتيح وهمية تدّعي الحفظ. */}
+              <div className="text-sm text-gray-500 leading-relaxed">
+                إشعارات الاستفسارات والتقارير الدورية <span className="font-semibold text-amber-600">— قريباً</span>.
+                حالياً تصلك استفسارات الباحثين مباشرةً في صفحة «الاستفسارات»، مع تنبيه بعددها غير المقروء في القائمة الجانبية.
               </div>
             </div>
             <div className="bg-gradient-to-l from-green-600 to-green-500 rounded-xl p-5 text-white">
