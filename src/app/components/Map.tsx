@@ -41,12 +41,15 @@ function ensureLeaflet(onReady: () => void) {
   document.head.appendChild(script);
 }
 
-export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
+export default function MapComponent({ points = [], onSelect }: { points?: MapPoint[]; onSelect?: (id: string | number) => void }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObj = useRef<ReturnType<Leaflet['map']> | null>(null);
   const layerRef = useRef<ReturnType<Leaflet['layerGroup']> | null>(null);
   // توقيع مجموعة النقاط آخر مرة كُبّرت إليها الخريطة — لتمييز «تغيّر الفلتر» عن إعادة الرسم العادية
   const fitSigRef = useRef<string>('');
+  // مرجع ثابت لمعالج «عرض التفاصيل» حتى يصله أحدث callback دون إعادة ربط العلامات
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
   const [ready, setReady] = useState(false);
 
   // تحميل Leaflet وتهيئة الخريطة مرة واحدة
@@ -61,11 +64,18 @@ export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
         attribution: '© OpenStreetMap',
       }).addTo(map);
       mapObj.current = map;
+      // تأكيد ملء البلاطات للحاوية الفعلية بعد التركيب (إصلاح حجم متأخّر).
+      setTimeout(() => map.invalidateSize(), 0);
       if (active) setReady(true);
     });
 
+    // إعادة حساب حجم الخريطة عند تغيّر مقاس النافذة (تبديل سطح المكتب/الجوال).
+    const onResize = () => mapObj.current?.invalidateSize();
+    window.addEventListener('resize', onResize);
+
     return () => {
       active = false;
+      window.removeEventListener('resize', onResize);
     };
   }, []);
 
@@ -101,9 +111,17 @@ export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
               '<strong style="color:#1B6CA8">' + l.fair.toLocaleString('ar-SA') + ' ريال</strong>' +
             '</div>' +
           '</div>' +
-          '<div style="text-align:center"><span style="background:' + color + '22;color:' + color + ';font-size:11px;padding:3px 10px;border-radius:8px;font-weight:700">' + (labels[l.st] || '') + '</span></div>' +
+          '<div style="text-align:center;margin-bottom:8px"><span style="background:' + color + '22;color:' + color + ';font-size:11px;padding:3px 10px;border-radius:8px;font-weight:700">' + (labels[l.st] || '') + '</span></div>' +
+          '<button class="ms-detail-btn" style="width:100%;background:#0A3D62;color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;font-family:Tajawal,sans-serif;cursor:pointer">عرض التفاصيل</button>' +
         '</div>';
-      L.marker([l.lat, l.lng], { icon }).addTo(group).bindPopup(popup, { maxWidth: 230 });
+      const marker = L.marker([l.lat, l.lng], { icon }).bindPopup(popup, { maxWidth: 240 });
+      // زر «عرض التفاصيل» داخل النافذة المنبثقة ⇒ يفتح بطاقة التفاصيل الكاملة (Aqar-style).
+      marker.on('popupopen', () => {
+        const root = marker.getPopup()?.getElement();
+        const btn = root?.querySelector('.ms-detail-btn') as HTMLButtonElement | null;
+        if (btn) btn.onclick = () => onSelectRef.current?.(l.id);
+      });
+      marker.addTo(group);
     });
 
     group.addTo(map);
@@ -129,8 +147,8 @@ export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
     fitSigRef.current = sig;
   }, [points, ready]);
 
-  // ارتفاع متجاوب: ~300px جوال / ~350px سطح المكتب — لا يطغى على الصفحة ولا يُحجب بالدرج.
-  return <div ref={mapRef} className="w-full h-[300px] md:h-[350px]" />;
+  // ارتفاع متجاوب: ~280px جوال / ~320px سطح المكتب — لا يطغى على الصفحة ولا يُحجب بالدرج.
+  return <div ref={mapRef} className="w-full h-[280px] md:h-[320px]" />;
 }
 
 // ── منتقي موقع الوحدة (لنموذج المكتب): نقرة على الخريطة = دبوس + إحداثيات ──

@@ -110,15 +110,17 @@ export default function SiteNav({ active, onNavigate, user, isAdmin, isOffice, o
       </nav>
 
       {/* ===== الغطاء ===== */}
+      {/* z مرتفع جداً (1900/2000) ليبقى الغطاء والدرج فوق أي عنصر Leaflet (panes/controls
+          تصل z-index ~400–1000) فلا تُغطّي الخريطةُ القائمةَ عند فتحها. */}
       <div
         onClick={() => setOpen(false)}
-        className={`fixed inset-0 z-[60] bg-[#0A3D62]/40 transition-opacity duration-300 ${open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-[1900] bg-[#0A3D62]/40 transition-opacity duration-300 ${open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       />
 
       {/* ===== الدرج الجانبي (من اليمين) ===== */}
       <aside
         dir="rtl"
-        className={`fixed top-0 right-0 h-full w-[290px] max-w-[85vw] z-[70] bg-gradient-to-b from-[#0A3D62] to-[#1B6CA8] overflow-y-auto transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed top-0 right-0 h-full w-[290px] max-w-[85vw] z-[2000] bg-gradient-to-b from-[#0A3D62] to-[#1B6CA8] overflow-y-auto transition-transform duration-300 ease-out ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* رأس الدرج */}
         <div className="flex items-center justify-between px-5 pb-4 pt-5 mb-3 border-b border-white/15">

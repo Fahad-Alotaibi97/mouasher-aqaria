@@ -122,6 +122,8 @@ export default function Home() {
   const [inqSending, setInqSending] = useState(false);
   const [inqErr, setInqErr] = useState<string | null>(null);
   const [selectedListing, setSelectedListing] = useState<UIListing | null>(null);
+  // بيانات المكتب المعلِن للإعلان المفتوح (حقيقية من جدول offices عبر office_id)
+  const [selectedOffice, setSelectedOffice] = useState<{ name: string; fal_license: string | null; verified: boolean } | null>(null);
   // نموذج التواصل بخصوص إعلان محدّد — يُحفظ في leads مربوطاً بالمكتب والإعلان
   const [ctOpen, setCtOpen] = useState(false);
   const [ctName, setCtName] = useState('');
@@ -156,6 +158,24 @@ export default function Home() {
     })();
     return () => { cancelled = true; };
   }, [user]);
+
+  // عند فتح تفاصيل إعلان: جلب بيانات مكتبه المعلِن (اسم/رخصة/توثيق) من offices عبر
+  // office_id — قراءة عامة (سياسة offices_read)، وبيانات حقيقية فقط؛ ما لا يوجد يُخفى.
+  useEffect(() => {
+    const oid = selectedListing?.office_id;
+    if (!oid || !isSupabaseConfigured()) { setSelectedOffice(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const sb = createClient();
+        const { data } = await sb.from('offices').select('name, fal_license, verified').eq('id', oid).single();
+        if (cancelled) return;
+        const d = data as { name?: string; fal_license?: string | null; verified?: boolean } | null;
+        setSelectedOffice(d ? { name: d.name ?? '', fal_license: d.fal_license ?? null, verified: !!d.verified } : null);
+      } catch { if (!cancelled) setSelectedOffice(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedListing?.office_id]);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authEmail, setAuthEmail] = useState('');
   const [authPass, setAuthPass] = useState('');
@@ -470,6 +490,14 @@ export default function Home() {
     return c;
   };
 
+  // فتح بطاقة تفاصيل الإعلان (من بطاقة القائمة أو دبوس الخريطة) — يسجّل النقرة ويصفّر نموذج التواصل.
+  const openListing = (l: UIListing) => {
+    track('listing_click', String(l.id), { hood: l.hood, type: l.type });
+    setSelectedListing(l);
+    setCtOpen(false); setCtSent(false); setCtErr(null);
+    setCtName(''); setCtPhone(''); setCtMsg('');
+  };
+
   const renderListing = (l: UIListing, isMatch = false) => {
     const fair = getFair(l);
     const st = getSt(l.adv, fair);
@@ -478,7 +506,7 @@ export default function Home() {
     const chips = attrChips(l);
     const vBadge = st === 'hi' ? 'bg-[#fff3e0] text-[#C2410C]' : st === 'lo' ? 'bg-[#e8f7ee] text-[#1f7a44]' : 'bg-[#e6f1fb] text-[#1B6CA8]';
     return (
-      <div key={l.id} onClick={() => { track('listing_click', String(l.id), { hood: l.hood, type: l.type }); setSelectedListing(l); setCtOpen(false); setCtSent(false); setCtErr(null); setCtName(''); setCtPhone(''); setCtMsg(''); }}
+      <div key={l.id} onClick={() => openListing(l)}
         className={`card-fade bg-white rounded-2xl border overflow-hidden cursor-pointer transition-all shadow-sm hover:shadow-lg hover:-translate-y-0.5 ${isMatch ? 'border-[#C9A84C] ring-1 ring-[#C9A84C]/40' : 'border-[#cfd9e4] hover:border-[#1B6CA8]'}`}>
         <div className="flex">
           {/* عمود الصورة (يمين) */}
@@ -671,16 +699,22 @@ export default function Home() {
               </div>
             </div>
 
-            {/* الخريطة — نقاطها مشتقّة من نفس القائمة المصفّاة (تتحدّث العلامات حيّاً) */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* الخريطة — نقاطها مشتقّة من نفس القائمة المصفّاة (تتحدّث العلامات حيّاً).
+                relative z-0 isolate: يحصر مكدّس Leaflet (z-index 400–1000) داخل سياق
+                تكديس خاص حتى يبقى الدرج الجانبي فوق الخريطة دائماً عند فتحه. */}
+            <div className="relative z-0 isolate bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
                 <span className="text-[#1B6CA8]">{Icons.map}</span>
                 <span className="font-bold text-sm text-gray-900">الخريطة التفاعلية</span>
                 <span className="text-xs text-[#33414f] mr-auto">{filteredMapPoints.length} عقار على الخريطة</span>
               </div>
               {/* الخريطة تُعرض دائماً وتفاعلية (تحمّل Leaflet دائماً) — الإعلانات بلا
-                  إحداثيات لا تضع دبوساً فقط، والخريطة تبقى تعمل (تصفّح/تكبير). */}
-              <MapComponent points={filteredMapPoints} />
+                  إحداثيات لا تضع دبوساً فقط، والخريطة تبقى تعمل (تصفّح/تكبير).
+                  نقر الدبوس ⇒ نافذة منبثقة بزر «عرض التفاصيل» يفتح التفاصيل الكاملة. */}
+              <MapComponent
+                points={filteredMapPoints}
+                onSelect={(id) => { const l = listings.find((x) => String(x.id) === String(id)); if (l) openListing(l); }}
+              />
               {filteredMapPoints.length === 0 && (
                 <div className="px-4 py-3 text-center text-[#33414f] text-xs border-t border-gray-100">
                   {listings.length === 0
@@ -1110,7 +1144,7 @@ export default function Home() {
       {selectedListing && (() => {
         const l = selectedListing; const fair = getFair(l); const st = getSt(l.adv, fair);
         return (
-          <div onClick={() => setSelectedListing(null)} className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-4">
+          <div onClick={() => setSelectedListing(null)} className="fixed inset-0 bg-black/50 z-[1000] flex items-end sm:items-center justify-center p-4">
             <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl w-full max-w-md max-h-[88vh] overflow-auto">
               <div className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] p-5 text-white flex justify-between items-start">
                 <div>
@@ -1183,8 +1217,24 @@ export default function Home() {
                     الموقع على الخريطة — افتح في خرائط Google
                   </a>
                 )}
-                {/* رخصة المعلن (معلومة عرض فقط — تظهر فقط إن وُجدت؛ الباحث لا يُسأل عن أي رخصة) */}
-                {l.fal && <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">رخصة فال المعلن: <span dir="ltr">{l.fal}</span></div>}
+                {/* المكتب المعلِن — بيانات حقيقية من جدول offices عبر office_id (يظهر ما توفّر فقط) */}
+                {(selectedOffice?.name || selectedOffice?.fal_license || l.fal) && (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5">
+                    <div className="text-xs text-gray-500 mb-1.5">المكتب المعلِن</div>
+                    {selectedOffice?.name && (
+                      <div className="flex items-center gap-2 font-bold text-gray-900 text-sm">
+                        <span className="text-[#0A3D62] flex-shrink-0">{Icons.building}</span>
+                        <span className="truncate">{selectedOffice.name}</span>
+                        {selectedOffice.verified && (
+                          <span className="text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 px-2 py-0.5 rounded-md whitespace-nowrap">موثّق</span>
+                        )}
+                      </div>
+                    )}
+                    {(selectedOffice?.fal_license || l.fal) && (
+                      <div className="text-xs text-gray-500 mt-1.5">رخصة فال: <span dir="ltr">{selectedOffice?.fal_license || l.fal}</span></div>
+                    )}
+                  </div>
+                )}
                 {ctSent ? (
                   <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl p-4 text-sm text-center font-medium">تم إرسال طلبك — سيتواصل معك المكتب قريباً.</div>
                 ) : ctOpen ? (
