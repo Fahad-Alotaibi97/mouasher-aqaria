@@ -28,6 +28,41 @@ export function track(type: TrackType, refId?: string | null, meta?: Record<stri
   }
 }
 
+// رغبة بحث غير مطابقة: تُسجَّل حين لا يجد المساعد الذكي أي إعلان مطابق لمعايير
+// الباحث الصريحة (حي/نوع/سقف سعري) — لتظهر للمدير «أين الطلب بلا عرض مطابق».
+//
+//  • نفس مبدأ track(): fire-and-forget، لا تنتظر الرد، تبتلع كل الأخطاء بصمت،
+//    ولا تكسر تجربة الباحث أبداً حتى قبل إنشاء جدول search_wishes.
+//  • خصوصية مقصودة: لا اسم، لا جوال، لا هوية — فقط المعايير المبحوث عنها
+//    (الحي/النوع/السقف السعري) ونص الطلب مقتطعاً.
+//  • الأمان في القاعدة: insert فقط للزوار بحدود حجم؛ القراءة للمدير حصراً عبر
+//    is_admin_user() (supabase/search_wishes.sql).
+export function trackSearchWish(w: {
+  neighborhood?: string | null;
+  type?: string | null;
+  maxPrice?: number | null;
+  rawQuery?: string | null;
+}) {
+  try {
+    if (!isSupabaseConfigured()) return;
+    const sb = createClient();
+    void sb
+      .from('search_wishes')
+      .insert({
+        neighborhood: w.neighborhood ?? null,
+        type: w.type ?? null,
+        max_price: w.maxPrice ?? null,
+        raw_query: (w.rawQuery ?? '').slice(0, 200) || null,
+      })
+      .then(
+        () => undefined,
+        () => undefined
+      );
+  } catch {
+    // التسجيل اختياري بطبيعته — لا شيء ينكسر إن غاب الجدول أو فشل الاتصال
+  }
+}
+
 // معرّف جلسة عشوائي لتقدير «جلسات تقريبية» في لوحة التحليلات — يعيش في
 // sessionStorage فقط (يزول بإغلاق التبويب)، عشوائي بالكامل، ولا يرتبط بأي
 // هوية أو حساب — مجرد تمييز أن عدة زيارات جاءت من نفس الجلسة.

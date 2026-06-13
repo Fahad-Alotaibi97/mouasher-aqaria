@@ -19,10 +19,14 @@ dev.log
 *.tsbuildinfo
 next-env.d.ts
 
-# local test harnesses (قد تحوي بيانات اعتماد)
+# local test harnesses (قد تحوي بيانات اعتماد) + كل سكربتات الفحص المحلية
 _logintest.mjs
 _admincheck.mjs
 _leadscheck.mjs
+_*.mjs
+
+# ملفات تقارير/بيانات محلية — لا تُرفع للنشر
+*.xlsx
 
 # ★ ملفات محذوفة عمداً — تكسر جلسة الأدمن إن نُشرت (انظر tools/guard-no-proxy.mjs)
 src/proxy.ts

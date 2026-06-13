@@ -88,6 +88,7 @@ interface AnaListing { id: string; title: string; hood: string; type: string; st
 interface AnaOffice { id: string; name: string; status: string | null; active: boolean; verified: boolean }
 interface AnaLead { listing_id: string | null; office_id: string | null; kind: string | null; created_at: string }
 interface AnaEvent { type: string; ref_id: string | null; meta: Record<string, unknown> | null; created_at: string }
+interface SearchWish { neighborhood: string | null; type: string | null; max_price: number | null; raw_query: string | null; created_at: string }
 
 // التجميعات تُحسب على آخر EVENTS_CAP حدث (الإجماليات تبقى دقيقة لأن الأحدث أولاً)
 const EVENTS_CAP = 5000;
@@ -211,6 +212,9 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const [leads, setLeads] = useState<AnaLead[]>([]);
   const [events, setEvents] = useState<AnaEvent[]>([]);
   const [eventsMissing, setEventsMissing] = useState(false); // الجدول غير منشأ بعد (42P01)
+  // رغبات الباحثين غير المطابقة (search_wishes) — طلبات لم تجد عرضاً مطابقاً
+  const [wishes, setWishes] = useState<SearchWish[]>([]);
+  const [wishesMissing, setWishesMissing] = useState(false); // جدول search_wishes غير منشأ بعد
   // زيارات الموقع (تحميلات صفحة) — أعداد COUNT دقيقة، null = تعذّر الجلب
   const [visits, setVisits] = useState<{ total: number; today: number; week: number } | null>(null);
   const [featureRank, setFeatureRank] = useState<{ key: string; label: string; count: number }[]>([]);
@@ -276,6 +280,15 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
           .sort((a, b) => b.count - a.count)
       );
     }
+    // رغبات الباحثين غير المطابقة — قراءة غير قاتلة: غياب الجدول لا يُسقط اللوحة
+    // (يظهر تنبيه تشغيل SQL). PostgREST يرجع PGRST205/42P01 للجدول المفقود.
+    const wr = await sb.from('search_wishes')
+      .select('neighborhood,type,max_price,raw_query,created_at')
+      .order('created_at', { ascending: false }).limit(EVENTS_CAP);
+    if (wr.error) {
+      if (wr.error.code === '42P01' || wr.error.code === 'PGRST205') { setWishesMissing(true); setWishes([]); }
+      else { setWishesMissing(false); setWishes([]); } // خطأ آخر (نادر) ⇒ نتركه فارغاً بلا إسقاط اللوحة
+    } else { setWishesMissing(false); setWishes((wr.data ?? []) as SearchWish[]); }
     setListings((lr.data ?? []) as AnaListing[]);
     setOffices((or_.data ?? []) as AnaOffice[]);
     setLeads(leadRows);
@@ -341,6 +354,20 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const typeRank = topCounts(searches, (e) => (e.meta?.type as string) || null, 6).map((r) => ({ ...r, label: r.key }));
   const budgetRank = topCounts(searches, (e) => { const b = Number(e.meta?.budget); return b > 0 ? budgetBucket(b) : null; }, 6).map((r) => ({ ...r, label: r.key }));
   const aiQueriesRank = topCounts(searches.filter((e) => e.meta?.source === 'ai'), (e) => ((e.meta?.q as string) || '').trim() || null, 8).map((r) => ({ ...r, label: `«${r.key}»` }));
+
+  // رغبات الباحثين غير المطابقة: طلبات بمعايير صريحة لم تجد عرضاً مطابقاً.
+  //  • التركيبة (حي + نوع): أوضح إشارة طلب-بلا-عرض (أين يُستقطب مكاتب).
+  //  • الحي وحده: أي الأحياء يطلبها الباحثون ولا نملك فيها معروضاً مطابقاً.
+  const wishComboRank = topCounts(wishes, (w) => {
+    const h = (w.neighborhood || '').trim();
+    const t = (w.type || '').trim();
+    if (!h && !t) return null; // بلا حي ولا نوع ⇒ لا تركيبة مفيدة للترتيب
+    return `${h || 'أي حي'}␟${t || 'أي نوع'}`;
+  }, 12).map((r) => {
+    const [h, t] = r.key.split('␟');
+    return { key: r.key, label: h, sub: t, count: r.count };
+  });
+  const wishHoodRank = topCounts(wishes, (w) => (w.neighborhood || '').trim() || null, 8).map((r) => ({ ...r, label: r.key }));
 
   // استخدام المؤشر: إجمالي + توزيع الأحكام (يعكس حالة السوق المعروضة للزوار)
   const indicatorUses = events.filter((e) => e.type === 'indicator_use');
@@ -546,6 +573,39 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                 <RankList rows={aiQueriesRank} unit="مرة" />
               </SubCard>
             </div>
+          )}
+
+          {/* ── رغبات الباحثين غير المطابقة (طلبات لا تجد عرضاً) ── */}
+          {head('رغبات الباحثين غير المطابقة', 'pin', 'gold')}
+          {wishesMissing ? (
+            <Empty text="يتطلّب هذا القسم إنشاء الجدول — شغّل supabase/search_wishes.sql في Supabase، وبعدها يبدأ تسجيل كل بحث لم يجد عرضاً مطابقاً." />
+          ) : (
+            <>
+              <SubCard
+                title={`طلبات بلا عرض مطابق: ${fmtNum(wishes.length)}`}
+                hint="حين يبحث زائر بحي/نوع/سقف سعري محدّد ولا يجد المساعد الذكي إعلاناً مطابقاً — إشارة طلب بلا معروض (أين تستقطب مكاتب). بلا أي بيانات شخصية."
+                icon="search"
+                tone="gold"
+              >
+                {wishes.length === 0 ? (
+                  <MiniEmpty text="لا رغبات غير مطابقة بعد — يبدأ التسجيل مع أول بحث لا يجد عرضاً مطابقاً." />
+                ) : (
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs font-bold text-[#0A3D62] mb-2">الأكثر طلباً (حي + نوع)</div>
+                      <RankList rows={wishComboRank} unit="طلب" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#0A3D62] mb-2">الأحياء الأكثر طلباً بلا عرض مطابق</div>
+                      <RankList rows={wishHoodRank} unit="طلب" />
+                    </div>
+                  </div>
+                )}
+              </SubCard>
+              {wishes.length >= EVENTS_CAP && (
+                <p className="text-[11px] text-[#5b6b7a] mt-2">ملاحظة: محسوبة على آخر {fmtNum(EVENTS_CAP)} رغبة.</p>
+              )}
+            </>
           )}
 
           {/* ── استخدام مؤشر أسعار الحي ── */}

@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from '@/lib/supabase/config';
 import dynamic from 'next/dynamic';
 import { useAppData, type UIListing, type MktAvg, type ImagesByCategory } from '@/lib/useAppData';
 import { useAuth } from '@/lib/useAuth';
-import { track, trackPageView } from '@/lib/track';
+import { track, trackPageView, trackSearchWish } from '@/lib/track';
 import { useEffect } from 'react';
 import SiteNav from './components/SiteNav';
 import ContactButtons, { isSaudiMobile } from './components/ContactButtons';
@@ -70,6 +70,45 @@ function fairForType(
 // أحياء مركزية قريبة من الخدمات — تُستخدم في منطق المساعد الذكي المحلّي (heuristic).
 const NEAR_HOODS = new Set(['العليا', 'الملقا', 'حطين', 'الياسمين']);
 
+// ── تحليل معايير المساعد الذكي من نص الطلب (محلّي بالكامل، بلا أي API) ──
+// أنواع الوحدات المعروفة. «بيت/منزل/سكن» كلمات عامة وليست نوعاً محدّداً ⇒ لا تُعدّ فلتراً.
+const AI_TYPES = ['شقة', 'فيلا', 'دوبلكس', 'استوديو', 'دور'];
+
+// تحويل الأرقام العربية/الفارسية إلى لاتينية حتى نتعرّف على الميزانية المكتوبة عربياً.
+function toAsciiDigits(s: string): string {
+  return s
+    .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+}
+
+// النوع: أول نوع معروف يُذكر صراحةً (فلتر صارم).
+function parseAiType(q: string): string | null {
+  return AI_TYPES.find((t) => q.includes(t)) ?? null;
+}
+
+// الحي: أطول اسم حي مطابق أولاً (حتى يفوز «الملك عبدالله» على أي جزء أقصر) — فلتر صارم.
+function parseAiHood(q: string, hoods: string[]): string | null {
+  const sorted = [...hoods].sort((a, b) => b.length - a.length);
+  return sorted.find((h) => h && q.includes(h)) ?? null;
+}
+
+// السقف السعري: نتعرّف على رقم ميزانية صريح فقط (مع «ألف» أو رقم كبير) فلا نخلط
+// «3 غرف» بسعر. «أرخص/رخيص» نيّة ترتيب لا سقفاً (تُعالَج في الترتيب لا كفلتر).
+function parseAiMaxPrice(qRaw: string): number | null {
+  const q = toAsciiDigits(qRaw);
+  const re = /(\d[\d,\.]*)\s*(ألف|الف|آلاف|k)?/g;
+  let best: number | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(q))) {
+    let n = parseInt(m[1].replace(/[,\.]/g, ''), 10);
+    if (Number.isNaN(n)) continue;
+    if (m[2]) n = n < 1000 ? n * 1000 : n; // «50 ألف» ⇒ 50000
+    else if (n < 10000) continue; // رقم صغير بلا «ألف» ⇒ غالباً غرف/حمامات لا سعر
+    if (best === null || n > best) best = n; // أعلى سقف مذكور = حدّ الميزانية
+  }
+  return best;
+}
+
 // رسالة خطأ تشخيصية لإرسال الرسائل/الاستفسارات (تكشف حجب RLS بوضوح بدل نجاح صوري).
 function leadErrText(error: { code?: string; message?: string }): string {
   if (error.code === '42501')
@@ -105,7 +144,14 @@ export default function Home() {
   const [aiQuery, setAiQuery] = useState('');
   const [aiReply, setAiReply] = useState<string | null>(null);
   const [aiMatchIds, setAiMatchIds] = useState<(string | number)[]>([]);
-  const [aiOrder, setAiOrder] = useState<(string | number)[] | null>(null);
+  // نتيجة المساعد الذكي: إمّا قائمة معرّفات مطابقة مرتّبة، أو «لا تطابق» مع المعايير
+  // الصريحة (حي/نوع/سقف) — تُغذّي العرض الصادق وزر تسجيل الطلب وتسجيل الرغبة.
+  type AiResult =
+    | { kind: 'matches'; ids: (string | number)[] }
+    | { kind: 'none'; hood: string | null; type: string | null; maxPrice: number | null; raw: string }
+    | null;
+  const [aiResult, setAiResult] = useState<AiResult>(null);
+  const [aiShowAlts, setAiShowAlts] = useState(false); // كشف «الخيارات الأخرى المتاحة» في حال لا تطابق
   const [leadName, setLeadName] = useState('');
   const [leadPhone, setLeadPhone] = useState('');
   const [leadMsg, setLeadMsg] = useState('');
@@ -438,15 +484,65 @@ export default function Home() {
   // ── المساعد الذكي: ترتيب/تصفية محلّية بالكلمات المفتاحية (بدون API) ──
   // TODO: لربط ذكاء اصطناعي حقيقي لاحقاً، استبدل منطق النقاط أدناه باستدعاء
   //       واجهة (مثل Anthropic) يُرجع ترتيب المعرّفات؛ تبقى الواجهة كما هي.
+  const scrollToListings = () =>
+    setTimeout(() => document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+
   const runAI = (raw?: string) => {
     const q = (raw ?? aiQuery).trim();
     if (raw !== undefined) setAiQuery(raw);
     if (!q) return;
-    const scored = listings.map((l) => {
+    setAiShowAlts(false);
+
+    // ── معايير صريحة = فلاتر صارمة: نحترم ما طلبه الباحث ولا نستبدله أبداً ──
+    const reqHood = parseAiHood(q, Object.keys(mktAvg));
+    const reqType = parseAiType(q);
+    const reqMaxPrice = parseAiMaxPrice(q);
+    // المطابقون فعلاً = الإعلانات الحقيقية التي تحقّق كل معيار صريح (الحي/النوع/السقف).
+    const pool = listings.filter((l) => {
+      if (reqHood && l.hood !== reqHood) return false;
+      if (reqType && l.type !== reqType) return false;
+      if (reqMaxPrice && l.adv > reqMaxPrice) return false;
+      return true;
+    });
+
+    // تتبّع بحث المساعد الذكي: نص الطلب (مقتطع) + المعايير المستخرجة + عدد المطابقين الفعلي
+    track('search', null, {
+      source: 'ai',
+      q: q.slice(0, 200),
+      hood: reqHood,
+      type: reqType,
+      budget: reqMaxPrice,
+      matches: pool.length,
+    });
+
+    // ── لا تطابق ──────────────────────────────────────────────
+    if (pool.length === 0) {
+      setAiMatchIds([]);
+      const hasCriteria = !!(reqHood || reqType || reqMaxPrice);
+      if (hasCriteria) {
+        // صدق: لا نستبدل الحي ولا ندّعي تطابقاً — نعرض رسالة صريحة + تسجيل الطلب،
+        // ونسجّل الرغبة غير المطابقة للمدير (fire-and-forget، لا تحجب ولا تكسر).
+        setAiResult({ kind: 'none', hood: reqHood, type: reqType, maxPrice: reqMaxPrice, raw: q });
+        setAiReply(null); // اللوحة الصريحة أدناه تحمل الرسالة بدل صندوق الرد
+        trackSearchWish({ neighborhood: reqHood, type: reqType, maxPrice: reqMaxPrice, rawQuery: q });
+      } else {
+        // بلا أي معيار صريح ولا نتيجة (مثلاً الكتالوج فارغ) — رسالة صادقة عامة
+        setAiResult({ kind: 'matches', ids: [] });
+        setAiReply(
+          listings.length === 0
+            ? 'لا توجد إعلانات متاحة حالياً — تُعرض هنا إعلانات المكاتب فور نشرها.'
+            : 'اذكر الحي أو النوع أو ميزانيتك لأبحث لك بدقّة بين الإعلانات المتاحة.'
+        );
+      }
+      setSearched(true);
+      scrollToListings();
+      return;
+    }
+
+    // ── يوجد تطابق: نرتّب المطابقين فقط وفق التفضيلات الناعمة (لا نضيف غيرهم) ──
+    const scored = pool.map((l) => {
       let score = 0;
       const fair = getFair(l);
-      if (q.includes(l.hood)) score += 10;                                   // الحي
-      if (q.includes(l.type)) score += 8;                                    // النوع
       if (/(رخيص|أرخص|ارخص|أقل سعر|اقل سعر|رخيصة|ميزانية|بسيط)/.test(q)) score += (200000 - l.adv) / 20000; // الرخص
       if (/(فرص|فرصة|أقل من السوق|اقل من السوق|عادل|تحت السوق)/.test(q) && l.adv < fair) score += 6;          // الفرص
       if (/(قريب|قريبة|خدمات|وسط|مركز)/.test(q) && NEAR_HOODS.has(l.hood)) score += 4;                        // قريبة من الخدمات
@@ -456,36 +552,43 @@ export default function Home() {
       if (/راكب/.test(q) && l.kitchen === true) score += 5;                                                  // مطبخ راكب
       if (/(مكيّف|مكيف|مكيفات|تكييف|مكيّفة|مكيفة)/.test(q) && l.ac === true) score += 5;                       // مكيّفة
       if (/(موقف|مواقف|كراج|باركن)/.test(q) && (l.parking ?? 0) >= 1) score += 5;                            // مواقف
-      return { id: l.id, score };
+      return { l, score };
     });
-    scored.sort((a, b) => b.score - a.score);
-    const matches = scored.filter((s) => s.score > 0).slice(0, 2).map((s) => s.id);
-    // تتبّع بحث المساعد الذكي: نص الطلب (مقتطع) + الحي/النوع المستخرجان إن ذُكرا
-    track('search', null, {
-      source: 'ai',
-      q: q.slice(0, 200),
-      hood: Object.keys(mktAvg).find((h) => q.includes(h)) ?? null,
-      type: ['شقة', 'فيلا', 'دوبلكس', 'استوديو', 'دور'].find((t) => q.includes(t)) ?? null,
-      matches: matches.length,
-    });
-    setAiOrder(scored.map((s) => s.id));
-    setAiMatchIds(matches);
-    if (matches.length) {
-      const best = listings.find((l) => l.id === matches[0]);
-      setAiReply(best
-        ? `رتّبت لك الإعلانات حسب طلبك. الأنسب: ${best.title} في ${best.hood} — ${best.adv.toLocaleString('ar-SA')} ريال. الإعلانات المميّزة بعلامة ذهبية «الأنسب لطلبك».`
-        : null);
-    } else {
-      setAiReply('ما لقيت تطابقاً دقيقاً لطلبك، لكن هذي كل الإعلانات المتاحة. جرّب تذكر الحي أو النوع أو ميزانيتك.');
-    }
+    scored.sort((a, b) => b.score - a.score || a.l.adv - b.l.adv); // عند التعادل: الأرخص أولاً (قيمة أفضل)
+    const orderedIds = scored.map((s) => s.l.id);
+    const matchIds = orderedIds.slice(0, Math.min(2, orderedIds.length));
+    setAiResult({ kind: 'matches', ids: orderedIds });
+    setAiMatchIds(matchIds);
+    const best = scored[0].l;
+    const crit = [reqHood, reqType, reqMaxPrice ? `حتى ${reqMaxPrice.toLocaleString('ar-SA')} ريال` : null].filter(Boolean).join(' · ');
+    setAiReply(
+      `${pool.length === 1 ? 'إعلان واحد مطابق' : `${pool.length.toLocaleString('ar-SA')} إعلانات مطابقة`}${crit ? ` لطلبك (${crit})` : ' لطلبك'}. الأنسب: ${best.title} في ${best.hood} — ${best.adv.toLocaleString('ar-SA')} ريال.`
+    );
     setSearched(true);
-    setTimeout(() => document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    scrollToListings();
   };
 
-  // القائمة المعروضة = نتائج التصفية مرتّبة وفق المساعد الذكي (إن استُخدم)
-  const displayList = aiOrder
-    ? [...filtered].sort((a, b) => aiOrder.indexOf(a.id) - aiOrder.indexOf(b.id))
-    : filtered;
+  // تسجيل الطلب عند لا تطابق: ينقل الباحث لنموذج الاستفسار (يصل للمكاتب والمدير
+  // فعلياً عبر leads) مع تعبئة الحي/النوع — تسجيل اهتمام صادق بلا وعد بإشعار آلي.
+  const registerWish = () => {
+    if (aiResult?.kind !== 'none') return;
+    if (aiResult.hood) setInqHood(aiResult.hood);
+    if (aiResult.type) setInqType(aiResult.type);
+    const wish = `أبحث عن ${aiResult.type || 'وحدة'}${aiResult.hood ? ` في ${aiResult.hood}` : ''}${aiResult.maxPrice ? ` بسعر حتى ${aiResult.maxPrice.toLocaleString('ar-SA')} ريال` : ''} ولم أجد إعلاناً مطابقاً حالياً.`;
+    setInqMsg((prev) => prev || wish);
+    go('inquiries');
+  };
+
+  // القائمة المعروضة في الرئيسية:
+  //  • تطابق ⇒ المطابقون فقط بالترتيب (لا نضيف أحياءً أخرى أبداً).
+  //  • لا تطابق ⇒ فارغة (اللوحة الصريحة تظهر بدلاً منها).
+  //  • قبل أي بحث ⇒ كل الإعلانات (filtered؛ فلاتر الرئيسية فارغة فتساوي الكل).
+  const displayList: UIListing[] =
+    aiResult?.kind === 'matches'
+      ? (aiResult.ids.map((id) => listings.find((l) => l.id === id)).filter(Boolean) as UIListing[])
+      : aiResult?.kind === 'none'
+        ? []
+        : filtered;
 
   const condColor: Record<string, string> = {
     new: 'bg-green-100 text-green-800 border border-green-200',
@@ -653,7 +756,60 @@ export default function Home() {
                 <h2 className="font-bold text-[#0f1a28] text-lg sec-underline">{searched ? 'نتائج بحثك' : 'الإعلانات'}</h2>
                 <div className="text-xs text-[#33414f] flex items-center gap-1">{Icons.chart} {displayList.length} إعلان</div>
               </div>
-              {displayList.length === 0 ? (
+              {aiResult?.kind === 'none' ? (
+                // ── لا تطابق: رسالة صادقة + تسجيل الطلب + خيارات أخرى (لا استبدال للحي) ──
+                (() => {
+                  const crit = [
+                    aiResult.hood ? `في ${aiResult.hood}` : null,
+                    aiResult.type ? `من نوع ${aiResult.type}` : null,
+                    aiResult.maxPrice ? `بسعر حتى ${aiResult.maxPrice.toLocaleString('ar-SA')} ريال` : null,
+                  ].filter(Boolean).join(' · ');
+                  return (
+                    <div className="space-y-3">
+                      <div className="bg-white rounded-2xl border border-[#cfd9e4] p-5 shadow-sm">
+                        <div className="flex items-start gap-3">
+                          <span className="flex-shrink-0 mt-0.5 text-[#C2410C]">{Icons.warning}</span>
+                          <div className="min-w-0">
+                            <div className="font-bold text-[#0f1a28] text-[15px]">
+                              لا توجد حالياً إعلانات مطابقة{crit ? ` (${crit})` : ''}.
+                            </div>
+                            <div className="text-[13px] text-[#33414f] mt-1 leading-relaxed">
+                              لا نعرض لك إعلانات في أحياء أخرى ونزعم أنها تطابق طلبك — هذي خياراتك:
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-4 space-y-2.5">
+                          {/* تسجيل الطلب: يصل للمكاتب والمنصة فعلياً (عبر leads) فيتواصلون معك —
+                              تسجيل اهتمام صادق، بلا وعد بنظام إشعارات آلي غير موجود. */}
+                          <button onClick={registerWish}
+                            className="w-full flex items-center justify-between gap-2 bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white px-4 py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-all text-right">
+                            <span>سجّل طلبك في المنصة — يصل للمكاتب فتتواصل معك عند توفّر ما يناسبك</span>
+                            <span className="flex-shrink-0">←</span>
+                          </button>
+                          {listings.length > 0 && (
+                            <button onClick={() => setAiShowAlts((v) => !v)}
+                              className="w-full flex items-center justify-between gap-2 bg-white border border-[#cfd9e4] text-[#0A3D62] px-4 py-3 rounded-xl font-bold text-sm hover:bg-[#f0f4f8] transition-all text-right">
+                              <span>{aiShowAlts ? 'إخفاء الخيارات الأخرى' : `تصفّح الخيارات الأخرى المتاحة (${listings.length.toLocaleString('ar-SA')})`}</span>
+                              <span className="flex-shrink-0 text-xs text-[#5b6b7a]">{aiShowAlts ? '▲' : '▼'}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {/* الخيارات الأخرى — معنونة بوضوح أنها لا تطابق الطلب الأصلي (ليست بديلاً مزعوماً) */}
+                      {aiShowAlts && (
+                        <div>
+                          <div className="text-xs text-[#5b6b7a] mb-2 px-1 font-medium">
+                            خيارات أخرى متاحة — لا تطابق طلبك تماماً (أحياء/أنواع مختلفة):
+                          </div>
+                          <div className="space-y-3">
+                            {listings.map((l) => renderListing(l, false))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+              ) : displayList.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 text-center text-[#33414f] text-sm">
                   {listings.length === 0 ? 'لا توجد إعلانات متاحة حالياً — تُعرض هنا إعلانات المكاتب فور نشرها.' : 'لا توجد نتائج — جرّب تغيير المعايير من البحث بالأعلى.'}
                 </div>
