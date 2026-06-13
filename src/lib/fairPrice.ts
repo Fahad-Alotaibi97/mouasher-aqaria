@@ -1,4 +1,4 @@
-// منطق "السعر العادل" — معزول عن التصميم، قابل لإعادة الاستخدام في الموقع والتطبيق.
+// منطق "مؤشر أسعار الحي" — معزول عن التصميم، قابل لإعادة الاستخدام في الموقع والتطبيق.
 import type { Listing, Neighborhood, PriceStatus } from './types';
 
 // معامل النوع نسبةً لمتوسط الحي (شقة = 1)
@@ -9,7 +9,7 @@ const TYPE_MULTIPLIER: Record<string, number> = {
   'شقة': 1,
 };
 
-/** حسبة السعر العادل لإعلان بناءً على متوسط حيّه ونوعه. */
+/** حسبة مؤشر أسعار الحي لإعلان بناءً على متوسط حيّه ونوعه. */
 export function getFairPrice(
   listing: Pick<Listing, 'hood' | 'type' | 'advertised'>,
   neighborhoods: Neighborhood[]

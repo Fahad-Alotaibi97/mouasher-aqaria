@@ -45,6 +45,8 @@ export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapObj = useRef<ReturnType<Leaflet['map']> | null>(null);
   const layerRef = useRef<ReturnType<Leaflet['layerGroup']> | null>(null);
+  // توقيع مجموعة النقاط آخر مرة كُبّرت إليها الخريطة — لتمييز «تغيّر الفلتر» عن إعادة الرسم العادية
+  const fitSigRef = useRef<string>('');
   const [ready, setReady] = useState(false);
 
   // تحميل Leaflet وتهيئة الخريطة مرة واحدة
@@ -95,7 +97,7 @@ export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
               '<strong>' + l.adv.toLocaleString('ar-SA') + ' ريال</strong>' +
             '</div>' +
             '<div style="display:flex;justify-content:space-between;font-size:12px;border-top:1px dashed #B5D4F4;padding-top:4px">' +
-              '<span style="color:#6b7a8a">السعر العادل</span>' +
+              '<span style="color:#6b7a8a">مؤشر أسعار الحي</span>' +
               '<strong style="color:#1B6CA8">' + l.fair.toLocaleString('ar-SA') + ' ريال</strong>' +
             '</div>' +
           '</div>' +
@@ -106,6 +108,16 @@ export default function MapComponent({ points = [] }: { points?: MapPoint[] }) {
 
     group.addTo(map);
     layerRef.current = group;
+
+    // تكبير الخريطة لتلائم النقاط الظاهرة — فقط عند تغيّر مجموعة النقاط (تطبيق فلتر/بحث):
+    // تصفّح حر بكل الدبابيس ⇒ تطبيق فلتر ⇒ تتقرّب الخريطة لنتائج الفلتر (fit bounds).
+    // لا نكبّر مع كل إعادة رسم حتى لا نُلغي تحريك/تكبير المستخدم اليدوي بين الفلاتر.
+    const sig = points.map((p) => p.id).join('|');
+    if (points.length && sig !== fitSigRef.current) {
+      const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]));
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+    }
+    fitSigRef.current = sig;
   }, [points, ready]);
 
   return <div ref={mapRef} style={{ height: '480px', width: '100%' }} />;

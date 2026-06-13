@@ -199,7 +199,7 @@ function RankList({ rows, unit }: { rows: { key: string; label: string; sub?: st
 // ميزات المنصة المرتّبة في «أكثر الميزات استخداماً» — كل بند يُعدّ بـ COUNT دقيق
 const FEATURES: { key: string; label: string; type: string; feature?: string }[] = [
   { key: 'listings', label: 'تصفّح الإعلانات (فتح إعلان)', type: 'listing_click' },
-  { key: 'indicator', label: 'مؤشر السعر العادل', type: 'indicator_use' },
+  { key: 'indicator', label: 'مؤشر أسعار الحي', type: 'indicator_use' },
   { key: 'search', label: 'البحث (فلاتر + المساعد الذكي)', type: 'search' },
   { key: 'finance', label: 'صفحة خيارات تقسيط الإيجار', type: 'feature_use', feature: 'finance' },
   { key: 'contact', label: 'فتح نموذج التواصل بخصوص إعلان', type: 'feature_use', feature: 'contact' },
@@ -548,8 +548,8 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
             </div>
           )}
 
-          {/* ── استخدام مؤشر السعر العادل ── */}
-          {head('استخدام مؤشر السعر العادل', 'chart', 'gold')}
+          {/* ── استخدام مؤشر أسعار الحي ── */}
+          {head('استخدام مؤشر أسعار الحي', 'chart', 'gold')}
           {eventsMissing ? (
             <Empty text="يتطلّب تفعيل التتبّع — شغّل supabase/analytics_events.sql." />
           ) : (

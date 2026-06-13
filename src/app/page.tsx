@@ -52,7 +52,7 @@ const NO_LISTINGS: UIListing[] = [];
 function getSt(adv: number, fair: number) { return adv / fair > 1.12 ? 'hi' : adv / fair < 0.85 ? 'lo' : 'ok'; }
 function rl(st: string) { return st === 'ok' ? 'مناسب' : st === 'hi' ? 'مرتفع' : 'فرصة'; }
 
-// ★ مصدر واحد لحساب السعر العادل من متوسط الحي (مأخوذ من جدول neighborhoods عبر /admin).
+// ★ مصدر واحد لحساب مؤشر أسعار الحي من متوسط الحي (مأخوذ من جدول neighborhoods عبر /admin).
 //   يُستخدم في: شارات الحالة للإعلانات (getFair) + الحاسبة الذكية للمكاتب.
 //   يقرأ متوسط النوع المُدار من /admin إن توفّر (villa/studio)، وإلا يشتقّه بالمعامل.
 function fairForType(
@@ -222,7 +222,7 @@ export default function Home() {
     setAuthBusy(false);
   };
 
-  // حساب السعر العادل وحالته بناءً على متوسطات /admin الحالية (mktAvg)
+  // حساب مؤشر أسعار الحي وحالته بناءً على متوسطات /admin الحالية (mktAvg)
   const getFair = (l: UIListing) => {
     const m = mktAvg[l.hood];
     return m ? fairForType(m, l.type) : l.adv; // الرجوع للسعر المُعلن إن لم يوجد متوسط للحي
@@ -368,7 +368,7 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [filterHood, filterType, filterBudget]);
 
-  // استخدام مؤشر السعر العادل: النتيجة تظهر حيّاً أثناء الكتابة، فنسجّل استخداماً
+  // استخدام مؤشر أسعار الحي: النتيجة تظهر حيّاً أثناء الكتابة، فنسجّل استخداماً
   // واحداً بعد استقرار الإدخال — مع الحكم الفعلي (hi مرتفع / ok مناسب / lo فرصة).
   useEffect(() => {
     const price = parseInt(siPrice) || 0;
@@ -489,7 +489,7 @@ export default function Home() {
               <span className="text-[19px] font-extrabold text-[#0A3D62]">{l.adv.toLocaleString('ar-SA')}</span>
               <span className="text-[11px] text-[#33414f] mr-1">ريال/سنة</span>
             </div>
-            <div className="text-[11px] text-[#1B6CA8] font-medium mt-1">السعر العادل: {fair.toLocaleString('ar-SA')} ريال</div>
+            <div className="text-[11px] text-[#1B6CA8] font-medium mt-1" title="السعر المتوسط لعدد الصفقات المماثلة بنفس الحي">مؤشر أسعار الحي: {fair.toLocaleString('ar-SA')} ريال</div>
             <div className="flex items-center gap-4 mt-2.5 pt-2.5 border-t border-[#f0f4f8] text-[11px] text-[#33414f]">
               <span><b className="text-[#0f1a28]">{l.rooms ?? '—'}</b> غرف</span>
               <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> م²</span>
@@ -537,7 +537,7 @@ export default function Home() {
             <div className="relative z-10 text-center">
               <h1 className="text-white text-xl font-bold mb-5">سوق الإيجار <span className="text-[#9BC8F0]">بكل وضوح</span></h1>
               <div className="flex flex-wrap gap-x-4 gap-y-2 justify-center">
-                {['استشارة عقارية مجانية', 'اعرف السعر العادل قبل توقيع العقد', 'سوق شفاف، قرار واثق'].map(t => (
+                {['استشارة عقارية مجانية', 'اعرف مؤشر أسعار الحي قبل توقيع العقد', 'سوق شفاف، قرار واثق'].map(t => (
                   <span key={t} className="text-white/90 text-xs leading-relaxed flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#9BC8F0] inline-block flex-shrink-0" />{t}
                   </span>
@@ -692,14 +692,14 @@ export default function Home() {
         </div>
       )}
 
-      {/* ═══ مؤشر السعر العادل — صفحة مستقلّة ═══ */}
+      {/* ═══ مؤشر أسعار الحي — صفحة مستقلّة ═══ */}
       {page === 'indicator' && (
         <div>
           <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-6 text-center text-white relative">
             <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#F5F8FB] rounded-t-3xl" />
             <div className="relative z-10">
-              <h1 className="text-xl font-bold mb-1">مؤشر السعر العادل</h1>
-              <p className="text-white/85 text-sm">قارن أي إيجار بمتوسط سوق الحي قبل التوقيع</p>
+              <h1 className="text-xl font-bold mb-1">مؤشر أسعار الحي</h1>
+              <p className="text-white/85 text-sm">السعر المتوسط لعدد الصفقات المماثلة بنفس الحي — قارنه بأي إيجار قبل التوقيع</p>
             </div>
           </div>
           <div className="px-4 pt-4 pb-6 max-w-xl mx-auto">
@@ -1022,7 +1022,7 @@ export default function Home() {
               {
                 name: 'باحث عن إيجار',
                 desc: 'للأفراد الباحثين عن سكن مناسب بأسعار عادلة',
-                features: ['بحث غير محدود في كل الأحياء', 'مؤشر السعر العادل لكل إعلان', '5 استشارات مع المساعد الذكي شهرياً', 'تنبيه واحد للإعلانات الجديدة'],
+                features: ['بحث غير محدود في كل الأحياء', 'مؤشر أسعار الحي لكل إعلان', '5 استشارات مع المساعد الذكي شهرياً', 'تنبيه واحد للإعلانات الجديدة'],
                 locked: ['تنبيهات غير محدودة', 'حفظ التفضيلات والمقارنة'],
                 popular: false,
                 cta: 'سجّل كباحث — مجاناً'
@@ -1030,7 +1030,7 @@ export default function Home() {
               {
                 name: 'مكتب عقاري',
                 desc: 'للمكاتب العقارية المرخصة بفال',
-                features: ['حتى 10 إعلانات نشطة', 'توثيق رخصة فال عبر مراجعة الإدارة', 'تقييم تلقائي بالسعر العادل', 'لوحة تحكم إحصائية', 'الحاسبة الذكية للأسعار'],
+                features: ['حتى 10 إعلانات نشطة', 'توثيق رخصة فال عبر مراجعة الإدارة', 'تقييم تلقائي بمؤشر أسعار الحي', 'لوحة تحكم إحصائية', 'الحاسبة الذكية للأسعار'],
                 locked: ['شارة المكتب الموثّق', 'AI لإدارة الردود تلقائياً'],
                 popular: true,
                 cta: 'سجّل مكتبك — مجاناً'
@@ -1105,7 +1105,7 @@ export default function Home() {
               </div>
               <div className="p-5 space-y-4">
                 <div className="flex items-center justify-between bg-blue-50 rounded-xl p-3">
-                  <span className="text-sm text-gray-700">السعر العادل للسوق</span>
+                  <span className="text-sm text-gray-700" title="السعر المتوسط لعدد الصفقات المماثلة بنفس الحي">مؤشر أسعار الحي للسوق</span>
                   <span className="font-bold text-[#0A3D62]">{fair.toLocaleString('ar-SA')} ريال</span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -1213,7 +1213,7 @@ export default function Home() {
               <h1 className="text-xl font-bold text-gray-900">شروط الاستخدام</h1>
               <p className="text-xs text-gray-400">آخر تحديث: 2026</p>
               <p>باستخدامك منصة «مؤشر العقارية» فإنك توافق على الالتزام بهذه الشروط.</p>
-              <div><h2 className="font-bold text-gray-900 mb-1">١. طبيعة الخدمة</h2><p>توفّر المنصة أداة استرشادية لمقارنة أسعار الإيجار بمتوسطات السوق، إضافةً لعرض إعلانات عقارية. مؤشر «السعر العادل» تقديري للاسترشاد فقط ولا يُعدّ تقييماً رسمياً مُلزِماً.</p></div>
+              <div><h2 className="font-bold text-gray-900 mb-1">١. طبيعة الخدمة</h2><p>توفّر المنصة أداة استرشادية لمقارنة أسعار الإيجار بمتوسطات السوق، إضافةً لعرض إعلانات عقارية. «مؤشر أسعار الحي» (السعر المتوسط لعدد الصفقات المماثلة بنفس الحي) تقديري للاسترشاد فقط ولا يُعدّ تقييماً رسمياً مُلزِماً.</p></div>
               <div><h2 className="font-bold text-gray-900 mb-1">٢. مسؤولية المحتوى</h2><p>المكاتب والمعلنون مسؤولون عن دقة بيانات إعلاناتهم وصحّة تراخيصهم. لا تتحمل المنصة مسؤولية أي اتفاق يتم خارجها بين الأطراف.</p></div>
               <div><h2 className="font-bold text-gray-900 mb-1">٣. الاستخدام المقبول</h2><p>يُمنع استخدام المنصة لأي غرض غير نظامي أو لنشر بيانات مضلّلة أو إعلانات وهمية.</p></div>
               <div><h2 className="font-bold text-gray-900 mb-1">٤. حدود المسؤولية</h2><p>تُقدَّم الخدمة «كما هي»، ولا تضمن المنصة خلوّها من الأخطاء أو دقّة كل البيانات المعروضة بشكل مطلق.</p></div>
@@ -1231,18 +1231,18 @@ export default function Home() {
             <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#EAF0F6] rounded-t-3xl" />
             <div className="relative z-10">
               <h1 className="text-2xl font-bold mb-2">عن مؤشر العقارية</h1>
-              <p className="text-white/85 text-sm max-w-md mx-auto leading-relaxed">منصّة تجعل سوق الإيجار السكني في الرياض شفّافاً — تعرف السعر العادل قبل توقيع العقد.</p>
+              <p className="text-white/85 text-sm max-w-md mx-auto leading-relaxed">منصّة تجعل سوق الإيجار السكني في الرياض شفّافاً — تعرف مؤشر أسعار الحي قبل توقيع العقد.</p>
             </div>
           </div>
           <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
             <div className="bg-white rounded-2xl border border-[#cfd9e4] shadow-sm p-6 text-[#33414f] text-sm leading-relaxed space-y-4">
               <div>
                 <h2 className="font-bold text-[#0f1a28] text-base mb-1 sec-underline">فكرتنا</h2>
-                <p>نُساعد الباحث عن سكن والمكتب العقاري على اتخاذ قرار واثق، عبر مؤشر «السعر العادل» الذي يقارن أي إيجار بمتوسط سوق الحي، وخريطة تفاعلية، ومساعد ذكي يفهم طلبك بكلامك.</p>
+                <p>نُساعد الباحث عن سكن والمكتب العقاري على اتخاذ قرار واثق، عبر «مؤشر أسعار الحي» الذي يقارن أي إيجار بمتوسط سوق الحي، وخريطة تفاعلية، ومساعد ذكي يفهم طلبك بكلامك.</p>
               </div>
               <div className="grid sm:grid-cols-3 gap-3">
                 {[
-                  { t: 'السعر العادل', d: 'قارن أي إيجار بمتوسط الحي فوراً.' },
+                  { t: 'مؤشر أسعار الحي', d: 'السعر المتوسط لعدد الصفقات المماثلة بنفس الحي.' },
                   { t: 'خريطة شفافة', d: 'شاهد الأسعار وحالتها على الخريطة.' },
                   { t: 'مساعد ذكي', d: 'اكتب رغبتك ونرتّب لك الأنسب.' },
                 ].map((f) => (
@@ -1738,7 +1738,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
 
 
   const calcFair = () => {
-    // السعر العادل = متوسط /admin للحي والنوع (mktAvg) معدّلاً بالمساحة. لا أرقام ثابتة.
+    // مؤشر أسعار الحي = متوسط /admin للحي والنوع (mktAvg) معدّلاً بالمساحة. لا أرقام ثابتة.
     const base = fairForType(mktAvg[cHood], cType);
     const area = parseInt(cArea) || 130;
     return Math.round(base * (area / 130));
@@ -1865,7 +1865,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
               <button onClick={() => setOffPage('calc')}
                 className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm hover:border-blue-300 transition-all">
                 <div className="text-lg font-bold text-gray-900 mb-1">الحاسبة</div>
-                <div className="text-xs text-gray-500">احسب السعر العادل</div>
+                <div className="text-xs text-gray-500">احسب مؤشر أسعار الحي</div>
               </button>
               <button onClick={() => setOffPage('inquiries')}
                 className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm hover:border-blue-300 transition-all">
@@ -1983,7 +1983,10 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">نوع العقار</label>
                     <select className={selectCls} value={fType} onChange={e=>setFType(e.target.value)}><option>شقة</option><option>فيلا</option><option>دور</option><option>دوبلكس</option><option>استوديو</option></select></div>
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحي</label>
-                    <select className={selectCls} value={fHood} onChange={e=>setFHood(e.target.value)}><option>النرجس</option><option>العليا</option><option>الملقا</option><option>حطين</option><option>الياسمين</option><option>القيروان</option><option>النخيل</option><option>إشبيلية</option></select></div>
+                    {/* مصدر واحد للأحياء: نفس قائمة جدول neighborhoods (mktAvg) المعروضة في الأدمن والفلاتر */}
+                    <select className={selectCls} value={fHood} onChange={e=>setFHood(e.target.value)}>
+                      {Object.keys(mktAvg).map((h) => <option key={h} value={h}>{h}</option>)}
+                    </select></div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">الإيجار السنوي (ريال)</label>
@@ -2086,7 +2089,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
             {addStep === 2 && (
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                 <div className="font-bold text-gray-900 mb-1">الحاسبة الذكية</div>
-                <div className="text-sm text-gray-500 mb-4">احسب السعر العادل والربح المتوقع (اختياري)</div>
+                <div className="text-sm text-gray-500 mb-4">احسب مؤشر أسعار الحي والربح المتوقع (اختياري)</div>
                 <div className="grid grid-cols-2 gap-12">
                   <div className="space-y-3">
                     <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحي</label>
@@ -2118,7 +2121,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                     <div className="text-sm font-bold text-gray-700 mb-3">النتيجة الذكية</div>
                     <div className="space-y-2">
                       {[
-                        { label:'السعر العادل', val:`${fair.toLocaleString('ar-SA')} ريال`, color:'text-[#0A3D62]', big:true },
+                        { label:'مؤشر أسعار الحي', val:`${fair.toLocaleString('ar-SA')} ريال`, color:'text-[#0A3D62]', big:true },
                         { label:'السعر التنافسي (-5%)', val:`${Math.round(fair*0.95).toLocaleString('ar-SA')} ريال`, color:'text-gray-700' },
                         { label:'الحد الأدنى الآمن', val:`${minSafe.toLocaleString('ar-SA')} ريال`, color:'text-orange-600' },
                         { label:'ربحك المتوقع', val:`${profit > 0 ? '+' : ''}${profit.toLocaleString('ar-SA')} ريال`, color: profit > 0 ? 'text-green-600' : 'text-red-600', big:true },
@@ -2130,7 +2133,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                       ))}
                     </div>
                     <div className={`mt-3 p-3 rounded-xl text-xs leading-relaxed ${profit < 0 ? 'bg-red-50 text-red-700 border border-red-200' : profit/fair < 0.1 ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'bg-blue-50 text-blue-800 border border-blue-200'}`}>
-                      {profit < 0 ? 'تحذير: ربحك سلبي — راجع التكاليف أو ارفع السعر' : profit/fair < 0.1 ? 'هامش الربح ضيق — أنصح بتثبيت السعر العادل' : 'السوق نشط — تقدر تثبت السعر العادل بثقة'}
+                      {profit < 0 ? 'تحذير: ربحك سلبي — راجع التكاليف أو ارفع السعر' : profit/fair < 0.1 ? 'هامش الربح ضيق — أنصح بتثبيت مؤشر أسعار الحي' : 'السوق نشط — تقدر تثبت مؤشر أسعار الحي بثقة'}
                     </div>
                   </div>
                 </div>
@@ -2195,7 +2198,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         {offPage === 'calc' && (
           <div>
             <div className="text-xl font-bold text-gray-900 mb-1">الحاسبة الذكية</div>
-            <div className="text-sm text-gray-500 mb-5">احسب السعر العادل والربح المتوقع لأي عقار</div>
+            <div className="text-sm text-gray-500 mb-5">احسب مؤشر أسعار الحي والربح المتوقع لأي عقار</div>
             <div className="grid grid-cols-2 gap-5">
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-3">
                 <div className="grid grid-cols-2 gap-3">
@@ -2226,7 +2229,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                 <div className="font-bold text-gray-800 mb-4">النتيجة</div>
                 <div className="space-y-3">
                   {[
-                    { label:'السعر العادل في السوق', val:`${fair.toLocaleString('ar-SA')} ريال`, color:'text-[#0A3D62]', big:true },
+                    { label:'مؤشر أسعار الحي', val:`${fair.toLocaleString('ar-SA')} ريال`, color:'text-[#0A3D62]', big:true },
                     { label:'السعر التنافسي (-5%)', val:`${Math.round(fair*0.95).toLocaleString('ar-SA')} ريال`, color:'text-gray-700' },
                     { label:'الحد الأدنى الآمن', val:`${minSafe.toLocaleString('ar-SA')} ريال`, color:'text-orange-600' },
                     { label:'الربح المتوقع سنوياً', val:`${profit > 0 ? '+' : ''}${profit.toLocaleString('ar-SA')} ريال`, color: profit > 0 ? 'text-green-600' : 'text-red-600', big:true },
@@ -2239,7 +2242,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                 </div>
                 <div className={`mt-4 p-3 rounded-xl text-sm leading-relaxed ${profit < 0 ? 'bg-red-50 text-red-700 border border-red-200' : profit/fair < 0.1 ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'bg-blue-50 text-blue-800 border border-blue-200'}`}>
                   <strong>نصيحة: </strong>
-                  {profit < 0 ? 'ربحك سلبي — راجع التكاليف أو ارفع السعر' : profit/fair < 0.1 ? 'هامش الربح ضيق — أنصح بتثبيت السعر العادل' : 'السوق نشط — تقدر تثبت السعر العادل بثقة'}
+                  {profit < 0 ? 'ربحك سلبي — راجع التكاليف أو ارفع السعر' : profit/fair < 0.1 ? 'هامش الربح ضيق — أنصح بتثبيت مؤشر أسعار الحي' : 'السوق نشط — تقدر تثبت مؤشر أسعار الحي بثقة'}
                 </div>
               </div>
             </div>
