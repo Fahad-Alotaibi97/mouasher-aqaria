@@ -40,3 +40,93 @@ body {
   to   { opacity: 1; transform: translateY(0); }
 }
 .card-fade { animation: cardFade .35s ease; }
+
+/* ════════════════════════════════════════════════════════════
+   لوحة الإدارة فقط — ثيم داكن «Estate Intelligence».
+   مقصور تماماً على /admin عبر الكلاسين .admin-bg / .admin-shell، فلا يمسّ
+   الموقع العام إطلاقاً (لا يحمل أيٌّ من صفحات الزوار هذين الكلاسين).
+   الفكرة: إعادة تلوين توكنات الأسطح/النصوص/الحدود المتكرّرة فقط — نفس البنية،
+   نفس المحتوى والبيانات الحقيقية، مظهر داكن جديد. الشارات الدلالية الفاتحة
+   (أخضر/كهرماني/أحمر للحالات) تبقى رقائق فاتحة مقروءة فوق السطح الداكن.
+   ════════════════════════════════════════════════════════════ */
+.admin-bg {
+  --adm-bg: #0b1326;          /* الخلفية الرئيسية */
+  --adm-lowest: #060e20;
+  --adm-low: #131b2e;
+  --adm-card: #171f33;        /* خلفية البطاقة */
+  --adm-high: #222a3d;        /* بطاقة مرتفعة / hover */
+  --adm-highest: #2d3449;
+  --adm-on: #dae2fd;          /* النص الأساسي */
+  --adm-on-variant: #bbcabf;  /* النص الثانوي المكتوم */
+  --adm-outline: rgba(134,148,138,.18);        /* حدود شعرية خفيفة */
+  --adm-outline-strong: rgba(134,148,138,.32);
+  --adm-primary: #4edea3;     /* الزمرّدي — لون الإبراز */
+  --adm-primary-container: #10b981;
+  --adm-on-primary: #003824;  /* نص فوق الزمرّدي */
+  --adm-secondary: #ffb95f;   /* الكهرماني — تحذيرات/إحصاءات ثانوية */
+  --adm-error: #ffb4ab;
+  background: var(--adm-bg);
+  color-scheme: dark;
+}
+.admin-shell { color: var(--adm-on); }
+
+/* الخلفيات المحايدة → أسطح داكنة */
+.admin-shell .bg-white { background-color: var(--adm-card); }
+.admin-shell .bg-gray-50 { background-color: var(--adm-low); }
+.admin-shell .bg-gray-100 { background-color: var(--adm-high); }
+.admin-shell .bg-gray-200 { background-color: var(--adm-highest); }
+.admin-shell .bg-\[\#f0f4f8\] { background-color: var(--adm-high); }
+.admin-shell .bg-\[\#EAF0F6\] { background-color: var(--adm-bg); }
+.admin-shell .hover\:bg-gray-50:hover { background-color: var(--adm-high); }
+.admin-shell .hover\:bg-\[\#f0f4f8\]:hover { background-color: var(--adm-high); }
+.admin-shell .hover\:bg-gray-100:hover { background-color: var(--adm-highest); }
+
+/* لوحات معلومات بخلفية فاتحة مخصّصة تقترن بنص مكتوم → تُعتَّم لتبقى مقروءة */
+.admin-shell .bg-\[\#f0f6fb\] { background-color: rgba(78,222,163,.08); }
+.admin-shell .bg-\[\#f7f3fb\] { background-color: rgba(255,185,95,.08); }
+
+/* النصوص */
+.admin-shell .text-\[\#0f1a28\] { color: var(--adm-on); }
+.admin-shell .text-\[\#33414f\] { color: var(--adm-on-variant); }
+.admin-shell .text-\[\#5b6b7a\] { color: var(--adm-on-variant); }
+.admin-shell .text-\[\#0A3D62\] { color: var(--adm-primary); }
+.admin-shell .text-\[\#1B6CA8\] { color: var(--adm-primary); }
+.admin-shell .text-blue-600 { color: var(--adm-primary); }
+.admin-shell .text-gray-400 { color: #8593a8; }
+.admin-shell .text-gray-500 { color: var(--adm-on-variant); }
+.admin-shell .text-gray-600 { color: var(--adm-on-variant); }
+.admin-shell .text-gray-700 { color: var(--adm-on-variant); }
+.admin-shell .text-gray-900 { color: var(--adm-on); }
+
+/* الحدود */
+.admin-shell .border-\[\#cfd9e4\] { border-color: var(--adm-outline); }
+.admin-shell .border-\[\#f0f4f8\] { border-color: var(--adm-outline); }
+.admin-shell .border-\[\#eef2f7\] { border-color: var(--adm-outline); }
+.admin-shell .border-\[\#dde9f4\] { border-color: var(--adm-outline); }
+.admin-shell .border-\[\#e7ddf2\] { border-color: var(--adm-outline); }
+.admin-shell .border-gray-200 { border-color: var(--adm-outline); }
+.admin-shell .border-gray-300 { border-color: var(--adm-outline-strong); }
+
+/* الأزرار/الأشرطة الأساسية (التدرّج الكحلي→أزرق) → تدرّج زمرّدي على السطح الداكن.
+   يشمل: أزرار الحفظ/الإرسال، أشرطة RankList في التحليلات. */
+.admin-shell .bg-gradient-to-l.from-\[\#1B6CA8\] {
+  background-image: linear-gradient(to left, #10b981, #047857);
+}
+
+/* حقول الإدخال على سطح داكن (الأسعار/التعديل) */
+.admin-shell input,
+.admin-shell textarea,
+.admin-shell select {
+  background-color: var(--adm-card);
+  color: var(--adm-on);
+  border-color: var(--adm-outline-strong);
+}
+.admin-shell input::placeholder,
+.admin-shell textarea::placeholder { color: #7e8aa0; }
+
+/* شريط الإبراز الزمرّدي على بطاقات الإحصاء (تحذيري ⇒ كهرماني) */
+.admin-shell .adm-stat-accent {
+  position: absolute; top: 0; inset-inline-start: 0;
+  width: 3px; height: 100%; background: var(--adm-primary); border-radius: 3px;
+}
+.admin-shell .adm-stat-warn .adm-stat-accent { background: var(--adm-secondary); }

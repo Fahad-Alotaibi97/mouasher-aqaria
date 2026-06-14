@@ -265,12 +265,12 @@ export default function AdminPage() {
 
   const wrap = (children: React.ReactNode) => (
     <div
-      className="min-h-screen bg-[#EAF0F6]"
+      className="min-h-screen admin-bg"
       dir="rtl"
       style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}
     >
       <SiteNav active="admin" />
-      <div className="flex items-center justify-center p-6">
+      <div className="admin-shell flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 max-w-md w-full shadow-sm">{children}</div>
       </div>
     </div>
@@ -314,12 +314,44 @@ export default function AdminPage() {
   // ── لوحة التحرير (accordion) ─────────────────────────────────
   return (
     <div
-      className="min-h-screen bg-[#EAF0F6]"
+      className="min-h-screen admin-bg"
       dir="rtl"
       style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}
     >
       <SiteNav active="admin" />
-      <div className="max-w-6xl mx-auto p-4 sm:p-6 flex flex-col md:flex-row gap-5 items-start">
+      <div className="admin-shell max-w-6xl mx-auto p-4 sm:p-6">
+        {/* ── شريط علوي داكن: السياق + جرس للرسائل + هوية المدير (بيانات حقيقية) ── */}
+        <div className="flex items-center justify-between gap-3 mb-5 pb-4 border-b border-[var(--adm-outline)]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-10 h-10 rounded-xl bg-[rgba(78,222,163,.14)] border border-[rgba(78,222,163,.3)] flex items-center justify-center text-[var(--adm-primary)] flex-shrink-0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 21h18M9 21V7l6-4v18M9 7H3v14" /><path d="M13 11h2M13 15h2M5 11h2M5 15h2" /></svg>
+            </span>
+            <div className="leading-tight min-w-0">
+              <div className="font-extrabold text-[var(--adm-primary)] text-base leading-none">مؤشر العقارية</div>
+              <div className="text-[11px] text-[var(--adm-on-variant)] mt-0.5">لوحة الإدارة</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* جرس = اختصار حقيقي للرسائل والطلبات (لا إشعارات وهمية) */}
+            <button
+              onClick={() => setSection('leads')}
+              aria-label="الرسائل والطلبات"
+              title="الرسائل والطلبات"
+              className="w-10 h-10 rounded-xl bg-[var(--adm-card)] border border-[var(--adm-outline)] flex items-center justify-center text-[var(--adm-on-variant)] hover:text-[var(--adm-primary)] hover:border-[rgba(78,222,163,.4)] transition-colors"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
+            </button>
+            {/* هوية المدير الحقيقية (البريد من الجلسة) */}
+            <div className="flex items-center gap-2.5 bg-[var(--adm-card)] border border-[var(--adm-outline)] rounded-xl pl-3 pr-2 py-1.5">
+              <div className="text-right leading-tight min-w-0 hidden sm:block">
+                <div className="text-xs font-bold text-[var(--adm-on)] truncate max-w-[180px]" title={user?.email ?? ''}>{user?.email ?? '—'}</div>
+                <div className="text-[10px] text-[var(--adm-primary)]">مدير المنصة</div>
+              </div>
+              <span className="w-8 h-8 rounded-lg bg-[var(--adm-primary-container)] text-[var(--adm-on-primary)] flex items-center justify-center font-extrabold flex-shrink-0">م</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col md:flex-row gap-5 items-start">
         <AdminSidebar
           section={section}
           setSection={setSection}
@@ -539,6 +571,7 @@ export default function AdminPage() {
         {section === 'clients' && <ClientsSection sessionAdmin={sessionAdmin} />}
         {section === 'leads' && <LeadsSection sessionAdmin={sessionAdmin} />}
         </main>
+        </div>
       </div>
     </div>
   );

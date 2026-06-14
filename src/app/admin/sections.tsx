@@ -113,22 +113,26 @@ function budgetBucket(n: number): string {
 }
 
 function StatCard({ label, val, warn }: { label: string; val: number; warn?: boolean }) {
+  const caution = warn && val > 0;
   return (
-    <div className={`${card} p-4 ${warn && val > 0 ? 'border-amber-300 bg-amber-50/50' : ''}`}>
-      <div className="text-xs text-[#33414f] mb-2 font-medium">{label}</div>
-      <div className={`text-3xl font-extrabold ${warn && val > 0 ? 'text-amber-700' : 'text-[#0A3D62]'}`}>{fmtNum(val)}</div>
+    <div className={`${card} relative overflow-hidden p-4 ${caution ? 'adm-stat-warn' : ''}`}>
+      <span className="adm-stat-accent" />
+      <div className="text-xs text-[var(--adm-on-variant)] mb-2 font-medium">{label}</div>
+      <div className={`text-3xl font-extrabold ${caution ? 'text-[var(--adm-secondary)]' : 'text-[var(--adm-on)]'}`}>{fmtNum(val)}</div>
     </div>
   );
 }
 
 // ── شارات الأيقونات الملوّنة: مربع صغير معبّأ بلون من عائلة المنصة، الأيقونة
 //    بيضاء فوقه (والذهبي بأيقونة داكنة للتباين) — تعيين ثابت لكل قسم، لا عشوائية.
+// الثيم الداكن: خلفيات شفافة خفيفة بأيقونة بلون مُشِع (زمرّدي/كهرماني/أزرق فولاذي)
+// لتبرز على بطاقة داكنة (بدل المربّعات الكحلية الصلبة الباهتة على الداكن).
 const TONES: Record<string, { bg: string; fg: string }> = {
-  navy: { bg: '#0A3D62', fg: '#ffffff' },
-  blue: { bg: '#1B6CA8', fg: '#ffffff' },
-  steel: { bg: '#13496E', fg: '#ffffff' },
-  green: { bg: '#0F6E56', fg: '#ffffff' },
-  gold: { bg: '#C9A84C', fg: '#3A2E0A' },
+  navy: { bg: 'rgba(78,222,163,.15)', fg: '#4edea3' },
+  blue: { bg: 'rgba(78,222,163,.15)', fg: '#4edea3' },
+  steel: { bg: 'rgba(143,170,255,.15)', fg: '#9db4ff' },
+  green: { bg: 'rgba(78,222,163,.15)', fg: '#4edea3' },
+  gold: { bg: 'rgba(255,185,95,.15)', fg: '#ffb95f' },
 };
 const AIcon: Record<string, React.ReactNode> = {
   star: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>),
@@ -863,7 +867,7 @@ export function OfficesSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                   {o.verified ? 'إلغاء التوثيق' : 'توثيق ✓'}
                 </button>
                 <button onClick={() => patch(o.id, { active: !o.active })} disabled={busy === o.id}
-                  className={`text-xs px-3 py-1.5 rounded-lg font-bold border disabled:opacity-50 ${o.active ? 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200' : 'bg-blue-50 text-[#0A3D62] border-blue-200 hover:bg-blue-100'}`}>
+                  className={`text-xs px-3 py-1.5 rounded-lg font-bold border disabled:opacity-50 ${o.active ? 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200' : 'bg-[rgba(78,222,163,.12)] text-[var(--adm-primary)] border-[rgba(78,222,163,.32)] hover:bg-[rgba(78,222,163,.2)]'}`}>
                   {o.active ? 'إيقاف' : 'تفعيل'}
                 </button>
                 <button onClick={() => toggleListings(o.id)}
@@ -1095,7 +1099,7 @@ export function ClientsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                     <div className="font-bold text-[#0f1a28] text-sm flex items-center gap-2 flex-wrap">
                       {c.full_name || '— بلا اسم —'}
                       {c.is_admin && (
-                        <span className="text-[10px] bg-[#C9A84C] text-[#0A3D62] px-2 py-0.5 rounded font-bold">مدير المنصة</span>
+                        <span className="text-[10px] bg-[rgba(255,185,95,.16)] text-[var(--adm-secondary)] border border-[rgba(255,185,95,.32)] px-2 py-0.5 rounded font-bold">مدير المنصة</span>
                       )}
                     </div>
                     {c.phone && <div className="text-xs text-[#1B6CA8] mt-0.5" dir="ltr" style={{ textAlign: 'right' }}>{c.phone}</div>}
@@ -1123,6 +1127,16 @@ const SIDEBAR_ITEMS: { id: AdminSection; label: string }[] = [
   { id: 'leads', label: 'الرسائل والطلبات' },
 ];
 
+// أيقونات أقسام الشريط الجانبي (زخرفية — تُعنون أقساماً حقيقية موجودة)
+const SIDEBAR_ICONS: Record<AdminSection, React.ReactNode> = {
+  prices: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/><path d="M16 3H8"/></svg>),
+  stats: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 4 4-8"/></svg>),
+  listings: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>),
+  offices: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 21h18M9 21V7l6-4v18M9 7H3v14"/><path d="M13 11h2M13 15h2M5 11h2M5 15h2"/></svg>),
+  clients: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>),
+  leads: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>),
+};
+
 export function AdminSidebar({ section, setSection, userEmail, onExit, exitLabel }: {
   section: AdminSection; setSection: (s: AdminSection) => void;
   userEmail: string | null; onExit: () => void; exitLabel: string;
@@ -1130,12 +1144,16 @@ export function AdminSidebar({ section, setSection, userEmail, onExit, exitLabel
   return (
     <aside className="w-full md:w-56 flex-shrink-0">
       <div className={`${card} p-2`}>
-        {SIDEBAR_ITEMS.map((it) => (
-          <button key={it.id} onClick={() => setSection(it.id)}
-            className={`w-full text-right px-3 py-2.5 rounded-xl text-sm mb-1 font-medium transition-colors ${section === it.id ? 'bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white font-bold shadow' : 'text-[#33414f] hover:bg-[#f0f4f8]'}`}>
-            {it.label}
-          </button>
-        ))}
+        {SIDEBAR_ITEMS.map((it) => {
+          const isActive = section === it.id;
+          return (
+            <button key={it.id} onClick={() => setSection(it.id)}
+              className={`w-full flex items-center gap-2.5 text-right px-3 py-2.5 rounded-xl text-sm mb-1 font-medium border-r-[3px] transition-colors ${isActive ? 'bg-[rgba(78,222,163,.12)] text-[var(--adm-primary)] font-bold border-[var(--adm-primary)]' : 'text-[var(--adm-on-variant)] border-transparent hover:bg-[var(--adm-high)] hover:text-[var(--adm-on)]'}`}>
+              <span className="w-[18px] h-[18px] flex-shrink-0">{SIDEBAR_ICONS[it.id]}</span>
+              {it.label}
+            </button>
+          );
+        })}
         <div className="border-t border-[#eef2f7] mt-2 pt-2 px-1">
           {userEmail && <div className="text-[11px] text-[#33414f] truncate mb-2" title={userEmail}>{userEmail}</div>}
           <button onClick={onExit} className="w-full text-xs text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50">
