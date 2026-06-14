@@ -112,13 +112,26 @@ function budgetBucket(n: number): string {
   return 'أكثر من 100 ألف';
 }
 
-function StatCard({ label, val, warn }: { label: string; val: number; warn?: boolean }) {
+function StatCard({ label, val, warn, icon, sub, subTone }: { label: string; val: number; warn?: boolean; icon?: string; sub?: string; subTone?: 'up' | 'warn' }) {
   const caution = warn && val > 0;
   return (
-    <div className={`${card} relative overflow-hidden p-4 ${caution ? 'adm-stat-warn' : ''}`}>
+    <div className={`${card} relative overflow-hidden p-5 ${caution ? 'adm-stat-warn' : ''}`}>
       <span className="adm-stat-accent" />
-      <div className="text-xs text-[var(--adm-on-variant)] mb-2 font-medium">{label}</div>
-      <div className={`text-3xl font-extrabold ${caution ? 'text-[var(--adm-secondary)]' : 'text-[var(--adm-on)]'}`}>{fmtNum(val)}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-xs text-[var(--adm-on-variant)] font-medium">{label}</div>
+        {icon && <IconBadge icon={icon} tone={caution ? 'gold' : 'green'} />}
+      </div>
+      <div className={`text-3xl font-extrabold mt-3 ${caution ? 'text-[var(--adm-secondary)]' : 'text-[var(--adm-on)]'}`}>{fmtNum(val)}</div>
+      {sub && (
+        <div className={`text-[11px] mt-2 flex items-center gap-1 font-medium ${subTone === 'warn' ? 'text-[var(--adm-secondary)]' : 'text-[var(--adm-primary)]'}`}>
+          <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            {subTone === 'warn'
+              ? <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              : <path d="M12 19V5M5 12l7-7 7 7" />}
+          </svg>
+          <span className="truncate">{sub}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -157,9 +170,10 @@ function IconBadge({ icon, tone }: { icon: string; tone: string }) {
 }
 
 // بطاقة فرعية موحّدة لأقسام اللوحة — أيقونتها على خلفية معبّأة (لا خلفيات بيضاء)
-function SubCard({ title, hint, icon, tone, children }: { title: string; hint?: string; icon?: string; tone?: string; children: React.ReactNode }) {
+function SubCard({ title, hint, icon, tone, accent, children }: { title: string; hint?: string; icon?: string; tone?: string; accent?: 'primary' | 'secondary'; children: React.ReactNode }) {
   return (
-    <div className={`${card} p-4`}>
+    <div className={`${card} relative overflow-hidden p-4`}>
+      {accent && <span className={`adm-accent-bar${accent === 'secondary' ? ' amber' : ''}`} />}
       <div className="flex items-center gap-2.5">
         {icon && <IconBadge icon={icon} tone={tone ?? 'navy'} />}
         <div className="min-w-0">
@@ -406,6 +420,18 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
       )}
       {loading ? <Loading /> : !err && (
         <>
+          {/* ── صف البطاقات الأربع البارزة (مقاييس حقيقية) — أعلى اللوحة كالمرجع ── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <StatCard label="إجمالي الإعلانات" val={listings.length} icon="home"
+              sub={pendingListings.length ? `${fmtNum(pendingListings.length)} بانتظار الاعتماد` : 'الكل معتمد'} subTone={pendingListings.length ? 'warn' : 'up'} />
+            <StatCard label="إجمالي المكاتب" val={offices.length} icon="building"
+              sub={`${fmtNum(offices.filter((o) => o.verified).length)} مكتب موثّق`} subTone="up" />
+            <StatCard label="إجمالي الاستفسارات" val={inquiries.length} icon="chat"
+              sub={`+${fmtNum(inquiriesWeek.length)} هذا الأسبوع`} subTone="up" />
+            <StatCard label="بانتظار الاعتماد" val={pendingListings.length + pendingOffices.length} warn icon="list"
+              sub={`إعلانات ${fmtNum(pendingListings.length)} · مكاتب ${fmtNum(pendingOffices.length)}`} subTone="warn" />
+          </div>
+
           {/* ── المستخدمون المسجّلون (حسابات فعلية معروفة — بعكس الزيارات المجهولة) ── */}
           {registered === null ? (
             profilesErr && (
@@ -455,190 +481,180 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
             </>
           )}
 
-          {/* ── الملخص العلوي ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
-            <StatCard label="إجمالي الإعلانات" val={listings.length} />
-            <StatCard label="إجمالي المكاتب" val={offices.length} />
-            <StatCard label="إجمالي الاستفسارات" val={inquiries.length} />
-            <StatCard label="استفسارات هذا الأسبوع" val={inquiriesWeek.length} />
-            <StatCard label="إعلانات بانتظار الاعتماد" val={pendingListings.length} warn />
-            <StatCard label="مكاتب بانتظار الاعتماد" val={pendingOffices.length} warn />
-          </div>
+          {/* ════ شبكة عمودين كالمرجع: لوحة عريضة (تحليلات) + عمود جانبي أضيق ════ */}
+          <div className="grid lg:grid-cols-3 gap-6 mt-6 items-start">
 
-          {/* ── أكثر الميزات استخداماً ── */}
-          {head('أكثر الميزات استخداماً', 'star', 'steel')}
-          {eventsMissing ? (
-            <Empty text="يتطلّب تفعيل التتبّع — شغّل supabase/analytics_events.sql ثم analytics_page_view.sql." />
-          ) : (
-            <SubCard title="ترتيب ميزات المنصة بالاستخدام الفعلي" hint="أعداد دقيقة (COUNT) من أحداث التتبّع — كل الأنواع منذ تفعيل تتبّع كلٍّ منها" icon="star" tone="steel">
-              {!anyFeatureUse ? (
-                <MiniEmpty text="لا توجد بيانات بعد — يبدأ الترتيب مع أول استخدام من الزوار." />
+            {/* ═══ اللوحة العريضة (≈⅔): أداء المنصة والتفاعل — التحليلات التفصيلية ═══ */}
+            <div className="lg:col-span-2 space-y-5 min-w-0">
+              {head('أداء المنصة والتفاعل', 'chart', 'green')}
+
+              {/* أكثر الميزات استخداماً */}
+              {eventsMissing ? (
+                <Empty text="يتطلّب تفعيل التتبّع — شغّل supabase/analytics_events.sql ثم analytics_page_view.sql." />
               ) : (
-                <>
-                  <RankList rows={featureRank} unit="استخدام" />
-                  {visits !== null && (
-                    <div className="text-[11px] text-[#5b6b7a] mt-2">للسياق: {fmtNum(visits.total)} زيارة للموقع إجمالاً.</div>
+                <SubCard title="أكثر الميزات استخداماً" hint="أعداد دقيقة (COUNT) من أحداث التتبّع — كل الأنواع منذ تفعيل تتبّع كلٍّ منها" icon="star" tone="steel">
+                  {!anyFeatureUse ? (
+                    <MiniEmpty text="لا توجد بيانات بعد — يبدأ الترتيب مع أول استخدام من الزوار." />
+                  ) : (
+                    <>
+                      <RankList rows={featureRank} unit="استخدام" />
+                      {visits !== null && (
+                        <div className="text-[11px] text-[#5b6b7a] mt-2">للسياق: {fmtNum(visits.total)} زيارة للموقع إجمالاً.</div>
+                      )}
+                    </>
                   )}
-                </>
+                </SubCard>
               )}
-            </SubCard>
-          )}
 
-          {/* ── صحة المنصة ── */}
-          {head('صحة المنصة', 'shield', 'green')}
-          <div className="grid md:grid-cols-2 gap-3">
-            <SubCard title="بانتظار اعتمادك" hint="إعلانات ومكاتب جديدة تحتاج مراجعتك — من قسمي الإدارة" icon="list" tone="gold">
-              {pendingListings.length === 0 && pendingOffices.length === 0 ? (
-                <MiniEmpty text="لا شيء بانتظار الاعتماد — كل المراجعات منجزة ✓" />
-              ) : (
-                <div className="space-y-1.5">
-                  {pendingListings.slice(0, 5).map((l) => (
-                    <div key={l.id} className="flex items-center justify-between text-xs">
-                      <span className="text-[#0f1a28] truncate">{l.title} <span className="text-[#5b6b7a]">· {l.hood}</span></span>
-                      <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded whitespace-nowrap">إعلان بانتظار</span>
-                    </div>
-                  ))}
-                  {pendingListings.length > 5 && <div className="text-[11px] text-[#5b6b7a]">+ {fmtNum(pendingListings.length - 5)} إعلانات أخرى في «إدارة الإعلانات»</div>}
-                  {pendingOffices.slice(0, 5).map((o) => (
-                    <div key={o.id} className="flex items-center justify-between text-xs">
-                      <span className="text-[#0f1a28] truncate">{o.name}</span>
-                      <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded whitespace-nowrap">مكتب بانتظار</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SubCard>
-            <SubCard title="حالة المكاتب والتحويل" icon="building" tone="steel">
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-[#33414f]">مكاتب نشطة / موقوفة</span>
-                  <span className="font-bold text-[#0f1a28]">{fmtNum(activeOffices.length)} نشط · {fmtNum(offices.length - activeOffices.length)} موقوف</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[#33414f]">مكاتب موثّقة</span>
-                  <span className="font-bold text-[#0f1a28]">{fmtNum(offices.filter((o) => o.verified).length)} من {fmtNum(offices.length)}</span>
-                </div>
-                <div className="flex items-center justify-between border-t border-[#f0f4f8] pt-2">
-                  <span className="text-[#33414f]">التحويل: نقرات إعلانات ← استفسارات</span>
-                  <span className="font-bold text-[#0f1a28]">
-                    {conversion === null ? '—' : `${fmtNum(conversion)}٪`}
-                  </span>
-                </div>
-                <div className="text-[11px] text-[#5b6b7a] leading-relaxed">
-                  {conversion === null
-                    ? eventsMissing ? 'تحتاج تفعيل التتبّع (SQL أعلاه) لقياس النقرات.' : 'لا نقرات مسجّلة بعد — يبدأ القياس مع استخدام الزوار.'
-                    : `${fmtNum(clicks.length)} نقرة إعلان ← ${fmtNum(linkedInquiries)} استفسار مرتبط بإعلان (منذ تفعيل التتبّع).`}
-                </div>
+              {/* التفاعل مع الإعلانات */}
+              <div className="grid md:grid-cols-2 gap-3">
+                <SubCard title="الإعلانات الأكثر استفساراً" hint="من جدول leads — استفسارات مرتبطة بإعلان محدّد" icon="chat" tone="navy">
+                  <RankList rows={inquiredRank} unit="استفسار" />
+                </SubCard>
+                <SubCard title="الإعلانات الأكثر مشاهدة" hint="نقرات فتح الإعلان منذ تفعيل التتبّع" icon="eye" tone="blue">
+                  {eventsMissing ? <MiniEmpty text="يتطلّب تفعيل التتبّع (شغّل SQL أعلاه)." /> : <RankList rows={viewedRank} unit="نقرة" />}
+                </SubCard>
               </div>
-            </SubCard>
-          </div>
 
-          {/* ── التفاعل مع الإعلانات ── */}
-          {head('التفاعل مع الإعلانات', 'building', 'navy')}
-          <div className="grid md:grid-cols-2 gap-3">
-            <SubCard title="الإعلانات الأكثر استفساراً" hint="من جدول leads — استفسارات مرتبطة بإعلان محدّد" icon="chat" tone="navy">
-              <RankList rows={inquiredRank} unit="استفسار" />
-            </SubCard>
-            <SubCard title="الإعلانات الأكثر مشاهدة" hint="نقرات فتح الإعلان منذ تفعيل التتبّع" icon="eye" tone="blue">
-              {eventsMissing ? <MiniEmpty text="يتطلّب تفعيل التتبّع (شغّل SQL أعلاه)." /> : <RankList rows={viewedRank} unit="نقرة" />}
-            </SubCard>
-          </div>
-          <div className="mt-3">
-            <SubCard title="المكاتب الأكثر نشاطاً" hint="مرتّبة بالاستفسارات الواردة ثم عدد الإعلانات" icon="building" tone="green">
-              {activeOfficesRank.length === 0 ? <MiniEmpty /> : (
-                <div className="space-y-1.5">
-                  {activeOfficesRank.map((o, i) => (
-                    <div key={o.id} className="flex items-center justify-between text-xs gap-2">
-                      <span className="text-[#0f1a28] font-medium truncate"><span className="text-[#C9A84C] font-bold ml-1">{fmtNum(i + 1)}.</span>{o.name}</span>
-                      <span className="text-[#33414f] whitespace-nowrap">{fmtNum(o.listings)} إعلان · <b className="text-[#0A3D62]">{fmtNum(o.inquiries)}</b> استفسار</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SubCard>
-          </div>
-
-          {/* ── سلوك الباحثين ── */}
-          {head('سلوك الباحثين', 'search', 'blue')}
-          {eventsMissing ? (
-            <Empty text="يتطلّب هذا القسم تفعيل التتبّع — شغّل supabase/analytics_events.sql ثم ستتجمّع البيانات مع استخدام الزوار." />
-          ) : (
-            <div className="grid md:grid-cols-2 gap-3">
-              <SubCard title="الأحياء الأكثر طلباً" hint="من بحث الفلاتر والمساعد الذكي" icon="pin" tone="navy">
-                <RankList rows={hoodRank} unit="بحث" />
-              </SubCard>
-              <SubCard title="أنواع الوحدات الأكثر طلباً" icon="home" tone="steel">
-                <RankList rows={typeRank} unit="بحث" />
-              </SubCard>
-              <SubCard title="نطاقات الميزانية المطلوبة" hint="ميزانيات بحث الزوار مجمّعة في شرائح" icon="coins" tone="green">
-                <RankList rows={budgetRank} unit="بحث" />
-              </SubCard>
-              <SubCard title="أكثر عبارات المساعد الذكي" hint="نص ما يكتبه الزوار حرفياً (مقتطع)" icon="chat" tone="blue">
-                <RankList rows={aiQueriesRank} unit="مرة" />
-              </SubCard>
-            </div>
-          )}
-
-          {/* ── رغبات الباحثين غير المطابقة (طلبات لا تجد عرضاً) ── */}
-          {head('رغبات الباحثين غير المطابقة', 'pin', 'gold')}
-          {wishesMissing ? (
-            <Empty text="يتطلّب هذا القسم إنشاء الجدول — شغّل supabase/search_wishes.sql في Supabase، وبعدها يبدأ تسجيل كل بحث لم يجد عرضاً مطابقاً." />
-          ) : (
-            <>
-              <SubCard
-                title={`طلبات بلا عرض مطابق: ${fmtNum(wishes.length)}`}
-                hint="حين يبحث زائر بحي/نوع/سقف سعري محدّد ولا يجد المساعد الذكي إعلاناً مطابقاً — إشارة طلب بلا معروض (أين تستقطب مكاتب). بلا أي بيانات شخصية."
-                icon="search"
-                tone="gold"
-              >
-                {wishes.length === 0 ? (
-                  <MiniEmpty text="لا رغبات غير مطابقة بعد — يبدأ التسجيل مع أول بحث لا يجد عرضاً مطابقاً." />
-                ) : (
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-xs font-bold text-[#0A3D62] mb-2">الأكثر طلباً (حي + نوع)</div>
-                      <RankList rows={wishComboRank} unit="طلب" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-[#0A3D62] mb-2">الأحياء الأكثر طلباً بلا عرض مطابق</div>
-                      <RankList rows={wishHoodRank} unit="طلب" />
-                    </div>
+              {/* المكاتب الأكثر نشاطاً */}
+              <SubCard title="المكاتب الأكثر نشاطاً" hint="مرتّبة بالاستفسارات الواردة ثم عدد الإعلانات" icon="building" tone="green">
+                {activeOfficesRank.length === 0 ? <MiniEmpty /> : (
+                  <div className="space-y-1.5">
+                    {activeOfficesRank.map((o, i) => (
+                      <div key={o.id} className="flex items-center justify-between text-xs gap-2">
+                        <span className="text-[#0f1a28] font-medium truncate"><span className="text-[#C9A84C] font-bold ml-1">{fmtNum(i + 1)}.</span>{o.name}</span>
+                        <span className="text-[#33414f] whitespace-nowrap">{fmtNum(o.listings)} إعلان · <b className="text-[#0A3D62]">{fmtNum(o.inquiries)}</b> استفسار</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </SubCard>
-              {wishes.length >= EVENTS_CAP && (
-                <p className="text-[11px] text-[#5b6b7a] mt-2">ملاحظة: محسوبة على آخر {fmtNum(EVENTS_CAP)} رغبة.</p>
-              )}
-            </>
-          )}
 
-          {/* ── استخدام مؤشر أسعار الحي ── */}
-          {head('استخدام مؤشر أسعار الحي', 'chart', 'gold')}
-          {eventsMissing ? (
-            <Empty text="يتطلّب تفعيل التتبّع — شغّل supabase/analytics_events.sql." />
-          ) : (
-            <SubCard title={`إجمالي الاستخدام: ${fmtNum(indicatorUses.length)} مرة`} hint="كل تقييم سعر فعلي أجراه زائر — وتوزيع الأحكام يعكس واقع الأسعار المعروضة" icon="chart" tone="gold">
-              {indicatorUses.length === 0 ? <MiniEmpty text="لا استخدام مسجّلاً بعد — يبدأ العد مع استخدام الزوار للمؤشر." /> : (
-                <div className="space-y-2">
-                  {verdicts.map((v) => (
-                    <div key={v.key}>
-                      <div className="flex items-center justify-between text-xs mb-0.5">
-                        <span className={`font-bold ${v.txt}`}>{v.label}</span>
-                        <span className="text-[#0f1a28] font-bold">{fmtNum(v.count)} ({fmtNum(Math.round((v.count / indicatorUses.length) * 100))}٪)</span>
-                      </div>
-                      <div className="h-2 bg-[#f0f4f8] rounded-full overflow-hidden">
-                        <div className={`h-full bg-gradient-to-l ${v.cls} rounded-full`} style={{ width: `${Math.max(2, (v.count / indicatorUses.length) * 100)}%` }} />
-                      </div>
-                    </div>
-                  ))}
+              {/* سلوك الباحثين */}
+              {eventsMissing ? (
+                <Empty text="يتطلّب هذا القسم تفعيل التتبّع — شغّل supabase/analytics_events.sql ثم ستتجمّع البيانات مع استخدام الزوار." />
+              ) : (
+                <div className="grid md:grid-cols-2 gap-3">
+                  <SubCard title="الأحياء الأكثر طلباً" hint="من بحث الفلاتر والمساعد الذكي" icon="pin" tone="navy">
+                    <RankList rows={hoodRank} unit="بحث" />
+                  </SubCard>
+                  <SubCard title="أنواع الوحدات الأكثر طلباً" icon="home" tone="steel">
+                    <RankList rows={typeRank} unit="بحث" />
+                  </SubCard>
+                  <SubCard title="نطاقات الميزانية المطلوبة" hint="ميزانيات بحث الزوار مجمّعة في شرائح" icon="coins" tone="green">
+                    <RankList rows={budgetRank} unit="بحث" />
+                  </SubCard>
+                  <SubCard title="أكثر عبارات المساعد الذكي" hint="نص ما يكتبه الزوار حرفياً (مقتطع)" icon="chat" tone="blue">
+                    <RankList rows={aiQueriesRank} unit="مرة" />
+                  </SubCard>
                 </div>
               )}
-            </SubCard>
-          )}
 
-          {events.length >= EVENTS_CAP && (
-            <p className="text-[11px] text-[#5b6b7a] mt-3">ملاحظة: التجميعات محسوبة على آخر {fmtNum(EVENTS_CAP)} حدث.</p>
-          )}
+              {events.length >= EVENTS_CAP && (
+                <p className="text-[11px] text-[#5b6b7a] mt-1">ملاحظة: التجميعات محسوبة على آخر {fmtNum(EVENTS_CAP)} حدث.</p>
+              )}
+            </div>
+
+            {/* ═══ العمود الجانبي الأضيق (≈⅓): مهام ومؤشرات سريعة ═══ */}
+            <div className="space-y-5 min-w-0">
+              {head('متابعة سريعة', 'shield', 'green')}
+
+              {/* بانتظار اعتمادك */}
+              <SubCard title="بانتظار اعتمادك" hint="إعلانات ومكاتب جديدة تحتاج مراجعتك" icon="list" tone="gold" accent="secondary">
+                {pendingListings.length === 0 && pendingOffices.length === 0 ? (
+                  <MiniEmpty text="لا شيء بانتظار الاعتماد — كل المراجعات منجزة ✓" />
+                ) : (
+                  <div className="space-y-1.5">
+                    {pendingListings.slice(0, 5).map((l) => (
+                      <div key={l.id} className="flex items-center justify-between text-xs">
+                        <span className="text-[#0f1a28] truncate">{l.title} <span className="text-[#5b6b7a]">· {l.hood}</span></span>
+                        <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded whitespace-nowrap">إعلان بانتظار</span>
+                      </div>
+                    ))}
+                    {pendingListings.length > 5 && <div className="text-[11px] text-[#5b6b7a]">+ {fmtNum(pendingListings.length - 5)} إعلانات أخرى في «إدارة الإعلانات»</div>}
+                    {pendingOffices.slice(0, 5).map((o) => (
+                      <div key={o.id} className="flex items-center justify-between text-xs">
+                        <span className="text-[#0f1a28] truncate">{o.name}</span>
+                        <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded whitespace-nowrap">مكتب بانتظار</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SubCard>
+
+              {/* رغبات الباحثين غير المطابقة */}
+              {wishesMissing ? (
+                <SubCard title="رغبات الباحثين غير المطابقة" icon="search" tone="gold" accent="secondary">
+                  <MiniEmpty text="شغّل supabase/search_wishes.sql ليبدأ تسجيل كل بحث لم يجد عرضاً مطابقاً." />
+                </SubCard>
+              ) : (
+                <SubCard title="رغبات الباحثين غير المطابقة" hint={`طلبات بلا عرض مطابق: ${fmtNum(wishes.length)} — أين الطلب بلا معروض`} icon="search" tone="gold" accent="secondary">
+                  {wishes.length === 0 ? (
+                    <MiniEmpty text="لا رغبات غير مطابقة بعد — يبدأ التسجيل مع أول بحث لا يجد عرضاً مطابقاً." />
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs font-bold text-[#0A3D62] mb-2">الأكثر طلباً (حي + نوع)</div>
+                        <RankList rows={wishComboRank} unit="طلب" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[#0A3D62] mb-2">الأحياء الأكثر طلباً بلا عرض</div>
+                        <RankList rows={wishHoodRank} unit="طلب" />
+                      </div>
+                    </div>
+                  )}
+                </SubCard>
+              )}
+
+              {/* استخدام مؤشر أسعار الحي */}
+              {eventsMissing ? (
+                <SubCard title="استخدام مؤشر أسعار الحي" icon="chart" tone="gold" accent="primary">
+                  <MiniEmpty text="يتطلّب تفعيل التتبّع — شغّل supabase/analytics_events.sql." />
+                </SubCard>
+              ) : (
+                <SubCard title="استخدام مؤشر أسعار الحي" hint={`إجمالي الاستخدام: ${fmtNum(indicatorUses.length)} مرة`} icon="chart" tone="gold" accent="primary">
+                  {indicatorUses.length === 0 ? <MiniEmpty text="لا استخدام مسجّلاً بعد — يبدأ العد مع استخدام الزوار." /> : (
+                    <div className="space-y-2">
+                      {verdicts.map((v) => (
+                        <div key={v.key}>
+                          <div className="flex items-center justify-between text-xs mb-0.5">
+                            <span className={`font-bold ${v.txt}`}>{v.label}</span>
+                            <span className="text-[#0f1a28] font-bold">{fmtNum(v.count)} ({fmtNum(Math.round((v.count / indicatorUses.length) * 100))}٪)</span>
+                          </div>
+                          <div className="h-2 bg-[#f0f4f8] rounded-full overflow-hidden">
+                            <div className={`h-full bg-gradient-to-l ${v.cls} rounded-full`} style={{ width: `${Math.max(2, (v.count / indicatorUses.length) * 100)}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </SubCard>
+              )}
+
+              {/* حالة المكاتب والتحويل */}
+              <SubCard title="حالة المكاتب والتحويل" icon="building" tone="steel" accent="primary">
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#33414f]">مكاتب نشطة / موقوفة</span>
+                    <span className="font-bold text-[#0f1a28]">{fmtNum(activeOffices.length)} نشط · {fmtNum(offices.length - activeOffices.length)} موقوف</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#33414f]">مكاتب موثّقة</span>
+                    <span className="font-bold text-[#0f1a28]">{fmtNum(offices.filter((o) => o.verified).length)} من {fmtNum(offices.length)}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-[#f0f4f8] pt-2">
+                    <span className="text-[#33414f]">التحويل: نقرات ← استفسارات</span>
+                    <span className="font-bold text-[#0f1a28]">{conversion === null ? '—' : `${fmtNum(conversion)}٪`}</span>
+                  </div>
+                  <div className="text-[11px] text-[#5b6b7a] leading-relaxed">
+                    {conversion === null
+                      ? eventsMissing ? 'تحتاج تفعيل التتبّع (SQL) لقياس النقرات.' : 'لا نقرات مسجّلة بعد — يبدأ القياس مع استخدام الزوار.'
+                      : `${fmtNum(clicks.length)} نقرة إعلان ← ${fmtNum(linkedInquiries)} استفسار مرتبط بإعلان.`}
+                  </div>
+                </div>
+              </SubCard>
+            </div>
+          </div>
         </>
       )}
     </>
@@ -1142,24 +1158,51 @@ export function AdminSidebar({ section, setSection, userEmail, onExit, exitLabel
   userEmail: string | null; onExit: () => void; exitLabel: string;
 }) {
   return (
-    <aside className="w-full md:w-56 flex-shrink-0">
-      <div className={`${card} p-2`}>
+    <aside className="w-full md:w-[260px] flex-shrink-0 md:sticky md:top-0 md:h-screen bg-[#0b1326] md:border-l border-[var(--adm-outline)] flex flex-col">
+      {/* العلامة */}
+      <div className="px-5 pt-6 pb-5">
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl bg-[rgba(78,222,163,.14)] border border-[rgba(78,222,163,.3)] flex items-center justify-center text-[var(--adm-primary)] flex-shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 21h18M9 21V7l6-4v18M9 7H3v14" /><path d="M13 11h2M13 15h2M5 11h2M5 15h2" /></svg>
+          </span>
+          <div className="leading-tight">
+            <div className="font-extrabold text-[var(--adm-primary)] text-[15px]">مؤشر العقارية</div>
+            <div className="text-[11px] text-[var(--adm-on-variant)] mt-0.5">لوحة الإدارة</div>
+          </div>
+        </div>
+      </div>
+
+      {/* عناصر التنقّل — أيقونة + نص، مسافات مريحة، النشط بحبّة زمرّدية + شريط حافة */}
+      <nav className="px-3 flex-1 md:overflow-y-auto">
         {SIDEBAR_ITEMS.map((it) => {
           const isActive = section === it.id;
           return (
             <button key={it.id} onClick={() => setSection(it.id)}
-              className={`w-full flex items-center gap-2.5 text-right px-3 py-2.5 rounded-xl text-sm mb-1 font-medium border-r-[3px] transition-colors ${isActive ? 'bg-[rgba(78,222,163,.12)] text-[var(--adm-primary)] font-bold border-[var(--adm-primary)]' : 'text-[var(--adm-on-variant)] border-transparent hover:bg-[var(--adm-high)] hover:text-[var(--adm-on)]'}`}>
+              className={`w-full flex items-center gap-3 text-right px-4 py-3 rounded-xl text-sm mb-1 font-medium border-r-[3px] transition-colors ${isActive ? 'bg-[rgba(78,222,163,.12)] text-[var(--adm-primary)] font-bold border-[var(--adm-primary)]' : 'text-[var(--adm-on-variant)] border-transparent hover:bg-[var(--adm-high)] hover:text-[var(--adm-on)]'}`}>
               <span className="w-[18px] h-[18px] flex-shrink-0">{SIDEBAR_ICONS[it.id]}</span>
               {it.label}
             </button>
           );
         })}
-        <div className="border-t border-[#eef2f7] mt-2 pt-2 px-1">
-          {userEmail && <div className="text-[11px] text-[#33414f] truncate mb-2" title={userEmail}>{userEmail}</div>}
-          <button onClick={onExit} className="w-full text-xs text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50">
-            {exitLabel}
-          </button>
-        </div>
+      </nav>
+
+      {/* زر بارز: معاينة الموقع العام (إجراء حقيقي — لا CTA وهمي) */}
+      <div className="px-3 pb-2">
+        <a href="/"
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[var(--adm-primary)] text-[var(--adm-on-primary)] font-bold text-sm hover:opacity-90 transition-opacity">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          معاينة الموقع العام
+        </a>
+      </div>
+
+      {/* مثبّت بالأسفل: البريد + تسجيل الخروج، مكتوم، بفاصل أعلاه */}
+      <div className="px-3 pb-5 pt-2 mt-1 border-t border-[var(--adm-outline)]">
+        {userEmail && <div className="text-[11px] text-[var(--adm-on-variant)] truncate px-2 mb-2" title={userEmail}>{userEmail}</div>}
+        <button onClick={onExit}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-[var(--adm-on-variant)] hover:bg-[var(--adm-high)] hover:text-[var(--adm-error)] transition-colors">
+          <svg className="w-[18px] h-[18px] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+          {exitLabel}
+        </button>
       </div>
     </aside>
   );

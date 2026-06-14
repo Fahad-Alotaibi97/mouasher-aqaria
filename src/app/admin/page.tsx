@@ -24,6 +24,16 @@ import { AdminSidebar, StatsSection, ListingsSection, OfficesSection, LeadsSecti
 // خانات الغرف للشقة/الفيلا (4 خانات): غرفة / غرفتين / ثلاث / أربع فأكثر
 const ROOM_LABELS = ['غرفة', 'غرفتين', 'ثلاث غرف', 'أربع غرف فأكثر'];
 
+// عناوين الأقسام لعرضها في الشريط العلوي (نفس مسمّيات الشريط الجانبي)
+const SECTION_TITLES: Record<AdminSection, string> = {
+  stats: 'لوحة التحليلات',
+  prices: 'الأسعار والمتوسطات',
+  listings: 'إدارة الإعلانات',
+  offices: 'إدارة المكاتب',
+  clients: 'العملاء',
+  leads: 'الرسائل والطلبات',
+};
+
 interface HoodRow {
   name: string;
   apt: (number | null)[]; // 4 خانات (الشقة فقط تبقى بخانات الغرف)
@@ -82,6 +92,10 @@ export default function AdminPage() {
 
   // القسم المعروض في الشريط الجانبي (الإحصائيات هي صفحة الهبوط بعد الدخول).
   const [section, setSection] = useState<AdminSection>('stats');
+
+  // عدّاد الرسائل غير المعالَجة لشارة الجرس في الشريط العلوي (رقم حقيقي من leads —
+  // قراءة COUNT خفيفة، لا تمسّ المصادقة، تُحدَّث مع كل تبديل قسم). null = تعذّر/غير متاح.
+  const [unhandledLeads, setUnhandledLeads] = useState<number | null>(null);
 
   // الخروج من جلسة المدير الموحّدة ثم العودة للرئيسية.
   const exitSession = async () => {
@@ -159,6 +173,18 @@ export default function AdminPage() {
       cancelled = true;
     };
   }, [open]);
+
+  // ── عدّاد الرسائل غير المعالَجة (شارة الجرس) — قراءة COUNT حقيقية، غير قاتلة ──
+  useEffect(() => {
+    if (!open || !isSupabaseConfigured()) return;
+    let cancelled = false;
+    (async () => {
+      const sb = createClient();
+      const { count, error } = await sb.from('leads').select('id', { count: 'exact', head: true }).eq('handled', false);
+      if (!cancelled) setUnhandledLeads(error ? null : (count ?? 0));
+    })();
+    return () => { cancelled = true; };
+  }, [open, section]);
 
   // ── تحديث خانة غرفة (شقة/فيلا) ───────────────────────────────
   const setSlot = (name: string, kind: 'apt' | 'villa', idx: number, value: string) => {
@@ -314,44 +340,12 @@ export default function AdminPage() {
   // ── لوحة التحرير (accordion) ─────────────────────────────────
   return (
     <div
-      className="min-h-screen admin-bg"
+      className="min-h-screen admin-bg admin-shell"
       dir="rtl"
       style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}
     >
-      <SiteNav active="admin" />
-      <div className="admin-shell max-w-6xl mx-auto p-4 sm:p-6">
-        {/* ── شريط علوي داكن: السياق + جرس للرسائل + هوية المدير (بيانات حقيقية) ── */}
-        <div className="flex items-center justify-between gap-3 mb-5 pb-4 border-b border-[var(--adm-outline)]">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="w-10 h-10 rounded-xl bg-[rgba(78,222,163,.14)] border border-[rgba(78,222,163,.3)] flex items-center justify-center text-[var(--adm-primary)] flex-shrink-0">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 21h18M9 21V7l6-4v18M9 7H3v14" /><path d="M13 11h2M13 15h2M5 11h2M5 15h2" /></svg>
-            </span>
-            <div className="leading-tight min-w-0">
-              <div className="font-extrabold text-[var(--adm-primary)] text-base leading-none">مؤشر العقارية</div>
-              <div className="text-[11px] text-[var(--adm-on-variant)] mt-0.5">لوحة الإدارة</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* جرس = اختصار حقيقي للرسائل والطلبات (لا إشعارات وهمية) */}
-            <button
-              onClick={() => setSection('leads')}
-              aria-label="الرسائل والطلبات"
-              title="الرسائل والطلبات"
-              className="w-10 h-10 rounded-xl bg-[var(--adm-card)] border border-[var(--adm-outline)] flex items-center justify-center text-[var(--adm-on-variant)] hover:text-[var(--adm-primary)] hover:border-[rgba(78,222,163,.4)] transition-colors"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
-            </button>
-            {/* هوية المدير الحقيقية (البريد من الجلسة) */}
-            <div className="flex items-center gap-2.5 bg-[var(--adm-card)] border border-[var(--adm-outline)] rounded-xl pl-3 pr-2 py-1.5">
-              <div className="text-right leading-tight min-w-0 hidden sm:block">
-                <div className="text-xs font-bold text-[var(--adm-on)] truncate max-w-[180px]" title={user?.email ?? ''}>{user?.email ?? '—'}</div>
-                <div className="text-[10px] text-[var(--adm-primary)]">مدير المنصة</div>
-              </div>
-              <span className="w-8 h-8 rounded-lg bg-[var(--adm-primary-container)] text-[var(--adm-on-primary)] flex items-center justify-center font-extrabold flex-shrink-0">م</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-col md:flex-row gap-5 items-start">
+      <div className="flex flex-col md:flex-row min-h-screen items-stretch">
+        {/* الشريط الجانبي الكامل الارتفاع (يميناً في RTL) */}
         <AdminSidebar
           section={section}
           setSection={setSection}
@@ -359,7 +353,42 @@ export default function AdminPage() {
           onExit={exitSession}
           exitLabel="تسجيل الخروج"
         />
-        <main className="flex-1 w-full min-w-0">
+
+        {/* عمود المحتوى */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* ── الشريط العلوي: عنوان القسم + جرس (عدّاد رسائل حقيقي) + هوية المدير ── */}
+          <div className="sticky top-0 z-30 bg-[rgba(11,19,38,.85)] backdrop-blur border-b border-[var(--adm-outline)] px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-base font-extrabold text-[var(--adm-on)] truncate">{SECTION_TITLES[section]}</div>
+              <div className="text-[11px] text-[var(--adm-on-variant)]">مؤشر العقارية — لوحة الإدارة</div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* جرس = اختصار حقيقي للرسائل + عدّاد الرسائل غير المعالَجة (رقم حقيقي) */}
+              <button
+                onClick={() => setSection('leads')}
+                aria-label="الرسائل والطلبات"
+                title="الرسائل والطلبات"
+                className="relative w-10 h-10 rounded-xl bg-[var(--adm-card)] border border-[var(--adm-outline)] flex items-center justify-center text-[var(--adm-on-variant)] hover:text-[var(--adm-primary)] hover:border-[rgba(78,222,163,.4)] transition-colors"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
+                {!!unhandledLeads && unhandledLeads > 0 && (
+                  <span className="absolute -top-1 -left-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--adm-secondary)] text-[#3a2a00] text-[10px] font-extrabold flex items-center justify-center">
+                    {unhandledLeads > 99 ? '99+' : unhandledLeads.toLocaleString('ar-SA')}
+                  </span>
+                )}
+              </button>
+              {/* هوية المدير الحقيقية (البريد من الجلسة) */}
+              <div className="flex items-center gap-2.5 bg-[var(--adm-card)] border border-[var(--adm-outline)] rounded-xl pl-3 pr-2 py-1.5">
+                <div className="text-right leading-tight min-w-0 hidden sm:block">
+                  <div className="text-xs font-bold text-[var(--adm-on)] truncate max-w-[180px]" title={user?.email ?? ''}>{user?.email ?? '—'}</div>
+                  <div className="text-[10px] text-[var(--adm-primary)]">مدير المنصة</div>
+                </div>
+                <span className="w-8 h-8 rounded-lg bg-[var(--adm-primary-container)] text-[var(--adm-on-primary)] flex items-center justify-center font-extrabold flex-shrink-0">م</span>
+              </div>
+            </div>
+          </div>
+
+          <main className="flex-1 w-full min-w-0 max-w-[1400px] mx-auto p-4 sm:p-6">
 
         {/* ═══ 1) الأسعار والمتوسطات (كما هي تماماً) ═══ */}
         {section === 'prices' && (

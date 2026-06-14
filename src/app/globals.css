@@ -130,3 +130,10 @@ body {
   width: 3px; height: 100%; background: var(--adm-primary); border-radius: 3px;
 }
 .admin-shell .adm-stat-warn .adm-stat-accent { background: var(--adm-secondary); }
+
+/* شريط إبراز على الحافة الداخلية لبطاقات العمود الجانبي (زمرّدي/كهرماني) */
+.admin-shell .adm-accent-bar {
+  position: absolute; top: 0; inset-inline-start: 0;
+  width: 3px; height: 100%; background: var(--adm-primary); border-radius: 3px;
+}
+.admin-shell .adm-accent-bar.amber { background: var(--adm-secondary); }
