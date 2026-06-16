@@ -207,7 +207,7 @@ body {
 /* ── SECTIONS ── */
 .stitch-home .sec{padding:4rem 0;}
 .stitch-home .sec-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:2rem;gap:12px;}
-.stitch-home .sec-head .ttl h2,.stitch-home .why h2{font-size:32px;font-weight:600;letter-spacing:-.01em;color:var(--on-surface);}
+.stitch-home .sec-head .ttl h2,.stitch-home .why h2{font-size:32px;font-weight:700;letter-spacing:-.01em;color:var(--on-surface);}
 .stitch-home .sec-head .ttl p{font-size:15px;color:var(--on-surface-variant);margin-top:4px;}
 .stitch-home .see-all{display:inline-flex;align-items:center;gap:6px;background:none;border:none;font-family:inherit;font-size:14px;font-weight:600;color:var(--secondary);cursor:pointer;transition:gap .25s var(--ease);white-space:nowrap;}
 .stitch-home .see-all:hover{gap:10px;}
@@ -271,7 +271,7 @@ body {
 .stitch-home .why-card:hover{transform:translateY(-5px);box-shadow:0 16px 36px rgba(0,0,0,.08);}
 .stitch-home .why-card .ic{width:64px;height:64px;border-radius:9999px;background:rgba(19,27,46,.08);display:flex;align-items:center;justify-content:center;color:var(--primary-container);margin:0 auto 1rem;}
 .stitch-home .why-card .ic .material-symbols-outlined{font-size:32px;}
-.stitch-home .why-card h3{font-size:18px;font-weight:600;margin-bottom:8px;color:var(--on-surface);}
+.stitch-home .why-card h3{font-size:18px;font-weight:700;margin-bottom:8px;color:var(--on-surface);}
 .stitch-home .why-card p{font-size:13px;color:var(--on-surface-variant);line-height:1.7;}
 
 /* ── FOOTER ── */
@@ -313,8 +313,8 @@ body {
 
 /* ── مقياس الطباعة (متاح للاستخدام عند الحاجة) ── */
 .site .display-lg{font-size:48px;font-weight:700;letter-spacing:-.02em;line-height:1.12;}
-.site .headline-lg{font-size:32px;font-weight:600;letter-spacing:-.01em;}
-.site .headline-md{font-size:24px;font-weight:600;}
+.site .headline-lg{font-size:32px;font-weight:700;letter-spacing:-.01em;}
+.site .headline-md{font-size:24px;font-weight:700;}
 .site .body-lg{font-size:18px;}
 .site .body-md{font-size:16px;}
 .site .label-md{font-size:14px;font-weight:500;}
@@ -340,6 +340,11 @@ body {
 .site .ghost-btn .material-symbols-outlined{font-size:18px;}
 .site .nav-burger{display:none;align-items:center;justify-content:center;width:42px;height:42px;border-radius:var(--r-lg);border:1px solid var(--outline-variant);background:var(--surface-card);color:var(--on-surface);cursor:pointer;}
 .site .nav-burger .material-symbols-outlined{font-size:24px;}
+/* مبدّل اللغة (ع / EN) — يظهر على كل الصفحات العامة */
+.site .lang-toggle{display:inline-flex;align-items:center;border:1px solid var(--outline-variant);border-radius:9999px;overflow:hidden;background:var(--surface-card);flex-shrink:0;}
+.site .lang-toggle button{font-family:inherit;font-size:12px;font-weight:600;line-height:1;padding:6px 11px;border:none;background:none;color:var(--on-surface-variant);cursor:pointer;transition:all .2s var(--ease);}
+.site .lang-toggle button:hover{color:var(--on-surface);}
+.site .lang-toggle button.active{background:var(--primary);color:var(--on-primary);}
 @media(max-width:768px){
   .site .nav-center{display:none;}
   .site .nav-account{display:none;}

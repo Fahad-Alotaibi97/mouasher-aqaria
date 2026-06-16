@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { LangProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "مؤشر العقارية — سوق الإيجار السكني في الرياض بكل وضوح",
@@ -45,7 +46,7 @@ export default function RootLayout({
         className="min-h-full flex flex-col"
         style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
       >
-        {children}
+        <LangProvider>{children}</LangProvider>
       </body>
     </html>
   );

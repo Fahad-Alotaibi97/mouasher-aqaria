@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from '@/lib/supabase/config';
 import dynamic from 'next/dynamic';
 import { useAppData, type UIListing, type MktAvg, type ImagesByCategory } from '@/lib/useAppData';
 import { useAuth } from '@/lib/useAuth';
+import { useLang } from '@/lib/i18n';
 import { track, trackPageView, trackSearchWish } from '@/lib/track';
 import { useEffect } from 'react';
 import { SiteHeader, SiteFooter } from './components/SiteChrome';
@@ -40,7 +41,7 @@ const msi = (name: string) => <span className="material-symbols-outlined">{name}
 
 // خلفية البطل: صورة ثابتة لحيّ سكني راقٍ (ليست من إعلانات قاعدة البيانات أبداً).
 // أصل تصميم خارجي؛ يمكن استبداله بصورة الرياض مستضافة محلياً لاحقاً.
-const HERO_IMG = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=80';
+const HERO_IMG = '/hero-riyadh.png';
 
 // رابط فتح موقع الوحدة في خرائط Google (إحداثيات إن وُجدت وإلا الرابط المخزّن)
 const listingMapsHref = (l: UIListing): string | null => mapsHref(l.lat, l.lng, l.maps_url);
@@ -202,6 +203,9 @@ export default function Home() {
 
   // تسجيل الدخول — بالإيميل وكلمة المرور (تبويب: دخول / إنشاء حساب)
   const { user, isAdmin, signInWithPassword, signUpWithPassword, requestPasswordReset, signOut, confirmSession } = useAuth();
+
+  // اللغة/الاتجاه (i18n) — عربي افتراضي (RTL)، إنجليزي اختياري (LTR)
+  const { t, dir } = useLang();
 
   // هل الحساب الحالي يملك مكتباً؟ ⇒ زر «لوحة المكتب» الذهبي في الدرج
   const [hasOffice, setHasOffice] = useState(false);
@@ -755,7 +759,7 @@ export default function Home() {
   const selectCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
   return (
-    <div className="min-h-screen site" dir="rtl" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
+    <div className="min-h-screen site" dir={dir} style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
 
       {/* الشريط العلوي الزجاجي المشترك — على كل الصفحات العامة (هوية موحّدة) */}
       <SiteHeader active={page} onNavigate={go} user={user} isAdmin={isAdmin} isOffice={hasOffice} onSignOut={signOut} />
@@ -772,41 +776,46 @@ export default function Home() {
               {/* backdrop-filter مضمّن سطرياً: المُصغِّر (Lightning CSS) كان يُسقط الخاصية
                   القياسية ويُبقي -webkit- فقط، فالنتيجة computed=none. السطري لا يُمسّ. */}
               <div className="glass-panel" style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
-                <h1>ابحث عن عقارك المثالي</h1>
-                <p className="sub">اكتشف أفضل عروض الإيجار في الرياض مع مؤشر أسعار حي دقيق وموثوق.</p>
+                <h1>{t('hero.h1')}</h1>
+                <p className="sub">{t('hero.sub')}</p>
                 <div className="search-box">
                   <span className="s-ico">{msi('search')}</span>
                   <input
                     value={aiQuery}
                     onChange={(e) => setAiQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && runAI()}
-                    placeholder="ابحث بالحي، نوع العقار، أو رغبتك…"
+                    placeholder={t('hero.placeholder')}
                   />
-                  <button onClick={() => runAI()}>بحث</button>
+                  <button onClick={() => runAI()}>{t('hero.searchBtn')}</button>
                 </div>
                 <div className="type-tabs">
                   {[
-                    { k: 'فيلا', label: 'فلل', icon: 'home' },
-                    { k: 'شقة', label: 'شقق', icon: 'apartment' },
-                    { k: 'تجاري', label: 'تجاري', icon: 'storefront' },
-                  ].map((t) => (
-                    <button key={t.k}
-                      className={`pill ${filterType === t.k ? 'active' : ''}`}
+                    { k: 'فيلا', label: 'type.villa', icon: 'home' },
+                    { k: 'شقة', label: 'type.apartment', icon: 'apartment' },
+                    { k: 'تجاري', label: 'type.commercial', icon: 'storefront' },
+                  ].map((tab) => (
+                    <button key={tab.k}
+                      className={`pill ${filterType === tab.k ? 'active' : ''}`}
                       onClick={() => {
                         // فلتر النوع الحقيقي + إلغاء أي بحث مساعد سابق لعرض النوع بوضوح
                         setAiResult(null); setAiReply(null); setSearched(false); setAiShowAlts(false);
-                        setFilterType(filterType === t.k ? '' : t.k);
+                        setFilterType(filterType === tab.k ? '' : tab.k);
                         setTimeout(() => document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
                       }}>
-                      {msi(t.icon)} {t.label}
+                      {msi(tab.icon)} {t(tab.label)}
                     </button>
                   ))}
                 </div>
-                {/* المساعد الذكي — مدمج بنفس نمط الحبوب: عبارات سريعة تُشغّل مطابقة الكلمات الحقيقية */}
+                {/* المساعد الذكي — التسمية مترجمة؛ الاستعلام يبقى عربياً للمطابقة المحلّية */}
                 <div className="ai-strip">
-                  <span className="lbl">{msi('auto_awesome')} المساعد الذكي:</span>
-                  {['أرخص شقة متاحة', 'فيلا في حطين', 'فرص بأقل من السوق', 'قريب من الخدمات'].map((c) => (
-                    <button key={c} className="pill chip" onClick={() => runAI(c)}>{c}</button>
+                  <span className="lbl">{msi('auto_awesome')} {t('hero.aiLabel')}</span>
+                  {[
+                    { q: 'أرخص شقة متاحة', k: 'ai.cheapest' },
+                    { q: 'فيلا في حطين', k: 'ai.villaHittin' },
+                    { q: 'فرص بأقل من السوق', k: 'ai.belowMarket' },
+                    { q: 'قريب من الخدمات', k: 'ai.nearServices' },
+                  ].map((c) => (
+                    <button key={c.k} className="pill chip" onClick={() => runAI(c.q)}>{t(c.k)}</button>
                   ))}
                 </div>
               </div>
@@ -818,10 +827,10 @@ export default function Home() {
             <div className="wrap">
               <div className="sec-head reveal">
                 <div className="ttl">
-                  <h2>{searched ? 'نتائج بحثك' : 'عقارات مميزة'}</h2>
-                  <p>{searched ? 'بين العروض المتاحة في الرياض' : 'أحدث العروض المختارة بعناية في الرياض'}</p>
+                  <h2>{searched ? t('listings.resultsTitle') : t('listings.featuredTitle')}</h2>
+                  <p>{searched ? t('listings.resultsSub') : t('listings.featuredSub')}</p>
                 </div>
-                <button className="see-all" onClick={() => go('search')}>عرض الكل {msi('arrow_back')}</button>
+                <button className="see-all" onClick={() => go('search')}>{t('listings.seeAll')} {msi('arrow_back')}</button>
               </div>
 
               {aiReply && aiResult?.kind === 'matches' && (
@@ -871,10 +880,10 @@ export default function Home() {
               ) : displayList.length === 0 ? (
                 <div className="empty-card reveal">
                   {listings.length === 0
-                    ? 'لا توجد عقارات متاحة حالياً — تظهر هنا فور نشر المكاتب لإعلاناتها.'
+                    ? t('listings.emptyNoListings')
                     : filterType === 'تجاري'
-                      ? 'لا توجد عقارات تجارية متاحة حالياً.'
-                      : 'لا توجد نتائج مطابقة — جرّب نوعاً آخر أو امسح الفلتر.'}
+                      ? t('listings.emptyNoCommercial')
+                      : t('listings.emptyNoMatch')}
                 </div>
               ) : (
                 <div className="cards">
@@ -888,14 +897,14 @@ export default function Home() {
           <section className="sec why">
             <div className="wrap">
               <div className="sec-head reveal">
-                <h2>لماذا تختار مؤشر العقارية؟</h2>
-                <p className="sub">نلتزم بتجربة عقارية مبنية على الشفافية والدقة لتسهيل قراراتك.</p>
+                <h2>{t('why.title')}</h2>
+                <p className="sub">{t('why.sub')}</p>
               </div>
               <div className="why-grid">
-                <div className="why-card reveal"><div className="ic">{msi('analytics')}</div><h3>دقة البيانات أولاً</h3><p>مؤشر أسعار الحي مبني على متوسطات السوق المُدارة، لتقارن قبل توقيع العقد.</p></div>
-                <div className="why-card reveal"><div className="ic">{msi('verified_user')}</div><h3>آمن وموثوق</h3><p>المكاتب موثّقة برخصة فال، وبياناتك محميّة وفق سياسة خصوصية واضحة.</p></div>
-                <div className="why-card reveal"><div className="ic">{msi('speed')}</div><h3>سرعة الوصول</h3><p>مساعد ذكي وبحث وخريطة تفاعلية توصلك للعقار المناسب بسرعة.</p></div>
-                <div className="why-card reveal"><div className="ic">{msi('support_agent')}</div><h3>استشارات مجانية</h3><p>أرسل استفسارك وسيصل للمكاتب والمنصة للتواصل معك بخصوص طلبك.</p></div>
+                <div className="why-card reveal"><div className="ic">{msi('analytics')}</div><h3>{t('why.c1t')}</h3><p>{t('why.c1d')}</p></div>
+                <div className="why-card reveal"><div className="ic">{msi('verified_user')}</div><h3>{t('why.c2t')}</h3><p>{t('why.c2d')}</p></div>
+                <div className="why-card reveal"><div className="ic">{msi('speed')}</div><h3>{t('why.c3t')}</h3><p>{t('why.c3d')}</p></div>
+                <div className="why-card reveal"><div className="ic">{msi('support_agent')}</div><h3>{t('why.c4t')}</h3><p>{t('why.c4d')}</p></div>
               </div>
             </div>
           </section>
@@ -1004,8 +1013,8 @@ export default function Home() {
           <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-6 text-center text-white relative">
             <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#F5F8FB] rounded-t-3xl" />
             <div className="relative z-10">
-              <h1 className="text-xl font-bold mb-1">مؤشر أسعار الحي</h1>
-              <p className="text-white/85 text-sm">السعر المتوسط لعدد الصفقات المماثلة بنفس الحي — قارنه بأي إيجار قبل التوقيع</p>
+              <h1 className="text-xl font-bold mb-1">{t('ind.title')}</h1>
+              <p className="text-white/85 text-sm">{t('ind.sub')}</p>
             </div>
           </div>
           <div className="px-4 pt-4 pb-6 max-w-xl mx-auto">
@@ -1015,14 +1024,14 @@ export default function Home() {
                   {Icons.chart}
                 </div>
                 <div>
-                  <div className="font-bold text-sm text-gray-900">جرّب المؤشر</div>
-                  <div className="text-xs text-gray-500">أدخل قيمة الإيجار وسنخبرك إن كانت مناسبة لسوق الحي</div>
+                  <div className="font-bold text-sm text-gray-900">{t('ind.cardTitle')}</div>
+                  <div className="text-xs text-gray-500">{t('ind.cardSub')}</div>
                 </div>
               </div>
               <div className="p-4">
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div>
-                    <label className="text-xs text-gray-700 block mb-1 font-semibold">الحي</label>
+                    <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.hood')}</label>
                     <select value={siZone} onChange={e => setSiZone(e.target.value)} className={selectCls}>
                       {Object.keys(mktAvg).map(h => (
                         <option key={h} value={h}>{h}</option>
@@ -1030,18 +1039,18 @@ export default function Home() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-700 block mb-1 font-semibold">نوع الوحدة</label>
+                    <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.unitType')}</label>
                     <select value={siType} onChange={e => setSiType(e.target.value)} className={selectCls}>
-                      {['شقة', 'فيلا', 'دور', 'دوبلكس', 'استوديو'].map(t => (
-                        <option key={t} value={t}>{t}</option>
+                      {['شقة', 'فيلا', 'دور', 'دوبلكس', 'استوديو'].map(ut => (
+                        <option key={ut} value={ut}>{ut}</option>
                       ))}
                     </select>
                   </div>
                 </div>
                 <div className="mb-3">
-                  <label className="text-xs text-gray-700 block mb-1 font-semibold">الإيجار السنوي (ريال)</label>
+                  <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.annualRent')}</label>
                   <input type="number" value={siPrice} onChange={e => setSiPrice(e.target.value)}
-                    placeholder="مثال: 65000" className={inputCls} />
+                    placeholder={t('ind.rentPlaceholder')} className={inputCls} />
                 </div>
                 {siPrice && (
                   <div className={`p-3 rounded-xl flex items-center gap-3 border ${indicator.color}`}>
@@ -1056,7 +1065,7 @@ export default function Home() {
                 )}
                 {!siPrice && (
                   <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-center text-sm text-gray-500">
-                    أدخل قيمة الإيجار للمقارنة بمتوسط السوق
+                    {t('ind.prompt')}
                   </div>
                 )}
               </div>
