@@ -8,7 +8,7 @@ import { useAppData, type UIListing, type MktAvg, type ImagesByCategory } from '
 import { useAuth } from '@/lib/useAuth';
 import { track, trackPageView, trackSearchWish } from '@/lib/track';
 import { useEffect } from 'react';
-import SiteNav from './components/SiteNav';
+import { SiteHeader, SiteFooter } from './components/SiteChrome';
 import ContactButtons, { isSaudiMobile } from './components/ContactButtons';
 import ReplyComposer from './components/ReplyComposer';
 import { parseMapsUrl, isMapsUrl, mapsHref } from '@/lib/mapsLocation';
@@ -755,44 +755,14 @@ export default function Home() {
   const selectCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
   return (
-    <div className="min-h-screen bg-[#F5F8FB]" dir="rtl" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
+    <div className="min-h-screen site" dir="rtl" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
 
-      {/* الشريط العلوي + الدرج الجانبي (مكوّن مشترك) — الرئيسية لها شريط Stitch خاص أدناه */}
-      {page !== 'home' && (
-        <SiteNav active={page} onNavigate={go} user={user} isAdmin={isAdmin} isOffice={hasOffice} onSignOut={signOut} />
-      )}
+      {/* الشريط العلوي الزجاجي المشترك — على كل الصفحات العامة (هوية موحّدة) */}
+      <SiteHeader active={page} onNavigate={go} user={user} isAdmin={isAdmin} isOffice={hasOffice} onSignOut={signOut} />
 
       {/* ═══ HOME — تصميم Stitch الرسمي (واجهة فاتحة) موصول ببياناتي الحقيقية ═══ */}
       {page === 'home' && (
         <div className="stitch-home">
-
-          {/* ── الشريط العلوي: زجاجي لاصق، 64px ── */}
-          <header className="nav">
-            <div className="wrap nav-inner">
-              {/* العلامة يميناً (RTL: أول عنصر = اليمين) */}
-              <button className="brand" onClick={() => go('home')}><span>مؤشر العقارية</span>{msi('real_estate_agent')}</button>
-              <nav className="nav-center">
-                <a className="active" onClick={() => go('home')}>الرئيسية</a>
-                <a onClick={() => go('search')}>ابحث</a>
-                <a onClick={() => go('indicator')}>مؤشر أسعار الحي</a>
-              </nav>
-              {/* الإجراءات يساراً */}
-              <div className="nav-actions">
-                {!user ? (
-                  <button className="login-btn" onClick={() => go('pricing')}>{msi('login')} دخول</button>
-                ) : (
-                  <>
-                    {isAdmin ? (
-                      <a className="login-btn" href="/admin">{msi('shield_person')} لوحة الإدارة</a>
-                    ) : hasOffice ? (
-                      <button className="login-btn" onClick={() => go('office')}>{msi('store')} لوحة المكتب</button>
-                    ) : null}
-                    <button className="ghost-btn" onClick={signOut}>تسجيل الخروج</button>
-                  </>
-                )}
-              </div>
-            </div>
-          </header>
 
           {/* ── البطل: صورة سكنية ثابتة (ليست من الإعلانات) + تدرّج + بطاقة زجاجية ── */}
           <section className="hero">
@@ -931,35 +901,6 @@ export default function Home() {
           </section>
 
           {/* ── التذييل ── */}
-          <footer>
-            <div className="wrap">
-              <div className="foot-grid">
-                <div className="foot-col">
-                  <h4>روابط سريعة</h4>
-                  <a onClick={() => go('home')}>الرئيسية</a>
-                  <a onClick={() => go('search')}>ابحث عن إيجارك</a>
-                  <a onClick={() => go('indicator')}>مؤشر أسعار الحي</a>
-                </div>
-                <div className="foot-col">
-                  <h4>قانوني</h4>
-                  <a onClick={() => go('terms')}>شروط الاستخدام</a>
-                  <a onClick={() => go('privacy')}>سياسة الخصوصية</a>
-                </div>
-                <div className="foot-col">
-                  <h4>الشركة</h4>
-                  <a onClick={() => go('about')}>عن المنصة</a>
-                  <a onClick={() => go('inquiries')}>تواصل معنا</a>
-                  <a onClick={() => go('pricing')}>سجّل مكتبك العقاري</a>
-                </div>
-                <div className="foot-col foot-brand">
-                  <div className="b"><span>مؤشر العقارية</span>{msi('real_estate_agent')}</div>
-                  <p>دقّة عقارية للرياض — سوق الإيجار بكل وضوح © 2026.</p>
-                </div>
-              </div>
-              <div className="foot-bottom">جميع الحقوق محفوظة — مؤشر العقارية · الرياض</div>
-            </div>
-          </footer>
-
         </div>
       )}
 
@@ -1762,16 +1703,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Footer — الرئيسية لها تذييل Stitch الخاص؛ هذا لبقية الصفحات */}
-      {page !== 'home' && (
-      <div className="bg-white border-t border-gray-200 py-4 px-5 text-center text-xs text-gray-500 mt-4">
-        <button onClick={() => { setPage('privacy'); if (typeof window !== 'undefined') window.scrollTo(0, 0); }} className="text-blue-600 font-medium hover:underline">سياسة الخصوصية</button>
-        <span className="mx-3 text-gray-300">·</span>
-        <button onClick={() => { setPage('terms'); if (typeof window !== 'undefined') window.scrollTo(0, 0); }} className="text-blue-600 font-medium hover:underline">شروط الاستخدام</button>
-        <span className="mx-3 text-gray-300">·</span>
-        <span>© 2026 مؤشر العقارية</span>
-      </div>
-      )}
+      {/* التذييل المشترك — على كل الصفحات العامة (هوية موحّدة) */}
+      <SiteFooter onNavigate={go} />
     </div>
   );
 }

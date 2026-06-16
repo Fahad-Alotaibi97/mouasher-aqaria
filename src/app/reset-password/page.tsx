@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { isSupabaseConfigured } from '@/lib/supabase/config';
+import { SiteHeader, SiteFooter } from '../components/SiteChrome';
 
 type Phase = 'checking' | 'ready' | 'done' | 'invalid';
 
@@ -138,16 +139,8 @@ export default function ResetPasswordPage() {
     'w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400';
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#F5F8FB] flex flex-col">
-      {/* شريط علوي مبسّط بهوية العلامة */}
-      <nav className="flex items-center justify-center px-5 py-3 bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] shadow-lg">
-        <a href="/" className="flex items-center gap-2.5">
-          <span className="w-10 h-10 rounded-xl bg-white/15 border border-white/25 flex items-center justify-center flex-shrink-0">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8"><path d="M3 21h18M9 21V7l6-4v18M9 7H3v14" /><path d="M13 11h2M13 15h2M5 11h2M5 15h2" /></svg>
-          </span>
-          <span className="text-white font-extrabold text-lg leading-none">مؤشر العقارية</span>
-        </a>
-      </nav>
+    <div dir="rtl" className="min-h-screen site flex flex-col">
+      <SiteHeader />
 
       <div className="flex-1 flex items-start justify-center px-5 py-10">
         <div className="w-full max-w-md bg-white rounded-2xl border-2 border-blue-200 shadow-sm p-6">
@@ -225,6 +218,7 @@ export default function ResetPasswordPage() {
           )}
         </div>
       </div>
+      <SiteFooter />
     </div>
   );
 }

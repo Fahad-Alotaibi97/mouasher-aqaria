@@ -289,3 +289,155 @@ body {
 /* ── reveal on scroll ── */
 .stitch-home .reveal{opacity:0;transform:translateY(28px);transition:all .7s var(--ease);}
 .stitch-home .reveal.in{opacity:1;transform:translateY(0);}
+
+/* ════════════════════════════════════════════════════════════
+   الهوية المشتركة لكل الصفحات العامة — تصميم Stitch الفاتح (.site).
+   تُطبَّق على الغلاف الخارجي لكل صفحات الموقع العام (عدا /admin). تضم:
+   (1) توكنات التصميم  (2) شريط/تذييل/درج مشترك  (3) طبقة إعادة تلوين
+   (remap) تُحوّل أدوات Tailwind/الألوان القديمة (كحلي/أزرق) إلى التوكنات
+   الجديدة — فتتبنّى كل الواجهات الهوية دون تغيير أي منطق. منطق العزل نفسه
+   المستخدم في .admin-shell: كل القواعد منطلقة من `.site ` فلا تمسّ /admin.
+   ════════════════════════════════════════════════════════════ */
+.site {
+  --surface:#f6fafe; --surface-card:#ffffff; --surface-container:#eaeef2; --surface-dim:#d6dade;
+  --surface-container-high:#e5e8ec; --surface-container-lowest:#ffffff; --surface-low:#f0f4f8;
+  --primary:#000000; --primary-container:#131b2e; --on-primary:#ffffff;
+  --secondary:#006c49; --status-positive:#10B981; --status-negative:#EF4444; --gold:#C9A84C;
+  --on-surface:#171c1f; --on-surface-variant:#45464d; --slate:#334155; --outline:#76777d; --outline-variant:#c6c6cd;
+  --r-xl:0.75rem; --r-lg:0.5rem; --ease:cubic-bezier(.4,0,.2,1);
+  background:var(--surface); color:var(--on-surface);
+  font-family:'IBM Plex Sans Arabic', sans-serif;
+}
+.site .wrap{max-width:1280px;margin:0 auto;padding:0 1.5rem;}
+.site .material-symbols-outlined{font-size:20px;line-height:1;vertical-align:middle;flex-shrink:0;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;}
+
+/* ── مقياس الطباعة (متاح للاستخدام عند الحاجة) ── */
+.site .display-lg{font-size:48px;font-weight:700;letter-spacing:-.02em;line-height:1.12;}
+.site .headline-lg{font-size:32px;font-weight:600;letter-spacing:-.01em;}
+.site .headline-md{font-size:24px;font-weight:600;}
+.site .body-lg{font-size:18px;}
+.site .body-md{font-size:16px;}
+.site .label-md{font-size:14px;font-weight:500;}
+.site .label-sm{font-size:12px;font-weight:600;}
+
+/* ════════ الشريط العلوي الزجاجي المشترك ════════ */
+.site .site-nav{position:sticky;top:0;z-index:50;height:64px;display:flex;align-items:center;background:rgba(246,250,254,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(198,198,205,.3);}
+.site .site-nav__inner{display:flex;align-items:center;justify-content:space-between;width:100%;gap:1rem;}
+.site .brand{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:700;color:var(--on-surface);background:none;border:none;font-family:inherit;cursor:pointer;}
+.site .brand .material-symbols-outlined{font-size:28px;color:var(--gold);}
+.site .nav-center{display:flex;align-items:center;gap:1.5rem;}
+.site .nav-center a{font-size:14px;font-weight:500;color:var(--on-surface-variant);padding:6px 2px;position:relative;cursor:pointer;transition:color .2s var(--ease);white-space:nowrap;}
+.site .nav-center a:hover{color:var(--on-surface);}
+.site .nav-center a.active{color:var(--on-surface);font-weight:600;}
+.site .nav-center a.active::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;border-radius:2px;background:var(--primary-container);}
+.site .nav-actions{display:flex;align-items:center;gap:8px;}
+.site .nav-account{display:flex;align-items:center;gap:8px;}
+.site .login-btn{display:inline-flex;align-items:center;gap:6px;background:var(--primary);color:var(--on-primary);font-family:inherit;font-size:14px;font-weight:500;padding:9px 18px;border-radius:var(--r-xl);border:none;cursor:pointer;text-decoration:none;transition:all .25s var(--ease);}
+.site .login-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,0,0,.18);}
+.site .login-btn .material-symbols-outlined{font-size:18px;}
+.site .ghost-btn{display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid var(--outline-variant);color:var(--on-surface-variant);font-family:inherit;font-size:14px;font-weight:500;padding:8px 14px;border-radius:var(--r-xl);cursor:pointer;transition:all .25s var(--ease);}
+.site .ghost-btn:hover{border-color:var(--gold);color:var(--on-surface);}
+.site .ghost-btn .material-symbols-outlined{font-size:18px;}
+.site .nav-burger{display:none;align-items:center;justify-content:center;width:42px;height:42px;border-radius:var(--r-lg);border:1px solid var(--outline-variant);background:var(--surface-card);color:var(--on-surface);cursor:pointer;}
+.site .nav-burger .material-symbols-outlined{font-size:24px;}
+@media(max-width:768px){
+  .site .nav-center{display:none;}
+  .site .nav-account{display:none;}
+  .site .nav-burger{display:inline-flex;}
+}
+
+/* ════════ الدرج الجانبي المشترك (جوال/كل الروابط) ════════ */
+.site .site-drawer__overlay{position:fixed;inset:0;z-index:1900;background:rgba(19,27,46,.45);opacity:0;pointer-events:none;transition:opacity .3s var(--ease);}
+.site .site-drawer__overlay.open{opacity:1;pointer-events:auto;}
+.site .site-drawer{position:fixed;top:0;right:0;height:100%;width:300px;max-width:85vw;z-index:2000;background:var(--surface-card);box-shadow:-12px 0 40px rgba(0,0,0,.18);overflow-y:auto;transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column;}
+.site .site-drawer.open{transform:translateX(0);}
+.site .site-drawer__head{display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.25rem;border-bottom:1px solid var(--surface-dim);}
+.site .site-drawer__title .t{font-weight:700;font-size:16px;color:var(--on-surface);}
+.site .site-drawer__title .s{font-size:11px;color:var(--on-surface-variant);}
+.site .site-drawer__close{width:36px;height:36px;border-radius:var(--r-lg);border:1px solid var(--outline-variant);background:var(--surface-card);color:var(--on-surface-variant);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.site .site-drawer__links{padding:.5rem 0;display:flex;flex-direction:column;}
+.site .drawer-link{display:flex;align-items:center;gap:12px;width:100%;padding:12px 20px;font-family:inherit;font-size:15px;font-weight:500;color:var(--on-surface-variant);text-align:right;background:none;border:none;border-right:3px solid transparent;cursor:pointer;transition:all .2s var(--ease);}
+.site .drawer-link:hover{background:var(--surface-low);color:var(--on-surface);}
+.site .drawer-link.active{background:var(--surface-low);color:var(--on-surface);font-weight:600;border-right-color:var(--gold);}
+.site .drawer-link .material-symbols-outlined{font-size:20px;color:var(--gold);}
+.site .site-drawer__sep{height:1px;background:var(--surface-dim);margin:.5rem 1.25rem;}
+.site .site-drawer__account{margin-top:auto;padding:1rem 1.25rem 1.5rem;display:flex;flex-direction:column;gap:10px;}
+.site .site-drawer__email{font-size:11px;color:var(--on-surface-variant);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.site .drawer-cta{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;background:var(--primary);color:var(--on-primary);font-family:inherit;font-size:14px;font-weight:600;padding:11px 16px;border-radius:var(--r-xl);border:none;cursor:pointer;text-decoration:none;}
+.site .drawer-cta .material-symbols-outlined{font-size:18px;}
+.site .drawer-ghost{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;background:none;border:1px solid var(--outline-variant);color:var(--on-surface-variant);font-family:inherit;font-size:14px;font-weight:500;padding:10px 16px;border-radius:var(--r-xl);cursor:pointer;}
+.site .drawer-ghost .material-symbols-outlined{font-size:18px;}
+
+/* ════════ التذييل المشترك ════════ */
+.site .site-foot{background:var(--surface);border-top:1px solid var(--outline-variant);padding:3rem 0 1.75rem;margin-top:2rem;}
+.site .site-foot .foot-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1.4fr;gap:2rem;margin-bottom:2rem;}
+@media(max-width:768px){.site .site-foot .foot-grid{grid-template-columns:1fr 1fr;gap:1.5rem;}}
+.site .site-foot .foot-col h4{font-size:13px;font-weight:600;color:var(--on-surface);margin-bottom:14px;}
+.site .site-foot .foot-col a{display:block;font-size:14px;color:var(--on-surface-variant);margin-bottom:9px;cursor:pointer;transition:color .2s var(--ease);}
+.site .site-foot .foot-col a:hover{color:var(--secondary);}
+.site .site-foot .foot-brand .b{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:700;margin-bottom:8px;color:var(--on-surface);}
+.site .site-foot .foot-brand .b .material-symbols-outlined{font-size:22px;color:var(--gold);}
+.site .site-foot .foot-brand p{font-size:12px;color:var(--on-surface-variant);}
+.site .site-foot .foot-bottom{border-top:1px solid var(--outline-variant);padding-top:1.25rem;text-align:center;font-size:13px;color:var(--outline);}
+
+/* ════════════════════════════════════════════════════════════
+   طبقة إعادة التلوين (remap) — تُحوّل أدوات Tailwind/الألوان القديمة
+   إلى توكنات الهوية الجديدة. القواعد منطلقة من `.site ` (مسافة) فتمسّ
+   الأحفاد فقط ولا تمسّ الغلاف نفسه ولا /admin. تشمل !important حيث يلزم
+   تجاوز فئات Tailwind ذات التخصيص المماثل.
+   ════════════════════════════════════════════════════════════ */
+/* الأسطح */
+.site .bg-\[\#F5F8FB\], .site .bg-\[\#EAF0F6\]{background-color:var(--surface);}
+.site .bg-white{background-color:var(--surface-card);}
+.site .bg-gray-50{background-color:var(--surface-low);}
+.site .bg-gray-100{background-color:var(--surface-container);}
+.site .bg-gray-200{background-color:var(--surface-dim);}
+.site .bg-blue-50{background-color:var(--surface-container);}
+.site .hover\:bg-gray-50:hover{background-color:var(--surface-low);}
+.site .hover\:bg-blue-50:hover{background-color:var(--surface-container);}
+.site .hover\:bg-\[\#f0f4f8\]:hover{background-color:var(--surface-low);}
+/* أيقونات/أسطح كحلية صلبة */
+.site .bg-\[\#1B6CA8\], .site .bg-\[\#13496E\]{background-color:var(--primary-container);}
+.site .bg-\[\#0F6E56\]{background-color:var(--secondary);}
+/* النصوص */
+.site .text-\[\#0A3D62\]{color:var(--primary-container);}
+.site .text-\[\#0f1a28\], .site .text-gray-900{color:var(--on-surface);}
+.site .text-\[\#1B6CA8\]{color:var(--secondary);}
+.site .text-\[\#33414f\]{color:var(--on-surface-variant);}
+.site .text-gray-700{color:var(--slate);}
+.site .text-gray-600, .site .text-gray-500{color:var(--on-surface-variant);}
+.site .text-gray-400{color:var(--outline);}
+.site .text-gray-300{color:var(--outline-variant);}
+.site .text-blue-600, .site .text-blue-700, .site .text-blue-800{color:var(--secondary);}
+.site .hover\:text-\[\#0A3D62\]:hover, .site .hover\:text-gray-700:hover{color:var(--on-surface);}
+/* الحدود */
+.site .border-gray-100{border-color:var(--surface-container);}
+.site .border-gray-200, .site .border-\[\#cfd9e4\]{border-color:var(--surface-dim);}
+.site .border-gray-300{border-color:var(--outline-variant);}
+.site .border-\[\#dde5ee\]{border-color:var(--surface-dim);}
+.site .border-blue-100, .site .border-blue-200{border-color:var(--outline-variant);}
+.site .border-blue-500{border-color:var(--primary-container);}
+.site .hover\:border-blue-300:hover{border-color:var(--gold);}
+.site .hover\:border-\[\#1B6CA8\]:hover{border-color:var(--gold);}
+.site .focus\:border-blue-500:focus{border-color:var(--primary-container);}
+/* التدرّجات الكحلية → تدرّج داكن (الهوية الأساسية) */
+.site .bg-gradient-to-br.from-\[\#0A3D62\]{background-image:linear-gradient(135deg,#131b2e,#05070d);}
+.site .bg-gradient-to-l.from-\[\#0A3D62\]{background-image:linear-gradient(to left,#05070d,#131b2e);}
+.site .bg-gradient-to-l.from-\[\#1B6CA8\]{background-image:linear-gradient(to left,#131b2e,#05070d);}
+.site .bg-gradient-to-br.from-blue-50{background-image:linear-gradient(135deg,var(--surface-container),var(--surface-card));}
+.site .bg-gradient-to-l.from-green-600{background-image:linear-gradient(to left,#0a8f63,#006c49);}
+/* الأزرار الذهبية تبقى ذهبية (الإبراز) — لا تُعاد تلوينها */
+
+/* تركيز موحّد للحقول على الهوية الجديدة (يتجاوز حلقة الأزرق) */
+.site input:focus, .site textarea:focus, .site select:focus{
+  border-color:var(--primary-container);
+  box-shadow:0 0 0 3px rgba(19,27,46,.12);
+  outline:none;
+}
+.site input::placeholder, .site textarea::placeholder{color:var(--outline);}
+
+/* أسطح فاتحة إضافية (مناطق صور البطاقات، بطاقات «عن المنصة») → توكنات محايدة */
+.site .bg-\[\#E6F1FB\]{background-color:var(--surface-container);}
+.site .bg-\[\#f7fafd\]{background-color:var(--surface-low);}
+.site .bg-\[\#f0f4f8\]{background-color:var(--surface-low);}
+.site .bg-gradient-to-br.from-\[\#E6F1FB\]{background-image:linear-gradient(135deg,var(--surface-container),var(--surface-dim));}
