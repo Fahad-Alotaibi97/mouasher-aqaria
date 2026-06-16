@@ -34,34 +34,13 @@ const Icons = {
   pin: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>),
 };
 
-// أيقونات تصميم Stitch للصفحة الرئيسية العامة (SVG مضمّنة — لا اعتماد على خط أيقونات خارجي).
-// الحجم/اللون يُضبطان عبر CSS في .stitch-home حسب السياق.
-const si = (d: React.ReactNode) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d}</svg>);
-const SI = {
-  brand: si(<><path d="M3 3v18h18" /><rect x="7" y="11" width="3" height="7" /><rect x="12" y="7" width="3" height="11" /><rect x="17" y="13" width="3" height="5" /></>),
-  login: si(<><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></>),
-  search: si(<><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" /></>),
-  home: si(<><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><path d="M9 22V12h6v10" /></>),
-  building: si(<><path d="M3 21h18M9 21V7l6-4v18M9 7H3v14" /><path d="M13 11h2M13 15h2M5 11h2M5 15h2" /></>),
-  store: si(<><path d="M3 9l1.5-5h15L21 9" /><path d="M4 9v11a1 1 0 001 1h14a1 1 0 001-1V9" /><path d="M3 9h18" /><path d="M9 21v-6h6v6" /></>),
-  mapPin: si(<><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></>),
-  bed: si(<><path d="M2 4v16" /><path d="M2 9h16a4 4 0 014 4v7" /><path d="M2 17h20" /><path d="M6 9V6h7v3" /></>),
-  bath: si(<><path d="M4 12V6a2 2 0 012-2 2 2 0 012 2" /><path d="M2 12h20v3a4 4 0 01-4 4H6a4 4 0 01-4-4z" /><path d="M7 19l-1 2M18 19l1 2" /></>),
-  ruler: si(<><path d="M3 8l5-5 13 13-5 5z" /><path d="M8 6l2 2M11 9l2 2M14 12l2 2" /></>),
-  minus: si(<path d="M5 12h14" />),
-  trendUp: si(<><path d="M3 17l6-6 4 4 8-8" /><path d="M17 7h4v4" /></>),
-  trendDown: si(<><path d="M3 7l6 6 4-4 8 8" /><path d="M17 17h4v-4" /></>),
-  bookmark: si(<path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />),
-  headset: si(<><path d="M4 14v-2a8 8 0 0116 0v2" /><path d="M4 14a2 2 0 012-2h1v6H6a2 2 0 01-2-2zM20 14a2 2 0 00-2-2h-1v6h1a2 2 0 002-2z" /><path d="M18 18a3 3 0 01-3 3h-3" /></>),
-  bolt: si(<path d="M13 2L3 14h7l-1 8 10-12h-7z" />),
-  shield: si(<><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z" /><path d="M9 12l2 2 4-4" /></>),
-  chartBar: si(<><path d="M3 3v18h18" /><rect x="7" y="10" width="3" height="8" /><rect x="12" y="6" width="3" height="12" /><rect x="17" y="13" width="3" height="5" /></>),
-  arrowLeft: si(<><path d="M19 12H5" /><path d="M11 18l-6-6 6-6" /></>),
-  ai: si(<path d="M12 3l1.8 4.2L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.8z" />),
-  warn: si(<><path d="M12 9v4M12 17h.01" /><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></>),
-};
-// خلفية البطل (مدينة الرياض) — أصل تصميم؛ يمكن استبداله بصورة مستضافة لاحقاً.
-const HERO_IMG = 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1920&q=80';
+// أيقونات Material Symbols Outlined للصفحة الرئيسية (نفس مجموعة تصميم Stitch).
+// الخط يُحمَّل في layout.tsx؛ الحجم/اللون عبر CSS في .stitch-home حسب السياق.
+const msi = (name: string) => <span className="material-symbols-outlined">{name}</span>;
+
+// خلفية البطل: صورة ثابتة لحيّ سكني راقٍ (ليست من إعلانات قاعدة البيانات أبداً).
+// أصل تصميم خارجي؛ يمكن استبداله بصورة الرياض مستضافة محلياً لاحقاً.
+const HERO_IMG = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=80';
 
 // رابط فتح موقع الوحدة في خرائط Google (إحداثيات إن وُجدت وإلا الرابط المخزّن)
 const listingMapsHref = (l: UIListing): string | null => mapsHref(l.lat, l.lng, l.maps_url);
@@ -668,38 +647,40 @@ export default function Home() {
   // النقرة تفتح بطاقة التفاصيل القائمة. الشارة تعكس حكم مؤشر أسعار الحي الحقيقي.
   const renderStitchCard = (l: UIListing, isMatch = false) => {
     const fair = getFair(l);
-    const st = getSt(l.adv, fair); // hi مرتفع / ok مستقر / lo فرصة
+    const st = getSt(l.adv, fair); // hi مرتفع / ok مناسب / lo فرصة
     const img = l.imagesByCategory?.facade ?? (l.images && l.images.length ? l.images[0] : null);
-    const badge = st === 'hi'
-      ? { cls: 'b-high', icon: SI.trendUp, label: 'مؤشر مرتفع' }
+    // شارة الحكم تعكس مؤشر أسعار الحي الحقيقي (ألوان صادقة: مرتفع تحذيري، فرصة إيجابي)
+    const v = st === 'hi'
+      ? { cls: 'v-high', icon: 'trending_up', label: 'مؤشر مرتفع' }
       : st === 'lo'
-        ? { cls: 'b-opp', icon: SI.trendDown, label: 'فرصة' }
-        : { cls: 'b-stable', icon: SI.minus, label: 'مستقر' };
+        ? { cls: 'v-opp', icon: 'trending_down', label: 'فرصة' }
+        : { cls: 'v-stable', icon: 'remove', label: 'مناسب' };
     return (
-      <div key={l.id} className={`card reveal${isMatch ? ' is-match' : ''}`} onClick={() => openListing(l)}>
+      <div key={l.id} className={`card group reveal${isMatch ? ' is-match' : ''}`} onClick={() => openListing(l)}>
         <div className="media">
           <div className="imgwrap">
             {img
               // eslint-disable-next-line @next/next/no-img-element
               ? <img src={img} alt={l.title} />
-              : <div className="ph">{SI.home}</div>}
+              : <div className="ph">{msi('home_work')}</div>}
           </div>
-          <span className="tag">{isMatch ? 'الأنسب لطلبك' : 'للإيجار'}</span>
+          {/* شارة الحالة: نقطة ذهبية للإيجار (لو توفّر للبيع مستقبلاً: نقطة خضراء) */}
+          <span className="tag"><span className="dot" />{isMatch ? 'الأنسب لطلبك' : 'للإيجار'}</span>
         </div>
         <div className="body">
           <div className="topline">
             <h3>{l.title || `${l.type} — ${l.hood}`}</h3>
-            <span className={`badge-state ${badge.cls}`}>{badge.icon} {badge.label}</span>
+            <span className={`badge-state ${v.cls}`}>{msi(v.icon)} {v.label}</span>
           </div>
-          <div className="loc">{SI.mapPin} {l.hood}، الرياض</div>
+          <div className="loc">{msi('location_on')} {l.hood}، الرياض</div>
           <div className="specs">
-            <span>{SI.bed} {l.rooms ?? '—'} غرف</span>
-            <span>{SI.bath} {l.baths ?? '—'} حمامات</span>
-            <span>{SI.ruler} {l.area ?? '—'} م²</span>
+            <span>{msi('bed')} {l.rooms ?? '—'} غرف</span>
+            <span>{msi('bathtub')} {l.baths ?? '—'} حمامات</span>
+            <span>{msi('square_foot')} {l.area ?? '—'} م²</span>
           </div>
           <div className="foot">
-            <div className="save" role="button" aria-label="حفظ" onClick={(e) => e.stopPropagation()}>{SI.bookmark}</div>
             <div className="price">{l.adv.toLocaleString('ar-SA')} <span>ر.س/سنوياً</span></div>
+            <button className="save" aria-label="حفظ" onClick={(e) => e.stopPropagation()}>{msi('bookmark_border')}</button>
           </div>
         </div>
       </div>
@@ -781,75 +762,81 @@ export default function Home() {
         <SiteNav active={page} onNavigate={go} user={user} isAdmin={isAdmin} isOffice={hasOffice} onSignOut={signOut} />
       )}
 
-      {/* ═══ HOME — تصميم Stitch (واجهة فاتحة) موصول ببياناتي ووظائفي الحقيقية ═══ */}
+      {/* ═══ HOME — تصميم Stitch الرسمي (واجهة فاتحة) موصول ببياناتي الحقيقية ═══ */}
       {page === 'home' && (
         <div className="stitch-home">
 
-          {/* ── الشريط العلوي ── */}
+          {/* ── الشريط العلوي: زجاجي لاصق، 64px ── */}
           <header className="nav">
             <div className="wrap nav-inner">
+              {/* العلامة يميناً (RTL: أول عنصر = اليمين) */}
+              <button className="brand" onClick={() => go('home')}><span>مؤشر العقارية</span>{msi('real_estate_agent')}</button>
+              <nav className="nav-center">
+                <a className="active" onClick={() => go('home')}>الرئيسية</a>
+                <a onClick={() => go('search')}>ابحث</a>
+                <a onClick={() => go('indicator')}>مؤشر أسعار الحي</a>
+              </nav>
+              {/* الإجراءات يساراً */}
               <div className="nav-actions">
                 {!user ? (
-                  <button className="login-btn" onClick={() => go('pricing')}>{SI.login} دخول</button>
+                  <button className="login-btn" onClick={() => go('pricing')}>{msi('login')} دخول</button>
                 ) : (
                   <>
                     {isAdmin ? (
-                      <a className="login-btn" href="/admin">{SI.shield} لوحة الإدارة</a>
+                      <a className="login-btn" href="/admin">{msi('shield_person')} لوحة الإدارة</a>
                     ) : hasOffice ? (
-                      <button className="login-btn" onClick={() => go('office')}>{SI.building} لوحة المكتب</button>
+                      <button className="login-btn" onClick={() => go('office')}>{msi('store')} لوحة المكتب</button>
                     ) : null}
                     <button className="ghost-btn" onClick={signOut}>تسجيل الخروج</button>
                   </>
                 )}
               </div>
-              <nav className="nav-center">
-                <a onClick={() => go('indicator')}>مؤشر أسعار الحي</a>
-                <a onClick={() => go('search')}>ابحث</a>
-                <a className="active" onClick={() => go('home')}>الرئيسية</a>
-              </nav>
-              <button className="brand" onClick={() => go('home')}>مؤشر العقارية {SI.brand}</button>
             </div>
           </header>
 
-          {/* ── البطل: خلفية الرياض + بطاقة زجاجية فيها بحث حقيقي وفلاتر الأنواع ── */}
+          {/* ── البطل: صورة سكنية ثابتة (ليست من الإعلانات) + تدرّج + بطاقة زجاجية ── */}
           <section className="hero">
             <div className="hero-bg" style={{ '--hero-img': `url('${HERO_IMG}')` } as React.CSSProperties} />
-            <div className="hero-card">
-              <h1>ابحث عن عقارك المثالي</h1>
-              <p className="sub">اكتشف أفضل عروض الإيجار في الرياض مع مؤشر أسعار حي دقيق وموثوق.</p>
-              <div className="search-box">
-                <input
-                  value={aiQuery}
-                  onChange={(e) => setAiQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && runAI()}
-                  placeholder="ابحث بالحي، نوع العقار، أو رغبتك…"
-                />
-                <button onClick={() => runAI()}>{SI.search} بحث</button>
-              </div>
-              <div className="type-tabs">
-                {[
-                  { k: 'فيلا', label: 'فلل', icon: SI.home },
-                  { k: 'شقة', label: 'شقق', icon: SI.building },
-                  { k: 'تجاري', label: 'تجاري', icon: SI.store },
-                ].map((t) => (
-                  <button key={t.k}
-                    className={`type-tab ${filterType === t.k ? 'active' : ''}`}
-                    onClick={() => {
-                      // فلتر النوع الحقيقي + إلغاء أي بحث مساعد سابق لعرض النوع بوضوح
-                      setAiResult(null); setAiReply(null); setSearched(false); setAiShowAlts(false);
-                      setFilterType(filterType === t.k ? '' : t.k);
-                      setTimeout(() => document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
-                    }}>
-                    {t.icon} {t.label}
-                  </button>
-                ))}
-              </div>
-              {/* المساعد الذكي — مدمج تحت البحث: عبارات سريعة تُشغّل مطابقة الكلمات الحقيقية */}
-              <div className="ai-strip">
-                <span className="lbl">{SI.ai} المساعد الذكي:</span>
-                {['أرخص شقة متاحة', 'فيلا في حطين', 'فرص بأقل من السوق', 'قريب من الخدمات'].map((c) => (
-                  <button key={c} className="chip" onClick={() => runAI(c)}>{c}</button>
-                ))}
+            <div className="hero-overlay" />
+            <div className="wrap hero-inner">
+              <div className="glass-panel">
+                <h1>ابحث عن عقارك المثالي</h1>
+                <p className="sub">اكتشف أفضل عروض الإيجار في الرياض مع مؤشر أسعار حي دقيق وموثوق.</p>
+                <div className="search-box">
+                  <span className="s-ico">{msi('search')}</span>
+                  <input
+                    value={aiQuery}
+                    onChange={(e) => setAiQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && runAI()}
+                    placeholder="ابحث بالحي، نوع العقار، أو رغبتك…"
+                  />
+                  <button onClick={() => runAI()}>بحث</button>
+                </div>
+                <div className="type-tabs">
+                  {[
+                    { k: 'فيلا', label: 'فلل', icon: 'home' },
+                    { k: 'شقة', label: 'شقق', icon: 'apartment' },
+                    { k: 'تجاري', label: 'تجاري', icon: 'storefront' },
+                  ].map((t) => (
+                    <button key={t.k}
+                      className={`pill ${filterType === t.k ? 'active' : ''}`}
+                      onClick={() => {
+                        // فلتر النوع الحقيقي + إلغاء أي بحث مساعد سابق لعرض النوع بوضوح
+                        setAiResult(null); setAiReply(null); setSearched(false); setAiShowAlts(false);
+                        setFilterType(filterType === t.k ? '' : t.k);
+                        setTimeout(() => document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+                      }}>
+                      {msi(t.icon)} {t.label}
+                    </button>
+                  ))}
+                </div>
+                {/* المساعد الذكي — مدمج بنفس نمط الحبوب: عبارات سريعة تُشغّل مطابقة الكلمات الحقيقية */}
+                <div className="ai-strip">
+                  <span className="lbl">{msi('auto_awesome')} المساعد الذكي:</span>
+                  {['أرخص شقة متاحة', 'فيلا في حطين', 'فرص بأقل من السوق', 'قريب من الخدمات'].map((c) => (
+                    <button key={c} className="pill chip" onClick={() => runAI(c)}>{c}</button>
+                  ))}
+                </div>
               </div>
             </div>
           </section>
@@ -860,13 +847,13 @@ export default function Home() {
               <div className="sec-head reveal">
                 <div className="ttl">
                   <h2>{searched ? 'نتائج بحثك' : 'عقارات مميزة'}</h2>
-                  <p>{searched ? 'بين العروض المتاحة في الرياض' : 'أحدث العروض المتاحة في الرياض'}</p>
+                  <p>{searched ? 'بين العروض المتاحة في الرياض' : 'أحدث العروض المختارة بعناية في الرياض'}</p>
                 </div>
-                <button className="see-all" onClick={() => go('search')}>عرض الكل {SI.arrowLeft}</button>
+                <button className="see-all" onClick={() => go('search')}>عرض الكل {msi('arrow_back')}</button>
               </div>
 
               {aiReply && aiResult?.kind === 'matches' && (
-                <div className="ai-reply reveal">{SI.ai}<span>{aiReply}</span></div>
+                <div className="ai-reply reveal">{msi('auto_awesome')}<span>{aiReply}</span></div>
               )}
 
               {aiResult?.kind === 'none' ? (
@@ -881,7 +868,7 @@ export default function Home() {
                     <div className="reveal in">
                       <div className="nomatch">
                         <div className="nm-head">
-                          {SI.warn}
+                          {msi('search_off')}
                           <div>
                             <div className="t">لا توجد حالياً عقارات مطابقة{crit ? ` (${crit})` : ''}.</div>
                             <div className="d">لا نعرض لك عقارات في أحياء أخرى ونزعم أنها تطابق طلبك — هذي خياراتك:</div>
@@ -889,7 +876,7 @@ export default function Home() {
                         </div>
                         <div className="nm-actions">
                           <button className="login-btn" onClick={registerWish}>
-                            <span>سجّل طلبك — يصل للمكاتب فتتواصل معك عند توفّر ما يناسبك</span>{SI.arrowLeft}
+                            <span>سجّل طلبك — يصل للمكاتب فتتواصل معك عند توفّر ما يناسبك</span>{msi('arrow_back')}
                           </button>
                           {listings.length > 0 && (
                             <button className="ghost-btn" onClick={() => setAiShowAlts((v) => !v)}>
@@ -933,10 +920,10 @@ export default function Home() {
                 <p className="sub">نلتزم بتجربة عقارية مبنية على الشفافية والدقة لتسهيل قراراتك.</p>
               </div>
               <div className="why-grid">
-                <div className="why-card reveal"><div className="ic">{SI.chartBar}</div><h3>دقة البيانات أولاً</h3><p>مؤشر أسعار الحي مبني على متوسطات السوق المُدارة، لتقارن قبل توقيع العقد.</p></div>
-                <div className="why-card reveal"><div className="ic">{SI.shield}</div><h3>آمن وموثوق</h3><p>المكاتب موثّقة برخصة فال، وبياناتك محميّة وفق سياسة خصوصية واضحة.</p></div>
-                <div className="why-card reveal"><div className="ic">{SI.bolt}</div><h3>سرعة الوصول</h3><p>مساعد ذكي وبحث وخريطة تفاعلية توصلك للعقار المناسب بسرعة.</p></div>
-                <div className="why-card reveal"><div className="ic">{SI.headset}</div><h3>استشارات مجانية</h3><p>أرسل استفسارك وسيصل للمكاتب والمنصة للتواصل معك بخصوص طلبك.</p></div>
+                <div className="why-card reveal"><div className="ic">{msi('analytics')}</div><h3>دقة البيانات أولاً</h3><p>مؤشر أسعار الحي مبني على متوسطات السوق المُدارة، لتقارن قبل توقيع العقد.</p></div>
+                <div className="why-card reveal"><div className="ic">{msi('verified_user')}</div><h3>آمن وموثوق</h3><p>المكاتب موثّقة برخصة فال، وبياناتك محميّة وفق سياسة خصوصية واضحة.</p></div>
+                <div className="why-card reveal"><div className="ic">{msi('speed')}</div><h3>سرعة الوصول</h3><p>مساعد ذكي وبحث وخريطة تفاعلية توصلك للعقار المناسب بسرعة.</p></div>
+                <div className="why-card reveal"><div className="ic">{msi('support_agent')}</div><h3>استشارات مجانية</h3><p>أرسل استفسارك وسيصل للمكاتب والمنصة للتواصل معك بخصوص طلبك.</p></div>
               </div>
             </div>
           </section>
@@ -957,13 +944,13 @@ export default function Home() {
                   <a onClick={() => go('privacy')}>سياسة الخصوصية</a>
                 </div>
                 <div className="foot-col">
-                  <h4>المنصة</h4>
+                  <h4>الشركة</h4>
                   <a onClick={() => go('about')}>عن المنصة</a>
                   <a onClick={() => go('inquiries')}>تواصل معنا</a>
                   <a onClick={() => go('pricing')}>سجّل مكتبك العقاري</a>
                 </div>
                 <div className="foot-col foot-brand">
-                  <div className="b">مؤشر العقارية {SI.brand}</div>
+                  <div className="b"><span>مؤشر العقارية</span>{msi('real_estate_agent')}</div>
                   <p>دقّة عقارية للرياض — سوق الإيجار بكل وضوح © 2026.</p>
                 </div>
               </div>
