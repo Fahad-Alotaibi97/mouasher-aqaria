@@ -1513,9 +1513,7 @@ export default function Home() {
               <div><h2 className="font-bold text-gray-900 mb-1">٤. حماية البيانات</h2><p>نتّخذ تدابير تقنية وتنظيمية معقولة لحماية بياناتك من الوصول غير المصرّح به أو التعديل أو الإفشاء.</p></div>
               <div><h2 className="font-bold text-gray-900 mb-1">٥. حقوقك</h2><p>يحق لك طلب الاطلاع على بياناتك أو تصحيحها أو حذفها، وذلك بالتواصل معنا عبر القنوات الرسمية للمنصة.</p></div>
               <div><h2 className="font-bold text-gray-900 mb-1">٦. التعديلات</h2><p>قد نُحدّث هذه السياسة من وقت لآخر، وسيُنشر أي تحديث على هذه الصفحة مع تاريخ آخر تعديل.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٧. التواصل</h2><p>لأي استفسار بخصوص الخصوصية، تواصل معنا عبر نموذج «اترك رسالة» في المنصة.</p></div>
-              <p className="text-xs text-gray-400 border-t border-gray-100 pt-4">ملاحظة: هذه صياغة عامة لأغراض المنصة، ويُنصح بمراجعتها قانونياً قبل الإطلاق الرسمي.</p>
-            </div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٧. التواصل</h2><p>لأي استفسار بخصوص الخصوصية، تواصل معنا عبر نموذج «اترك رسالة» في المنصة.</p></div>            </div>
           ) : (
             <div className="bg-white rounded-2xl border border-gray-200 p-6 text-gray-700 leading-relaxed text-sm space-y-4">
               <h1 className="text-xl font-bold text-gray-900">شروط الاستخدام</h1>
@@ -1525,9 +1523,7 @@ export default function Home() {
               <div><h2 className="font-bold text-gray-900 mb-1">٢. مسؤولية المحتوى</h2><p>المكاتب والمعلنون مسؤولون عن دقة بيانات إعلاناتهم وصحّة تراخيصهم. لا تتحمل المنصة مسؤولية أي اتفاق يتم خارجها بين الأطراف.</p></div>
               <div><h2 className="font-bold text-gray-900 mb-1">٣. الاستخدام المقبول</h2><p>يُمنع استخدام المنصة لأي غرض غير نظامي أو لنشر بيانات مضلّلة أو إعلانات وهمية.</p></div>
               <div><h2 className="font-bold text-gray-900 mb-1">٤. حدود المسؤولية</h2><p>تُقدَّم الخدمة «كما هي»، ولا تضمن المنصة خلوّها من الأخطاء أو دقّة كل البيانات المعروضة بشكل مطلق.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٥. التعديلات</h2><p>يحق للمنصة تحديث هذه الشروط، ويسري التحديث فور نشره على هذه الصفحة.</p></div>
-              <p className="text-xs text-gray-400 border-t border-gray-100 pt-4">ملاحظة: هذه صياغة عامة لأغراض المنصة، ويُنصح بمراجعتها قانونياً قبل الإطلاق الرسمي.</p>
-            </div>
+              <div><h2 className="font-bold text-gray-900 mb-1">٥. التعديلات</h2><p>يحق للمنصة تحديث هذه الشروط، ويسري التحديث فور نشره على هذه الصفحة.</p></div>            </div>
           )}
         </div>
       )}
