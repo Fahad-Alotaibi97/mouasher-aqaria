@@ -94,12 +94,12 @@ export default function MapComponent({ points = [], onSelect }: { points?: MapPo
       const icon = L.divIcon({
         className: '',
         html:
-          '<div style="background:' + color + ';color:white;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:700;font-family:Tajawal,sans-serif;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.2);border:2px solid white">' +
+          '<div style="background:' + color + ';color:white;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:700;font-family:\'IBM Plex Sans Arabic\',sans-serif;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.2);border:2px solid white">' +
           (l.adv / 1000).toFixed(0) + 'K ' + arrow + '</div>',
         iconAnchor: [30, 16],
       });
       const popup =
-        '<div dir="rtl" style="font-family:Tajawal,sans-serif;min-width:190px">' +
+        '<div dir="rtl" style="font-family:\'IBM Plex Sans Arabic\',sans-serif;min-width:190px">' +
           '<div style="font-weight:700;font-size:13px;color:#1a2a3e;margin-bottom:6px">' + l.title + '</div>' +
           '<div style="background:#E6F1FB;border-radius:8px;padding:9px;margin-bottom:7px">' +
             '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">' +
@@ -112,7 +112,7 @@ export default function MapComponent({ points = [], onSelect }: { points?: MapPo
             '</div>' +
           '</div>' +
           '<div style="text-align:center;margin-bottom:8px"><span style="background:' + color + '22;color:' + color + ';font-size:11px;padding:3px 10px;border-radius:8px;font-weight:700">' + (labels[l.st] || '') + '</span></div>' +
-          '<button class="ms-detail-btn" style="width:100%;background:#0A3D62;color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;font-family:Tajawal,sans-serif;cursor:pointer">عرض التفاصيل</button>' +
+          '<button class="ms-detail-btn" style="width:100%;background:#0A3D62;color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;font-family:\'IBM Plex Sans Arabic\',sans-serif;cursor:pointer">عرض التفاصيل</button>' +
         '</div>';
       const marker = L.marker([l.lat, l.lng], { icon }).bindPopup(popup, { maxWidth: 240 });
       // زر «عرض التفاصيل» داخل النافذة المنبثقة ⇒ يفتح بطاقة التفاصيل الكاملة (Aqar-style).

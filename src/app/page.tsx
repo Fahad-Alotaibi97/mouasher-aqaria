@@ -755,7 +755,7 @@ export default function Home() {
   const selectCls = "w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
   return (
-    <div className="min-h-screen bg-[#F5F8FB]" dir="rtl" style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F8FB]" dir="rtl" style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
 
       {/* الشريط العلوي + الدرج الجانبي (مكوّن مشترك) — الرئيسية لها شريط Stitch خاص أدناه */}
       {page !== 'home' && (
@@ -799,7 +799,9 @@ export default function Home() {
             <div className="hero-bg" style={{ '--hero-img': `url('${HERO_IMG}')` } as React.CSSProperties} />
             <div className="hero-overlay" />
             <div className="wrap hero-inner">
-              <div className="glass-panel">
+              {/* backdrop-filter مضمّن سطرياً: المُصغِّر (Lightning CSS) كان يُسقط الخاصية
+                  القياسية ويُبقي -webkit- فقط، فالنتيجة computed=none. السطري لا يُمسّ. */}
+              <div className="glass-panel" style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
                 <h1>ابحث عن عقارك المثالي</h1>
                 <p className="sub">اكتشف أفضل عروض الإيجار في الرياض مع مؤشر أسعار حي دقيق وموثوق.</p>
                 <div className="search-box">

@@ -293,7 +293,7 @@ export default function AdminPage() {
     <div
       className="min-h-screen admin-bg"
       dir="rtl"
-      style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}
+      style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
     >
       <SiteNav active="admin" />
       <div className="admin-shell flex items-center justify-center p-6">
@@ -342,7 +342,7 @@ export default function AdminPage() {
     <div
       className="min-h-screen admin-bg admin-shell"
       dir="rtl"
-      style={{ fontFamily: "var(--font-body), 'Tajawal', sans-serif" }}
+      style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
     >
       <div className="flex flex-col md:flex-row min-h-screen items-stretch">
         {/* الشريط الجانبي الكامل الارتفاع (يميناً في RTL) */}

@@ -32,7 +32,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Tajawal:wght@400;500;700;800;900&display=swap"
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap"
           rel="stylesheet"
         />
         {/* أيقونات Material Symbols Outlined — تُستخدم في الصفحة الرئيسية (تصميم Stitch) */}
@@ -43,7 +43,7 @@ export default function RootLayout({
       </head>
       <body
         className="min-h-full flex flex-col"
-        style={{ fontFamily: "'IBM Plex Sans Arabic', 'Tajawal', 'Segoe UI', sans-serif" }}
+        style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}
       >
         {children}
       </body>
