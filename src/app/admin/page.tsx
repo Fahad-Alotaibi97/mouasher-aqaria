@@ -42,6 +42,10 @@ interface HoodRow {
   studio: number | null; // خانة واحدة
   floor: number | null; // الدور — قيمة واحدة (avg_dor)
   duplex: number | null; // الدوبلكس — قيمة واحدة (avg_duplex)
+  // المتوسطات التجارية (ريال/م² سنوياً) — تُحفظ في جدول commercial_prices المنفصل
+  shop: number | null;     // محل
+  office: number | null;   // مكتب
+  showroom: number | null; // معرض
   baseApt: number | null; // avg_rent المُخزّن (للرجوع إن لم تُعبّأ خانات)
   baseVilla: number | null; // avg_villa المُخزّن
   isNew?: boolean;
@@ -79,6 +83,15 @@ function approvedAvg(slots: (number | null)[]): number | null {
 
 const fmt = (n: number | null | undefined) =>
   n == null ? '—' : `${n.toLocaleString('ar-SA')} ريال`;
+// تنسيق المتوسط التجاري — ريال لكل متر² سنوياً (فارغ = شرطة، بلا رقم مُفبرك)
+const fmtM2 = (n: number | null | undefined) =>
+  n == null ? '—' : `${n.toLocaleString('ar-SA')} ريال/م²`;
+// الأنواع التجارية الثلاثة (مفتاح القاعدة + التسمية العربية) — نفس ترتيب العام
+const COMM_TYPES: { key: 'shop' | 'office' | 'showroom'; label: string }[] = [
+  { key: 'shop', label: 'محل' },
+  { key: 'office', label: 'مكتب' },
+  { key: 'showroom', label: 'معرض' },
+];
 
 export default function AdminPage() {
   // ── الدخول الموحّد (المسار الوحيد): جلسة Supabase من الرئيسية + is_admin=true ──
@@ -113,6 +126,8 @@ export default function AdminPage() {
   const [hasDetailCols, setHasDetailCols] = useState(true);
   // هل توجد أعمدة الدور/الدوبلكس (avg_dor/avg_duplex)؟ (قبل تشغيل add_floor_duplex.sql)
   const [hasNewTypeCols, setHasNewTypeCols] = useState(true);
+  // هل جدول commercial_prices موجود؟ (للرسائل الصادقة عند الحفظ — قبل/بعد الترحيل)
+  const [hasCommTable, setHasCommTable] = useState(true);
 
   // ── جلب الأحياء بعد فتح اللوحة (بجلسة موحّدة أو بكلمة المرور) ──
   useEffect(() => {
@@ -153,18 +168,42 @@ export default function AdminPage() {
         const data = rawData ?? [];
         setHasDetailCols(detailOk);
         setHasNewTypeCols(newTypesOk);
+        // ── المتوسطات التجارية: نقرأ commercial_prices ونمزجها في صفوف الأحياء ──
+        // (القيمة الفارغة تبقى فارغة — لا رقم مُفبرك). غياب الجدول لا يُسقط المحرّر.
+        const commByHood: Record<string, { shop: number | null; office: number | null; showroom: number | null }> = {};
+        const cpRes = await sb.from('commercial_prices').select('hood, commercial_type, price_per_m2');
+        if (cancelled) return;
+        if (cpRes.error) {
+          setHasCommTable(false);
+        } else {
+          setHasCommTable(true);
+          for (const row of (cpRes.data ?? []) as Record<string, unknown>[]) {
+            const hn = row.hood as string;
+            const ct = row.commercial_type as string;
+            if (!commByHood[hn]) commByHood[hn] = { shop: null, office: null, showroom: null };
+            if (ct === 'shop' || ct === 'office' || ct === 'showroom') {
+              commByHood[hn][ct] = (row.price_per_m2 as number) ?? null;
+            }
+          }
+        }
         setRows(
-          data.map((h) => ({
-            name: h.name as string,
-            apt: detailToSlots(h.apt_detail),
-            villa: detailToSlots(h.villa_detail),
-            villaSingle: (h.avg_villa as number) ?? null,
-            studio: (h.avg_studio as number) ?? null,
-            floor: (h.avg_dor as number) ?? null,
-            duplex: (h.avg_duplex as number) ?? null,
-            baseApt: (h.avg_rent as number) ?? null,
-            baseVilla: (h.avg_villa as number) ?? null,
-          }))
+          data.map((h) => {
+            const c = commByHood[h.name as string];
+            return {
+              name: h.name as string,
+              apt: detailToSlots(h.apt_detail),
+              villa: detailToSlots(h.villa_detail),
+              villaSingle: (h.avg_villa as number) ?? null,
+              studio: (h.avg_studio as number) ?? null,
+              floor: (h.avg_dor as number) ?? null,
+              duplex: (h.avg_duplex as number) ?? null,
+              shop: c?.shop ?? null,
+              office: c?.office ?? null,
+              showroom: c?.showroom ?? null,
+              baseApt: (h.avg_rent as number) ?? null,
+              baseVilla: (h.avg_villa as number) ?? null,
+            };
+          })
         );
       }
       setLoading(false);
@@ -200,7 +239,7 @@ export default function AdminPage() {
   };
 
   // ── تحديث قيمة مفردة (استوديو/دور/دوبلكس) ────────────────────
-  const setSingle = (name: string, key: 'studio' | 'floor' | 'duplex' | 'villaSingle', value: string) => {
+  const setSingle = (name: string, key: 'studio' | 'floor' | 'duplex' | 'villaSingle' | 'shop' | 'office' | 'showroom', value: string) => {
     const num = value === '' ? null : parseInt(value, 10);
     setRows((prev) =>
       prev.map((r) => (r.name === name ? { ...r, [key]: Number.isNaN(num as number) ? null : num } : r))
@@ -223,7 +262,7 @@ export default function AdminPage() {
     }
     setRows((prev) => [
       ...prev,
-      { name, apt: [null, null, null, null], villa: [null, null, null, null], villaSingle: null, studio: null, floor: null, duplex: null, baseApt: null, baseVilla: null, isNew: true },
+      { name, apt: [null, null, null, null], villa: [null, null, null, null], villaSingle: null, studio: null, floor: null, duplex: null, shop: null, office: null, showroom: null, baseApt: null, baseVilla: null, isNew: true },
     ]);
     setOpenHood(name);
     setMsg(null);
@@ -257,6 +296,35 @@ export default function AdminPage() {
           return base;
         });
 
+      // ── حفظ المتوسطات التجارية في commercial_prices (منفصل عن السكني) ──
+      // القيم المعبّأة (>0) تُحفظ upsert على (hood, commercial_type)؛ والمُفرّغة تُحذف
+      // فتعود لحالة «لا بيانات» (لا رقم مُفبرك). يرجع نص خطأ أو null عند النجاح.
+      const saveCommercial = async (): Promise<string | null> => {
+        const nowIso = new Date().toISOString();
+        const upserts: { hood: string; commercial_type: string; price_per_m2: number; updated_at: string }[] = [];
+        for (const r of rows) {
+          for (const t of COMM_TYPES) {
+            const v = r[t.key];
+            if (v != null && !Number.isNaN(v) && v > 0) {
+              upserts.push({ hood: r.name, commercial_type: t.key, price_per_m2: v, updated_at: nowIso });
+            }
+          }
+        }
+        if (upserts.length) {
+          const { error: e } = await sb.from('commercial_prices').upsert(upserts, { onConflict: 'hood,commercial_type' });
+          if (e) return e.message;
+        }
+        // حذف المُفرّغ: لكل نوع، الأحياء التي قيمتها فارغة الآن (استعلام واحد لكل نوع)
+        for (const t of COMM_TYPES) {
+          const emptyHoods = rows.filter((r) => !(r[t.key] != null && (r[t.key] as number) > 0)).map((r) => r.name);
+          if (emptyHoods.length) {
+            const { error: e } = await sb.from('commercial_prices').delete().eq('commercial_type', t.key).in('hood', emptyHoods);
+            if (e) return e.message;
+          }
+        }
+        return null;
+      };
+
       // نحاول الحفظ بكل الأعمدة؛ إن فشل بسبب غياب أعمدة (التفصيل أو الدور/الدوبلكس)
       // نعيد المحاولة بالأعمدة الأساسية فقط حتى لا يضيع الحفظ.
       let { error } = await sb.from('neighborhoods').upsert(buildPayload(hasDetailCols, hasNewTypeCols), { onConflict: 'name' });
@@ -265,20 +333,25 @@ export default function AdminPage() {
         setHasNewTypeCols(false);
         ({ error } = await sb.from('neighborhoods').upsert(buildPayload(false, false), { onConflict: 'name' }));
         if (!error) {
+          const cErr = await saveCommercial();
           setMsg({
             ok: true,
-            text: 'تم حفظ المتوسطات الأساسية ✓ (لكن تفصيل الغرف و/أو الدور/الدوبلكس لم تُحفظ — شغّل supabase/admin_neighborhoods_v2.sql و supabase/add_floor_duplex.sql مرة واحدة).',
+            text: 'تم حفظ المتوسطات الأساسية ✓ (لكن تفصيل الغرف و/أو الدور/الدوبلكس لم تُحفظ — شغّل supabase/admin_neighborhoods_v2.sql و supabase/add_floor_duplex.sql مرة واحدة).'
+              + (cErr ? ` — وتعذّر حفظ المتوسطات التجارية: ${cErr}` : ' والمتوسطات التجارية حُفظت.'),
           });
           setSaving(false);
           return;
         }
       }
-      if (error) setMsg({ ok: false, text: 'فشل الحفظ: ' + error.message });
-      else
-        setMsg({
-          ok: true,
-          text: 'تم الحفظ ✓ — مؤشر أسعار الحي في الموقع سيقرأ القيم الجديدة فوراً.',
-        });
+      if (error) { setMsg({ ok: false, text: 'فشل الحفظ: ' + error.message }); setSaving(false); return; }
+      // السكني حُفظ — نحفظ التجاري (commercial_prices) ونضمّ نتيجته للرسالة
+      const cErr = await saveCommercial();
+      setMsg({
+        ok: !cErr,
+        text: cErr
+          ? `حُفظت المتوسطات السكنية ✓ لكن تعذّر حفظ التجاري: ${cErr}`
+          : 'تم الحفظ ✓ — مؤشر أسعار الحي (السكني والتجاري) في الموقع سيقرأ القيم الجديدة فوراً.',
+      });
     } catch (e) {
       setMsg({ ok: false, text: 'فشل الحفظ: ' + (e instanceof Error ? e.message : 'خطأ غير متوقع') });
     }
@@ -440,6 +513,16 @@ export default function AdminPage() {
                     <span className="bg-indigo-50 text-indigo-800 border border-indigo-200 px-2 py-1 rounded-lg whitespace-nowrap">
                       دوبلكس: <b>{fmt(duplexApproved)}</b>
                     </span>
+                    {/* المتوسطات التجارية (ريال/م²) — تمييز ذهبي */}
+                    <span className="bg-[#f7f1df] text-[#8a6d18] border border-[#e6d9ad] px-2 py-1 rounded-lg whitespace-nowrap">
+                      محل: <b>{fmtM2(r.shop)}</b>
+                    </span>
+                    <span className="bg-[#f7f1df] text-[#8a6d18] border border-[#e6d9ad] px-2 py-1 rounded-lg whitespace-nowrap">
+                      مكتب: <b>{fmtM2(r.office)}</b>
+                    </span>
+                    <span className="bg-[#f7f1df] text-[#8a6d18] border border-[#e6d9ad] px-2 py-1 rounded-lg whitespace-nowrap">
+                      معرض: <b>{fmtM2(r.showroom)}</b>
+                    </span>
                   </div>
                 </button>
 
@@ -550,6 +633,30 @@ export default function AdminPage() {
                             className={cellCls}
                           />
                         </div>
+                      </div>
+                    </div>
+
+                    {/* تجاري — محل/مكتب/معرض (متوسط الإيجار السنوي للمتر²) → جدول commercial_prices */}
+                    <div className="pt-4 border-t border-dashed border-[#e6d9ad]">
+                      <div className="text-sm font-bold text-[#8a6d18] mb-1">تجاري — متوسط الإيجار السنوي للمتر² (ريال/م²)</div>
+                      <div className="text-[11px] text-gray-500 mb-2.5 leading-relaxed">اتركها فارغة إن لم تتوفّر بيانات — يظهر «قريباً» للعامة حتى تُعبّأ. تُحفظ في جدول commercial_prices المنفصل، ويقرؤها المؤشر التجاري العام لكل (حي + نوع).</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {COMM_TYPES.map((t) => (
+                          <div key={t.key}>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-[11px] text-gray-600 font-semibold">{t.label}</label>
+                              <span className="text-[10px] text-[#8a6d18]">المعتمد: <b>{fmtM2(r[t.key])}</b></span>
+                            </div>
+                            <input
+                              type="number"
+                              min={0}
+                              value={r[t.key] ?? ''}
+                              onChange={(e) => setSingle(r.name, t.key, e.target.value)}
+                              placeholder="—"
+                              className={cellCls}
+                            />
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>

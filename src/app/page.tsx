@@ -256,6 +256,7 @@ export default function Home() {
   const [siZone, setSiZone] = useState('النرجس'); // اسم الحي المختار في "جرّب المؤشر"
   const [siType, setSiType] = useState('شقة'); // نوع الوحدة في "جرّب المؤشر"
   const [siSector, setSiSector] = useState<'residential' | 'commercial'>('residential'); // قطاع المؤشر العام
+  const [siCommType, setSiCommType] = useState<'shop' | 'office' | 'showroom'>('shop'); // النوع التجاري في المؤشر العام
   const [siPrice, setSiPrice] = useState('');
   // القطاع المختار في التصفّح/البحث: سكني (افتراضي) | تجاري — التبديل الأساسي
   const [filterSector, setFilterSector] = useState<'residential' | 'commercial'>('residential');
@@ -572,6 +573,7 @@ export default function Home() {
   // استخدام مؤشر أسعار الحي: النتيجة تظهر حيّاً أثناء الكتابة، فنسجّل استخداماً
   // واحداً بعد استقرار الإدخال — مع الحكم الفعلي (hi مرتفع / ok مناسب / lo فرصة).
   useEffect(() => {
+    if (siSector !== 'residential') return; // المؤشر التجاري لا يُسجَّل بحكم سكني
     const price = parseInt(siPrice) || 0;
     if (!price) return;
     const t = setTimeout(() => {
@@ -581,7 +583,7 @@ export default function Home() {
       track('indicator_use', null, { hood: siZone, type: siType, price, verdict: getSt(price, avg) });
     }, 1500);
     return () => clearTimeout(t);
-  }, [siZone, siType, siPrice, mktAvg]);
+  }, [siZone, siType, siPrice, mktAvg, siSector]);
 
   // ── المساعد الذكي: ترتيب/تصفية محلّية بالكلمات المفتاحية (بدون API) ──
   // TODO: لربط ذكاء اصطناعي حقيقي لاحقاً، استبدل منطق النقاط أدناه باستدعاء
@@ -1179,14 +1181,53 @@ export default function Home() {
                     </button>
                   ))}
                 </div>
-                {siSector === 'commercial' ? (
-                  // المؤشر التجاري قيد الإعداد — حالة صادقة (الجدول فارغ بعد)
-                  <div className="p-5 rounded-xl bg-[#f7f1df] border border-[#e6d9ad] text-center">
-                    <div className="text-[#8a6d18] mb-2 flex justify-center">{msi('storefront')}</div>
-                    <div className="font-bold text-sm text-[#7a5f12] mb-1">{t('comm.soonShort')} — المؤشر التجاري قيد الإعداد</div>
-                    <div className="text-xs text-[#8a6d18] leading-relaxed">{t('comm.indexSoon')}</div>
-                  </div>
-                ) : (
+                {siSector === 'commercial' ? (() => {
+                  // المؤشر التجاري — يقرأ المتوسط المحفوظ (commercial_prices) للحي+النوع.
+                  // مُعبّأ ⇒ نعرض المتوسط ونقارن إيجار المتر² المُدخَل؛ فارغ ⇒ حالة صادقة «قريباً».
+                  const cAvg = commIndex[`${siZone}|${siCommType}`]?.pricePerM2 ?? null;
+                  const cPrice = parseInt(siPrice) || 0;
+                  const avgTxt = cAvg != null ? `متوسط ${commLabel(siCommType)} في ${siZone}: ${cAvg.toLocaleString('ar-SA')} ريال/م² سنوياً` : '';
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.hood')}</label>
+                          <select value={siZone} onChange={e => setSiZone(e.target.value)} className={selectCls}>
+                            {Object.keys(mktAvg).map(h => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-700 block mb-1 font-semibold">النوع التجاري</label>
+                          <select value={siCommType} onChange={e => setSiCommType(e.target.value as 'shop' | 'office' | 'showroom')} className={selectCls}>
+                            <option value="shop">محل</option><option value="office">مكتب</option><option value="showroom">معرض</option>
+                          </select>
+                        </div>
+                      </div>
+                      {cAvg == null ? (
+                        <div className="p-5 rounded-xl bg-[#f7f1df] border border-[#e6d9ad] text-center">
+                          <div className="text-[#8a6d18] mb-2 flex justify-center">{msi('storefront')}</div>
+                          <div className="font-bold text-sm text-[#7a5f12] mb-1">{t('comm.soonShort')}</div>
+                          <div className="text-xs text-[#8a6d18] leading-relaxed">{t('comm.indexSoon')}</div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mb-3">
+                            <label className="text-xs text-gray-700 block mb-1 font-semibold">إيجارك السنوي للمتر² (ريال/م²)</label>
+                            <input type="number" value={siPrice} onChange={e => setSiPrice(e.target.value)} placeholder="مثال: 1800" className={inputCls} />
+                          </div>
+                          {!cPrice ? (
+                            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-800"><b>{avgTxt}.</b><div className="text-xs mt-0.5 text-gray-600">أدخل إيجارك للمتر² للمقارنة بمتوسط الحي التجاري.</div></div>
+                          ) : (() => {
+                            const hi = cPrice > cAvg * 1.12, lo = cPrice < cAvg * 0.85;
+                            const cls = hi ? 'bg-orange-50 border-orange-300 text-orange-700' : lo ? 'bg-green-50 border-green-300 text-green-700' : 'bg-blue-50 border-blue-200 text-blue-800';
+                            const ttl = hi ? 'السعر مرتفع عن متوسط الحي التجاري' : lo ? 'فرصة — أقل من متوسط الحي التجاري' : 'السعر مناسب لمتوسط الحي التجاري';
+                            return <div className={`p-3 rounded-xl border ${cls}`}><div className="font-bold text-sm">{ttl}</div><div className="text-xs mt-0.5 text-gray-600">{avgTxt} · الفرق {Math.abs(cPrice - cAvg).toLocaleString('ar-SA')} ريال/م².</div></div>;
+                          })()}
+                        </>
+                      )}
+                    </>
+                  );
+                })() : (
                   <>
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
@@ -1580,6 +1621,18 @@ export default function Home() {
         const ratio = hasFair ? l.adv / fair : 1;
         const diff = Math.abs(l.adv - fair);
 
+        // ── المؤشر التجاري: متوسط الحي التجاري المحفوظ (commercial_prices) لنوع هذا الإعلان ──
+        // القيمة ريال/م² سنوياً. إن وُجد متوسط محفوظ نعرضه (وحُكماً إن أمكن حساب سعر متر
+        // الإعلان من مساحته)؛ وإلا تبقى الحالة الصادقة «قريباً». لا رقم مُفبرك إطلاقاً.
+        const commAvg = isComm ? (commIndex[`${l.hood}|${l.commercialType}`]?.pricePerM2 ?? null) : null;
+        const listPerM2 = (isComm && l.area && l.area > 0) ? Math.round(l.adv / l.area) : null;
+        const commHasIdx = commAvg != null && commAvg > 0;
+        const commCmp = commHasIdx && listPerM2 != null;
+        const commSt = commCmp ? getSt(listPerM2!, commAvg!) : 'ok';
+        const commColor = commSt === 'hi' ? '#F59E0B' : commSt === 'lo' ? '#10B981' : '#3B82F6';
+        const commRatio = commCmp ? listPerM2! / commAvg! : 1;
+        const commDiff = commCmp ? Math.abs(listPerM2! - commAvg!) : 0;
+
         // معرض الصور المصنّفة → قائمة لقطات بمسمّيات عربية (نفس مصدر المعرض القديم، يغذّي الـ lightbox)
         const cat = l.imagesByCategory;
         const shots: { label: string; url: string }[] = [];
@@ -1701,16 +1754,40 @@ export default function Home() {
                   {/* مؤشر الحي — السكني: مقياس نصف دائري بالحكم الحقيقي + متوسط الحي + الفرق.
                       التجاري: حالة صادقة «قريباً / لا توجد بيانات كافية» (لا حكم/رقم مُفبرك). */}
                   {isComm ? (
-                    <div className="ld-card ld-soon-card">
-                      <div className="ld-card-h">{msi('analytics')}<span>المؤشر التجاري</span></div>
-                      <div className="ld-soon">
-                        {msi('hourglass_empty')}
-                        <div>
-                          <div className="t">{t('comm.soonShort')}</div>
-                          <p>{t('comm.indexSoon')}</p>
+                    commHasIdx ? (
+                      // متوسط تجاري محفوظ لهذا (الحي+النوع) ⇒ نعرضه؛ ومع مساحة الإعلان نحسب الحكم
+                      <div className="ld-card ld-gauge">
+                        <div className="ld-card-h">{msi('analytics')}<span>المؤشر التجاري</span></div>
+                        {commCmp && <PriceGauge ratio={commRatio} color={commColor} />}
+                        {commCmp && <div className="ld-verdict" style={{ color: commColor }}>{rl(commSt)}</div>}
+                        <div className="ld-gauge-rows">
+                          <div className="row"><span>متوسط الحي التجاري ({commLabel(l.commercialType)})</span><b>{commAvg!.toLocaleString('ar-SA')} ريال/م²</b></div>
+                          {listPerM2 != null && <div className="row"><span>سعر متر هذا الإعلان</span><b>{listPerM2.toLocaleString('ar-SA')} ريال/م²</b></div>}
+                          {commCmp && (
+                            <div className="row cmp" style={{ color: commColor }}>
+                              {listPerM2! > commAvg! ? `أعلى من متوسط الحي بـ ${commDiff.toLocaleString('ar-SA')} ريال/م²`
+                                : listPerM2! < commAvg! ? `أقل من متوسط الحي بـ ${commDiff.toLocaleString('ar-SA')} ريال/م²`
+                                  : 'مطابق لمتوسط الحي'}
+                            </div>
+                          )}
+                        </div>
+                        <p className="ld-gauge-note">{listPerM2 == null
+                          ? 'أضف مساحة الإعلان لمقارنة سعر المتر بمتوسط الحي التجاري.'
+                          : `بناءً على المتوسط التجاري المحفوظ لـ${commLabel(l.commercialType)} في حي ${l.hood} (ريال/م² سنوياً).`}</p>
+                      </div>
+                    ) : (
+                      // لا متوسط تجاري محفوظ بعد لهذا (الحي+النوع) ⇒ حالة صادقة «قريباً»
+                      <div className="ld-card ld-soon-card">
+                        <div className="ld-card-h">{msi('analytics')}<span>المؤشر التجاري</span></div>
+                        <div className="ld-soon">
+                          {msi('hourglass_empty')}
+                          <div>
+                            <div className="t">{t('comm.soonShort')}</div>
+                            <p>{t('comm.indexSoon')}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )
                   ) : hasFair ? (
                     <div className="ld-card ld-gauge">
                       <div className="ld-card-h">{msi('analytics')}<span>مؤشر الحي</span></div>
