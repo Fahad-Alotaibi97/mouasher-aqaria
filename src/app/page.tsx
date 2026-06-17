@@ -10,7 +10,7 @@ import { useLang } from '@/lib/i18n';
 import { track, trackPageView, trackSearchWish } from '@/lib/track';
 import { useEffect } from 'react';
 import { SiteHeader, SiteFooter } from './components/SiteChrome';
-import ContactButtons, { isSaudiMobile } from './components/ContactButtons';
+import ContactButtons, { isSaudiMobile, waNumber, telNumber } from './components/ContactButtons';
 import ReplyComposer from './components/ReplyComposer';
 import { parseMapsUrl, isMapsUrl, mapsHref } from '@/lib/mapsLocation';
 const MapComponent = dynamic(() => import('./components/Map'), { ssr: false });
@@ -140,6 +140,34 @@ function photoSlots(rooms: number, baths: number): PhotoSlot[] {
   ];
 }
 
+// مقياس نصف دائري لـ«مؤشر الحي»: الإبرة تعكس نسبة السعر المُعلن إلى متوسط الحي الحقيقي.
+// ثلاث مناطق: فرصة (أخضر، أقل من المتوسط) ← مناسب (أزرق) ← مرتفع (برتقالي، أعلى من المتوسط).
+// لا رقم/نسبة مُفبركة — موضع الإبرة مشتقّ من أرقام حقيقية فقط (adv ÷ fair).
+function PriceGauge({ ratio, color }: { ratio: number; color: string }) {
+  const t = Math.max(0, Math.min(1, (ratio - 0.7) / 0.6)); // 0.7×المتوسط → يسار، 1.3× → يمين
+  const deg = 180 - t * 180;
+  const polar = (r: number, d: number): [number, number] => {
+    const a = (d * Math.PI) / 180;
+    return [100 + r * Math.cos(a), 100 - r * Math.sin(a)];
+  };
+  const arc = (r: number, s: number, e: number) => {
+    const [x1, y1] = polar(r, s);
+    const [x2, y2] = polar(r, e);
+    return `M ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+  };
+  const [nx, ny] = polar(70, deg);
+  return (
+    <svg viewBox="0 0 200 118" className="ld-gauge-svg" role="img" aria-hidden="true">
+      <path d={arc(80, 180, 136)} stroke="#10B981" strokeWidth="13" fill="none" strokeLinecap="round" />
+      <path d={arc(80, 133, 57)} stroke="#3B82F6" strokeWidth="13" fill="none" />
+      <path d={arc(80, 54, 0)} stroke="#F59E0B" strokeWidth="13" fill="none" strokeLinecap="round" />
+      <line x1="100" y1="100" x2={nx.toFixed(1)} y2={ny.toFixed(1)} stroke={color} strokeWidth="4" strokeLinecap="round" />
+      <circle cx="100" cy="100" r="8" fill={color} />
+      <circle cx="100" cy="100" r="3.5" fill="#fff" />
+    </svg>
+  );
+}
+
 // أيقونة منزل بديلة عند غياب صورة الإعلان
 const HousePlaceholder = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-9 h-9">
@@ -178,10 +206,12 @@ export default function Home() {
   const [inqErr, setInqErr] = useState<string | null>(null);
   const [selectedListing, setSelectedListing] = useState<UIListing | null>(null);
   // بيانات المكتب المعلِن للإعلان المفتوح (حقيقية من جدول offices عبر office_id)
-  const [selectedOffice, setSelectedOffice] = useState<{ name: string; fal_license: string | null; verified: boolean } | null>(null);
+  const [selectedOffice, setSelectedOffice] = useState<{ name: string; fal_license: string | null; verified: boolean; phone: string | null } | null>(null);
   // معرض الصور بملء الشاشة (lightbox): قائمة كل صور الوحدة بالترتيب + المؤشر الحالي.
   const [lightbox, setLightbox] = useState<{ shots: { label: string; url: string }[]; idx: number } | null>(null);
   const lbTouch = useRef<number | null>(null); // نقطة بدء اللمس لاكتشاف السحب (swipe)
+  // الصورة الرئيسية المعروضة في معرض بطاقة التفاصيل (فهرس داخل shots) — تُصفَّر عند فتح إعلان جديد
+  const [detailShot, setDetailShot] = useState(0);
   // نموذج التواصل بخصوص إعلان محدّد — يُحفظ في leads مربوطاً بالمكتب والإعلان
   const [ctOpen, setCtOpen] = useState(false);
   const [ctName, setCtName] = useState('');
@@ -229,10 +259,13 @@ export default function Home() {
     (async () => {
       try {
         const sb = createClient();
-        const { data } = await sb.from('offices').select('name, fal_license, verified').eq('id', oid).single();
+        // نحاول قراءة رقم الجوال (offices.phone — بعد add_office_phone.sql) لتفعيل أزرار
+        // الاتصال/واتساب؛ وإن لم يوجد العمود بعد نرجع للأعمدة الأساسية فلا تنكسر القراءة.
+        let res = await sb.from('offices').select('name, fal_license, verified, phone').eq('id', oid).single();
+        if (res.error) res = await sb.from('offices').select('name, fal_license, verified').eq('id', oid).single();
         if (cancelled) return;
-        const d = data as { name?: string; fal_license?: string | null; verified?: boolean } | null;
-        setSelectedOffice(d ? { name: d.name ?? '', fal_license: d.fal_license ?? null, verified: !!d.verified } : null);
+        const d = res.data as { name?: string; fal_license?: string | null; verified?: boolean; phone?: string | null } | null;
+        setSelectedOffice(d ? { name: d.name ?? '', fal_license: d.fal_license ?? null, verified: !!d.verified, phone: d.phone ?? null } : null);
       } catch { if (!cancelled) setSelectedOffice(null); }
     })();
     return () => { cancelled = true; };
@@ -616,17 +649,6 @@ export default function Home() {
         ? []
         : filtered;
 
-  const condColor: Record<string, string> = {
-    new: 'bg-green-100 text-green-800 border border-green-200',
-    good: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
-    old: 'bg-red-100 text-red-800 border border-red-200',
-  };
-  const stBadge: Record<string, string> = {
-    ok: 'bg-blue-100 text-blue-800 border border-blue-200',
-    hi: 'bg-orange-100 text-orange-800 border border-orange-200',
-    lo: 'bg-green-100 text-green-800 border border-green-200',
-  };
-
   // بطاقة إعلان أفقية: عمود صورة (يمين) + شارة الحالة فوق الصورة + معلومات (يسار)
   // شارات الخصائص المنظّمة — تظهر كل خاصية عبّأها المكتب (null = غير محدّد ⇒ لا شارة).
   // هذه نفسها الحقول التي يطابق عليها المساعد الذكي (furnished/kitchen/ac/parking).
@@ -643,6 +665,7 @@ export default function Home() {
   const openListing = (l: UIListing) => {
     track('listing_click', String(l.id), { hood: l.hood, type: l.type });
     setSelectedListing(l);
+    setDetailShot(0); // ابدأ المعرض من الصورة الأولى لكل إعلان يُفتح
     setCtOpen(false); setCtSent(false); setCtErr(null);
     setCtName(''); setCtPhone(''); setCtMsg('');
   };
@@ -1407,119 +1430,228 @@ export default function Home() {
 
       {/* تفاصيل الإعلان */}
       {selectedListing && (() => {
-        const l = selectedListing; const fair = getFair(l); const st = getSt(l.adv, fair);
+        const l = selectedListing;
+        // مؤشر الحي الحقيقي: متوسط الحي للنوع (من جدول neighborhoods عبر /admin) + الحكم.
+        // إن لم يوجد متوسط لهذا الحي/النوع ⇒ لا نُظهر المؤشر إطلاقاً (لا رقم مُفبرك).
+        const m = mktAvg[l.hood];
+        const fair = m ? fairForType(m, l.type) : 0;
+        const hasFair = fair > 0;
+        const st = hasFair ? getSt(l.adv, fair) : 'ok';
+        const vColor = st === 'hi' ? '#F59E0B' : st === 'lo' ? '#10B981' : '#3B82F6';
+        const ratio = hasFair ? l.adv / fair : 1;
+        const diff = Math.abs(l.adv - fair);
+
+        // معرض الصور المصنّفة → قائمة لقطات بمسمّيات عربية (نفس مصدر المعرض القديم، يغذّي الـ lightbox)
+        const cat = l.imagesByCategory;
+        const shots: { label: string; url: string }[] = [];
+        if (cat) {
+          if (cat.facade) shots.push({ label: 'الواجهة', url: cat.facade });
+          if (cat.hall) shots.push({ label: 'الصالة', url: cat.hall });
+          (cat.bedrooms ?? []).forEach((u, i) => shots.push({ label: (cat.bedrooms ?? []).length > 1 ? `غرفة نوم ${i + 1}` : 'غرفة النوم', url: u }));
+          if (cat.majlis) shots.push({ label: 'المجلس', url: cat.majlis });
+          if (cat.kitchen) shots.push({ label: 'المطبخ', url: cat.kitchen });
+          (cat.bathrooms ?? []).forEach((u, i) => shots.push({ label: (cat.bathrooms ?? []).length > 1 ? `حمام ${i + 1}` : 'الحمام', url: u }));
+        }
+        if (!shots.length && l.images?.length) l.images.forEach((u, i) => shots.push({ label: `صورة ${i + 1}`, url: u }));
+        const hasPhotos = shots.length > 0;
+        const mainIdx = Math.min(detailShot, Math.max(0, shots.length - 1));
+        const main = shots[mainIdx];
+        const THUMBS = 5;
+        const thumbs = shots.slice(0, THUMBS);
+        const overflow = shots.length - THUMBS; // >0 ⇒ صور إضافية تُفتح عبر «+N»/المعرض
+
+        // التفاصيل الرئيسية — الخانة تظهر فقط إن توفّرت قيمتها الحقيقية (المساحة تختفي إن غابت)
+        const keys: { icon: string; val: number; label: string }[] = [];
+        if (l.area != null) keys.push({ icon: 'square_foot', val: l.area, label: 'م²' });
+        if (l.rooms != null) keys.push({ icon: 'bed', val: l.rooms, label: 'غرف' });
+        if (l.baths != null) keys.push({ icon: 'bathtub', val: l.baths, label: 'دورات المياه' });
+
+        // المزايا — حقول منظّمة حقيقية فقط (المتوفّرة = true). لا مزايا مُفبركة (مسبح/سمارت هوم…)
+        const amen: string[] = [];
+        if (l.furnished) amen.push('مفروشة');
+        if (l.kitchen) amen.push('مطبخ راكب');
+        if (l.ac) amen.push('مكيّفة');
+        if (l.parking && l.parking >= 1) amen.push(l.parking > 1 ? `${l.parking.toLocaleString('ar-SA')} مواقف` : 'موقف سيارة');
+
+        // تواصل المكتب الحقيقي (offices.phone) — أزرار الاتصال/واتساب تظهر فقط بتوفّر رقم صالح
+        const oWa = waNumber(selectedOffice?.phone);
+        const oTel = telNumber(selectedOffice?.phone);
+        const waText = `مرحباً، لديّ استفسار عن إعلان: ${l.title || l.type} — ${l.hood}، ${l.adv.toLocaleString('en-US')} ريال/سنة.`;
+        const maps = listingMapsHref(l);
+
+        // عقارات مشابهة: من نفس الحي، الأقرب نوعاً أولاً، باستثناء الحالي، بحد أقصى 3 (تُخفى إن لم توجد)
+        const similar = [...listings.filter((x) => x.hood === l.hood && x.id !== l.id)]
+          .sort((a, b) => Number(b.type === l.type) - Number(a.type === l.type))
+          .slice(0, 3);
+
         return (
-          <div onClick={() => setSelectedListing(null)} className="fixed inset-0 bg-black/50 z-[1000] flex items-end sm:items-center justify-center p-4">
-            <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl w-full max-w-md max-h-[88vh] overflow-auto">
-              <div className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] p-5 text-white flex justify-between items-start">
-                <div>
-                  <div className="text-2xl font-bold">{l.adv.toLocaleString('ar-SA')} <span className="text-sm font-normal opacity-80">ريال/سنة</span></div>
-                  <div className="text-sm opacity-90 mt-1">{l.type} · {l.hood}</div>
-                </div>
-                <button onClick={() => setSelectedListing(null)} className="text-white text-3xl leading-none px-1">×</button>
-              </div>
-              <div className="p-5 space-y-4">
-                <div className="flex items-center justify-between bg-blue-50 rounded-xl p-3">
-                  <span className="text-sm text-gray-700" title="السعر المتوسط لعدد الصفقات المماثلة بنفس الحي">مؤشر أسعار الحي للسوق</span>
-                  <span className="font-bold text-[#0A3D62]">{fair.toLocaleString('ar-SA')} ريال</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">حالة السعر</span>
-                  <span className={`text-xs px-2.5 py-1 rounded-xl font-bold ${stBadge[st]}`}>{rl(st)}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-gray-50 rounded-xl p-3"><div className="text-lg font-bold text-gray-900">{l.rooms ?? '—'}</div><div className="text-xs text-gray-500">غرف</div></div>
-                  <div className="bg-gray-50 rounded-xl p-3"><div className="text-lg font-bold text-gray-900">{l.area ?? '—'}</div><div className="text-xs text-gray-500">م²</div></div>
-                  <div className="bg-gray-50 rounded-xl p-3"><div className="text-lg font-bold text-gray-900">{l.baths ?? '—'}</div><div className="text-xs text-gray-500">حمامات</div></div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${condColor[l.cond] || ''}`}>{l.condLabel || 'الحالة غير محددة'}</span>
-                  {l.furnished != null && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-purple-100 text-purple-800 border border-purple-200">{l.furnished ? 'مفروشة' : 'غير مفروشة'}</span>}
-                  {l.kitchen != null && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-blue-50 text-blue-800 border border-blue-200">{l.kitchen ? 'مطبخ راكب' : 'مطبخ غير راكب'}</span>}
-                  {l.ac != null && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-cyan-50 text-cyan-800 border border-cyan-200">{l.ac ? 'مكيّفة' : 'غير مكيّفة'}</span>}
-                  {l.parking != null && <span className="text-xs px-2.5 py-1 rounded-lg font-medium bg-teal-50 text-teal-800 border border-teal-200">{l.parking >= 1 ? `مواقف: ${l.parking}` : 'لا يوجد مواقف'}</span>}
-                </div>
-                {/* معرض الصور المصنّفة — بطاقات بمسمّيات عربية حسب الغرفة */}
-                {(() => {
-                  const cat = l.imagesByCategory;
-                  const shots: { label: string; url: string }[] = [];
-                  if (cat) {
-                    if (cat.facade) shots.push({ label: 'الواجهة', url: cat.facade });
-                    if (cat.hall) shots.push({ label: 'الصالة', url: cat.hall });
-                    (cat.bedrooms ?? []).forEach((u, i) => shots.push({ label: (cat.bedrooms ?? []).length > 1 ? `غرفة نوم ${i + 1}` : 'غرفة النوم', url: u }));
-                    if (cat.majlis) shots.push({ label: 'المجلس', url: cat.majlis });
-                    if (cat.kitchen) shots.push({ label: 'المطبخ', url: cat.kitchen });
-                    (cat.bathrooms ?? []).forEach((u, i) => shots.push({ label: (cat.bathrooms ?? []).length > 1 ? `حمام ${i + 1}` : 'الحمام', url: u }));
-                  }
-                  // إعلانات قديمة بلا تصنيف: نعرض مصفوفة الصور المسطّحة بلا مسمّيات
-                  if (!shots.length && l.images?.length) l.images.forEach((u, i) => shots.push({ label: `صورة ${i + 1}`, url: u }));
-                  if (!shots.length) return null;
-                  return (
-                    <div>
-                      <div className="text-sm font-bold text-gray-800 mb-2">صور الوحدة <span className="text-xs font-normal text-gray-400">(اضغط الصورة للتكبير)</span></div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {shots.map((s, i) => (
-                          <figure key={i} onClick={() => setLightbox({ shots, idx: i })}
-                            className="relative rounded-xl overflow-hidden border border-gray-200 cursor-pointer group">
+          <div onClick={() => setSelectedListing(null)} className="fixed inset-0 bg-black/60 z-[1000] flex items-end sm:items-center justify-center sm:p-4 overflow-auto">
+            <div dir="rtl" onClick={(e) => e.stopPropagation()} className="listing-detail relative bg-white w-full sm:max-w-5xl rounded-t-2xl sm:rounded-2xl max-h-[94vh] sm:max-h-[92vh] overflow-auto">
+              <button onClick={() => setSelectedListing(null)} className="ld-close" aria-label="إغلاق">{msi('close')}</button>
+
+              <div className="ld-grid">
+                {/* ── المعرض (الصورة الكبيرة + الشارات العائمة + شريط المصغّرات + زر التكبير) ── */}
+                <div className="ld-gallery">
+                  <div className="ld-main" onClick={() => hasPhotos && setLightbox({ shots, idx: mainIdx })}>
+                    {main
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={main.url} alt={main.label} />
+                      : <div className="ld-main-ph">{msi('home_work')}</div>}
+                    <div className="ld-pills">
+                      <span className="ld-pill"><span className="dot" />متاح</span>
+                      <span className="ld-pill">{msi('home_work')}{l.type}</span>
+                    </div>
+                    {hasPhotos && (
+                      <button className="ld-zoom" onClick={(e) => { e.stopPropagation(); setLightbox({ shots, idx: mainIdx }); }} aria-label="تكبير الصور">
+                        {msi('zoom_in')}<span>عرض الصور{shots.length > 1 ? ` (${shots.length.toLocaleString('ar-SA')})` : ''}</span>
+                      </button>
+                    )}
+                    {main && <span className="ld-caption">{main.label}</span>}
+                  </div>
+                  {shots.length > 1 && (
+                    <div className="ld-thumbs">
+                      {thumbs.map((s, i) => {
+                        const isMore = overflow > 0 && i === THUMBS - 1;
+                        return (
+                          <button key={i} className={`ld-thumb${i === mainIdx && !isMore ? ' is-active' : ''}`}
+                            onClick={() => (isMore ? setLightbox({ shots, idx: i }) : setDetailShot(i))} aria-label={s.label}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={s.url} alt={s.label} className="w-full h-28 object-cover transition-transform group-hover:scale-[1.04]" />
-                            <figcaption className="absolute bottom-0 inset-x-0 bg-black/45 text-white text-[11px] px-2 py-1 text-right">{s.label}</figcaption>
-                            <span className="absolute top-1.5 left-1.5 bg-black/45 text-white rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-                            </span>
-                          </figure>
+                            <img src={s.url} alt={s.label} />
+                            {isMore && <span className="more">+{(overflow + 1).toLocaleString('ar-SA')}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── لوحة المعلومات (قابلة للتمرير) ── */}
+                <div className="ld-info">
+                  <div className="ld-head">
+                    <h2 className="ld-title">{l.title || `${l.type} — ${l.hood}`}</h2>
+                    <div className="ld-loc">{msi('location_on')}<span>{l.hood}، الرياض</span></div>
+                    <div className="ld-price-row">
+                      <div className="ld-price">{l.adv.toLocaleString('ar-SA')}<span>ريال/سنة</span></div>
+                      <span className={`ld-cond ${l.cond}`}>{l.condLabel || 'الحالة غير محددة'}</span>
+                    </div>
+                  </div>
+
+                  {/* مؤشر الحي — مقياس نصف دائري يعكس الحكم الحقيقي + متوسط الحي + الفرق بالريال */}
+                  {hasFair && (
+                    <div className="ld-card ld-gauge">
+                      <div className="ld-card-h">{msi('analytics')}<span>مؤشر الحي</span></div>
+                      <PriceGauge ratio={ratio} color={vColor} />
+                      <div className="ld-verdict" style={{ color: vColor }}>{rl(st)}</div>
+                      <div className="ld-gauge-rows">
+                        <div className="row"><span>متوسط الحي ({l.type})</span><b>{fair.toLocaleString('ar-SA')} ريال</b></div>
+                        <div className="row"><span>هذا الإعلان</span><b>{l.adv.toLocaleString('ar-SA')} ريال</b></div>
+                        <div className="row cmp" style={{ color: vColor }}>
+                          {l.adv > fair ? `أعلى من متوسط الحي بـ ${diff.toLocaleString('ar-SA')} ريال`
+                            : l.adv < fair ? `أقل من متوسط الحي بـ ${diff.toLocaleString('ar-SA')} ريال`
+                              : 'مطابق لمتوسط الحي'}
+                        </div>
+                      </div>
+                      <p className="ld-gauge-note">بناءً على متوسط إيجار {l.type} في حي {l.hood} (مؤشر أسعار الحي).</p>
+                    </div>
+                  )}
+
+                  {keys.length > 0 && (
+                    <div className="ld-keys">
+                      {keys.map((k) => (
+                        <div key={k.label} className="ld-key">
+                          {msi(k.icon)}
+                          <b>{k.val.toLocaleString('ar-SA')}</b>
+                          <span>{k.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {amen.length > 0 && (
+                    <div className="ld-card">
+                      <div className="ld-card-h">{msi('verified')}<span>المزايا</span></div>
+                      <div className="ld-amen">
+                        {amen.map((a) => (
+                          <div key={a} className="ld-amen-item">{msi('check_circle')}<span>{a}</span></div>
                         ))}
                       </div>
                     </div>
-                  );
-                })()}
-                {l.description && <p className="text-sm text-gray-700 leading-relaxed">{l.description}</p>}
-                {/* موقع الوحدة — زر بارز يفتح خرائط Google على موقع الوحدة مباشرة */}
-                {listingMapsHref(l) && (
-                  <a
-                    href={listingMapsHref(l)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full flex items-center justify-center gap-2 bg-[#0F6E56] text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-opacity"
-                  >
-                    {Icons.pin}
-                    الموقع على الخريطة — افتح في خرائط Google
-                  </a>
-                )}
-                {/* المكتب المعلِن — بيانات حقيقية من جدول offices عبر office_id (يظهر ما توفّر فقط) */}
-                {(selectedOffice?.name || selectedOffice?.fal_license || l.fal) && (
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5">
-                    <div className="text-xs text-gray-500 mb-1.5">المكتب المعلِن</div>
-                    {selectedOffice?.name && (
-                      <div className="flex items-center gap-2 font-bold text-gray-900 text-sm">
-                        <span className="text-[#0A3D62] flex-shrink-0">{Icons.building}</span>
-                        <span className="truncate">{selectedOffice.name}</span>
-                        {selectedOffice.verified && (
-                          <span className="text-[10px] font-bold bg-green-100 text-green-800 border border-green-200 px-2 py-0.5 rounded-md whitespace-nowrap">موثّق</span>
-                        )}
-                      </div>
-                    )}
-                    {(selectedOffice?.fal_license || l.fal) && (
-                      <div className="text-xs text-gray-500 mt-1.5">رخصة فال: <span dir="ltr">{selectedOffice?.fal_license || l.fal}</span></div>
-                    )}
-                  </div>
-                )}
-                {ctSent ? (
-                  <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl p-4 text-sm text-center font-medium">تم إرسال طلبك — سيتواصل معك المكتب قريباً.</div>
-                ) : ctOpen ? (
-                  <div className="space-y-3 pt-1">
-                    <div className="grid grid-cols-2 gap-3">
-                      <input value={ctName} onChange={e => setCtName(e.target.value)} placeholder="الاسم" className={inputCls} />
-                      <input value={ctPhone} onChange={e => setCtPhone(e.target.value)} placeholder="رقم الجوال" className={inputCls} dir="ltr" />
+                  )}
+
+                  {l.description && <p className="ld-desc">{l.description}</p>}
+
+                  {/* المكتب المعلِن — بيانات حقيقية من offices عبر office_id (يظهر ما توفّر فقط) */}
+                  {(selectedOffice?.name || selectedOffice?.fal_license || l.fal) && (
+                    <div className="ld-office">
+                      <div className="ld-office-l">المكتب المعلِن</div>
+                      {selectedOffice?.name && (
+                        <div className="ld-office-name">{msi('apartment')}<span className="nm">{selectedOffice.name}</span>
+                          {selectedOffice.verified && <span className="vbadge">موثّق</span>}
+                        </div>
+                      )}
+                      {(selectedOffice?.fal_license || l.fal) && (
+                        <div className="ld-office-fal">رخصة فال: <span dir="ltr">{selectedOffice?.fal_license || l.fal}</span></div>
+                      )}
                     </div>
-                    <textarea value={ctMsg} onChange={e => setCtMsg(e.target.value)} placeholder="رسالتك (اختياري) — مثال: متى أقدر أعاين الوحدة؟" rows={2} className={inputCls + ' resize-none'} />
-                    {ctErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{ctErr}</div>}
-                    <button onClick={submitListingContact} disabled={ctSending} className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-3 rounded-xl font-bold text-sm disabled:opacity-50">{ctSending ? 'جارٍ الإرسال…' : 'إرسال طلب التواصل'}</button>
-                  </div>
-                ) : (
-                  <button onClick={() => { track('feature_use', null, { feature: 'contact' }); setCtOpen(true); }} className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-3 rounded-xl font-bold text-sm">تواصل بخصوص هذا الإعلان</button>
-                )}
+                  )}
+
+                  {/* أزرار التواصل الحقيقية — اتصال/واتساب من رقم المكتب، خرائط من موقع الوحدة (يظهر المتوفّر فقط) */}
+                  {(oTel || oWa || maps) && (
+                    <div className="ld-actions">
+                      {oTel && <a href={`tel:${oTel}`} className="ld-btn call">{msi('call')}اتصل الآن</a>}
+                      {oWa && <a href={`https://wa.me/${oWa}?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer" className="ld-btn wa">{msi('chat')}واتساب</a>}
+                      {maps && <a href={maps} target="_blank" rel="noopener noreferrer" className="ld-btn maps">{msi('location_on')}خرائط جوجل</a>}
+                    </div>
+                  )}
+
+                  {/* نموذج «تواصل بخصوص هذا الإعلان» — يُحفظ في leads مربوطاً بالمكتب (office_id) */}
+                  {ctSent ? (
+                    <div className="ld-sent">تم إرسال طلبك — سيتواصل معك المكتب قريباً.</div>
+                  ) : ctOpen ? (
+                    <div className="ld-inq">
+                      <div className="ld-inq-row">
+                        <input value={ctName} onChange={e => setCtName(e.target.value)} placeholder="الاسم" className={inputCls} />
+                        <input value={ctPhone} onChange={e => setCtPhone(e.target.value)} placeholder="رقم الجوال" className={inputCls} dir="ltr" />
+                      </div>
+                      <textarea value={ctMsg} onChange={e => setCtMsg(e.target.value)} placeholder="رسالتك (اختياري) — مثال: متى أقدر أعاين الوحدة؟" rows={2} className={inputCls + ' resize-none'} />
+                      {ctErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{ctErr}</div>}
+                      <button onClick={submitListingContact} disabled={ctSending} className="ld-btn primary block">{ctSending ? 'جارٍ الإرسال…' : 'إرسال طلب التواصل'}</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => { track('feature_use', null, { feature: 'contact' }); setCtOpen(true); }} className="ld-btn primary block">{msi('forum')}تواصل بخصوص هذا الإعلان</button>
+                  )}
+                </div>
               </div>
+
+              {/* ── عقارات مشابهة في نفس الحي (حقيقية فقط — تُخفى إن لم توجد) ── */}
+              {similar.length > 0 && (
+                <div className="ld-similar">
+                  <h3>عقارات مشابهة في {l.hood}</h3>
+                  <div className="ld-sim-grid">
+                    {similar.map((s) => {
+                      const simg = s.imagesByCategory?.facade ?? (s.images && s.images.length ? s.images[0] : null);
+                      return (
+                        <button key={s.id} className="ld-sim-card" onClick={() => openListing(s)}>
+                          <div className="ld-sim-img">
+                            {simg
+                              // eslint-disable-next-line @next/next/no-img-element
+                              ? <img src={simg} alt={s.title} />
+                              : <div className="ph">{msi('home_work')}</div>}
+                            <span className="ld-sim-price">{s.adv.toLocaleString('ar-SA')} ريال</span>
+                          </div>
+                          <div className="ld-sim-body">
+                            <div className="ld-sim-title">{s.title || `${s.type} — ${s.hood}`}</div>
+                            <div className="ld-sim-specs">
+                              {s.rooms != null && <span>{msi('bed')}{s.rooms.toLocaleString('ar-SA')} غرف</span>}
+                              {s.area != null && <span>{msi('square_foot')}{s.area.toLocaleString('ar-SA')} م²</span>}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );

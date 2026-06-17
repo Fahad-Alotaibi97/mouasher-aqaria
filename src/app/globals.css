@@ -446,3 +446,134 @@ body {
 .site .bg-\[\#f7fafd\]{background-color:var(--surface-low);}
 .site .bg-\[\#f0f4f8\]{background-color:var(--surface-low);}
 .site .bg-gradient-to-br.from-\[\#E6F1FB\]{background-image:linear-gradient(135deg,var(--surface-container),var(--surface-dim));}
+
+/* ════════════════════════════════════════════════════════════
+   بطاقة تفاصيل الإعلان — تصميم Stitch (تقسيم: معرض كبير + لوحة معلومات
+   قابلة للتمرير + عقارات مشابهة). داخل .site فترث كل توكناتها؛ معزولة تماماً
+   بـ .listing-detail فلا تمسّ أي صفحة أخرى. كل القيم حقيقية أو مُخفاة.
+   ════════════════════════════════════════════════════════════ */
+.listing-detail{box-shadow:0 24px 60px rgba(15,23,42,.30);}
+.listing-detail .material-symbols-outlined{font-size:18px;line-height:1;vertical-align:middle;flex-shrink:0;}
+
+.listing-detail .ld-close{position:absolute;top:14px;left:14px;z-index:20;width:40px;height:40px;border-radius:9999px;border:none;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:var(--on-surface);box-shadow:0 2px 10px rgba(0,0,0,.18);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s var(--ease);}
+.listing-detail .ld-close:hover{background:#fff;transform:scale(1.05);}
+.listing-detail .ld-close .material-symbols-outlined{font-size:24px;}
+
+.listing-detail .ld-grid{display:grid;grid-template-columns:1fr;gap:0;}
+@media(min-width:880px){.listing-detail .ld-grid{grid-template-columns:1.05fr .95fr;}}
+
+/* ── المعرض (الصورة الكبيرة + الشارات + المصغّرات + زر التكبير) ── */
+.listing-detail .ld-gallery{padding:1.25rem;display:flex;flex-direction:column;gap:12px;}
+@media(min-width:880px){.listing-detail .ld-gallery{position:sticky;top:0;align-self:start;}}
+.listing-detail .ld-main{position:relative;border-radius:1.5rem;overflow:hidden;aspect-ratio:4/3;background:var(--surface-low);cursor:zoom-in;}
+.listing-detail .ld-main img{width:100%;height:100%;object-fit:cover;transition:transform .5s var(--ease);}
+.listing-detail .ld-main:hover img{transform:scale(1.04);}
+.listing-detail .ld-main-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--outline);}
+.listing-detail .ld-main-ph .material-symbols-outlined{font-size:64px;}
+.listing-detail .ld-pills{position:absolute;top:14px;right:14px;display:flex;flex-wrap:wrap;gap:8px;max-width:70%;}
+.listing-detail .ld-pill{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.92);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:var(--on-surface);font-size:12px;font-weight:600;padding:6px 12px;border-radius:9999px;box-shadow:0 2px 8px rgba(0,0,0,.10);}
+.listing-detail .ld-pill .dot{width:8px;height:8px;border-radius:9999px;background:var(--status-positive);}
+.listing-detail .ld-pill .material-symbols-outlined{font-size:16px;color:var(--gold);}
+.listing-detail .ld-zoom{position:absolute;bottom:14px;left:14px;display:inline-flex;align-items:center;gap:6px;background:rgba(23,28,31,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#fff;border:none;font-family:inherit;font-size:12px;font-weight:600;padding:8px 14px;border-radius:9999px;cursor:pointer;transition:background .2s var(--ease);}
+.listing-detail .ld-zoom:hover{background:rgba(23,28,31,.92);}
+.listing-detail .ld-zoom .material-symbols-outlined{font-size:18px;}
+.listing-detail .ld-caption{position:absolute;bottom:14px;right:14px;background:rgba(23,28,31,.6);color:#fff;font-size:11px;font-weight:600;padding:4px 10px;border-radius:9999px;}
+.listing-detail .ld-thumbs{display:flex;gap:10px;}
+.listing-detail .ld-thumb{position:relative;flex:1;min-width:0;aspect-ratio:1;border-radius:.85rem;overflow:hidden;border:2px solid transparent;background:var(--surface-low);cursor:pointer;padding:0;transition:border-color .2s var(--ease);}
+.listing-detail .ld-thumb img{width:100%;height:100%;object-fit:cover;}
+.listing-detail .ld-thumb.is-active{border-color:var(--gold);}
+.listing-detail .ld-thumb:hover{border-color:var(--outline-variant);}
+.listing-detail .ld-thumb .more{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.62);color:#fff;font-size:16px;font-weight:700;}
+
+/* ── لوحة المعلومات ── */
+.listing-detail .ld-info{padding:1.25rem 1.5rem 1.75rem;display:flex;flex-direction:column;gap:1.1rem;min-width:0;}
+@media(min-width:880px){.listing-detail .ld-info{border-inline-start:1px solid var(--surface-dim);padding-top:3.25rem;}}
+.listing-detail .ld-head{display:flex;flex-direction:column;gap:8px;}
+.listing-detail .ld-title{font-size:26px;font-weight:700;letter-spacing:-.01em;color:var(--on-surface);line-height:1.25;}
+.listing-detail .ld-loc{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--on-surface-variant);}
+.listing-detail .ld-loc .material-symbols-outlined{font-size:18px;color:var(--gold);font-variation-settings:'FILL' 1;}
+.listing-detail .ld-price-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:2px;}
+.listing-detail .ld-price{font-size:30px;font-weight:800;color:var(--on-surface);}
+.listing-detail .ld-price span{font-size:13px;font-weight:500;color:var(--on-surface-variant);margin-inline-start:6px;}
+.listing-detail .ld-cond{font-size:12px;font-weight:700;padding:5px 12px;border-radius:9999px;}
+.listing-detail .ld-cond.new{background:rgba(16,185,129,.12);color:#047857;}
+.listing-detail .ld-cond.good{background:rgba(201,168,76,.16);color:#8a6d18;}
+.listing-detail .ld-cond.old{background:var(--surface-container);color:var(--on-surface-variant);}
+
+/* بطاقة فرعية عامة */
+.listing-detail .ld-card{border:1px solid var(--surface-dim);border-radius:1rem;padding:1.1rem;background:var(--surface-card);}
+.listing-detail .ld-card-h{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--on-surface);margin-bottom:10px;}
+.listing-detail .ld-card-h .material-symbols-outlined{font-size:20px;color:var(--gold);}
+
+/* مؤشر الحي — المقياس نصف الدائري */
+.listing-detail .ld-gauge{text-align:center;}
+.listing-detail .ld-gauge .ld-card-h{justify-content:center;}
+.listing-detail .ld-gauge-svg{width:210px;max-width:82%;height:auto;margin:2px auto 0;display:block;}
+.listing-detail .ld-verdict{font-size:22px;font-weight:800;margin-top:-8px;}
+.listing-detail .ld-gauge-rows{margin-top:12px;text-align:right;display:flex;flex-direction:column;gap:6px;}
+.listing-detail .ld-gauge-rows .row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--on-surface-variant);}
+.listing-detail .ld-gauge-rows .row b{font-weight:700;color:var(--on-surface);}
+.listing-detail .ld-gauge-rows .row.cmp{justify-content:center;font-weight:700;margin-top:2px;}
+.listing-detail .ld-gauge-note{font-size:11px;color:var(--outline);margin-top:10px;line-height:1.5;}
+
+/* التفاصيل الرئيسية (تظهر الخانة فقط بقيمة حقيقية) */
+.listing-detail .ld-keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:10px;}
+.listing-detail .ld-key{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;border:1px solid var(--surface-dim);border-radius:1rem;padding:14px 8px;background:var(--surface-low);}
+.listing-detail .ld-key .material-symbols-outlined{font-size:24px;color:var(--gold);}
+.listing-detail .ld-key b{font-size:18px;font-weight:800;color:var(--on-surface);}
+.listing-detail .ld-key span{font-size:12px;color:var(--on-surface-variant);}
+
+/* المزايا — علامات ذهبية، حقول حقيقية فقط */
+.listing-detail .ld-amen{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.listing-detail .ld-amen-item{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--on-surface);}
+.listing-detail .ld-amen-item .material-symbols-outlined{font-size:20px;color:var(--gold);font-variation-settings:'FILL' 1;}
+
+.listing-detail .ld-desc{font-size:14px;line-height:1.7;color:var(--slate);}
+
+/* المكتب المعلِن */
+.listing-detail .ld-office{border:1px solid var(--surface-dim);border-radius:1rem;background:var(--surface-low);padding:.9rem 1rem;}
+.listing-detail .ld-office-l{font-size:11px;color:var(--on-surface-variant);margin-bottom:6px;}
+.listing-detail .ld-office-name{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;color:var(--on-surface);}
+.listing-detail .ld-office-name .material-symbols-outlined{font-size:20px;color:var(--gold);}
+.listing-detail .ld-office-name .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.listing-detail .ld-office-name .vbadge{font-size:10px;font-weight:700;background:rgba(16,185,129,.14);color:#047857;padding:2px 8px;border-radius:9999px;white-space:nowrap;flex-shrink:0;}
+.listing-detail .ld-office-fal{font-size:12px;color:var(--on-surface-variant);margin-top:6px;}
+
+/* أزرار التواصل الحقيقية */
+.listing-detail .ld-actions{display:flex;flex-wrap:wrap;gap:10px;}
+.listing-detail .ld-btn{flex:1 1 130px;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-family:inherit;font-size:14px;font-weight:700;padding:13px 16px;border-radius:var(--r-xl);border:1px solid transparent;cursor:pointer;text-decoration:none;transition:all .2s var(--ease);white-space:nowrap;}
+.listing-detail .ld-btn .material-symbols-outlined{font-size:19px;}
+.listing-detail .ld-btn.block{width:100%;flex:none;}
+.listing-detail .ld-btn.call{background:var(--primary);color:var(--on-primary);}
+.listing-detail .ld-btn.call:hover{background:var(--primary-container);}
+.listing-detail .ld-btn.wa{background:var(--status-positive);color:#fff;}
+.listing-detail .ld-btn.wa:hover{filter:brightness(.94);}
+.listing-detail .ld-btn.maps{background:var(--surface-card);color:var(--on-surface);border-color:var(--outline-variant);}
+.listing-detail .ld-btn.maps:hover{border-color:var(--gold);}
+.listing-detail .ld-btn.primary{background:var(--primary);color:var(--on-primary);}
+.listing-detail .ld-btn.primary:hover{background:var(--primary-container);}
+.listing-detail .ld-btn.primary:disabled{opacity:.55;cursor:default;}
+
+/* نموذج «تواصل بخصوص هذا الإعلان» */
+.listing-detail .ld-inq{display:flex;flex-direction:column;gap:12px;}
+.listing-detail .ld-inq-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.listing-detail .ld-sent{background:rgba(16,185,129,.10);border:1px solid rgba(16,185,129,.3);color:#047857;border-radius:1rem;padding:1rem;font-size:14px;font-weight:600;text-align:center;}
+
+/* عقارات مشابهة */
+.listing-detail .ld-similar{border-top:1px solid var(--surface-dim);background:var(--surface-low);padding:1.5rem;}
+.listing-detail .ld-similar h3{font-size:18px;font-weight:700;color:var(--on-surface);margin-bottom:1rem;}
+.listing-detail .ld-sim-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+@media(max-width:640px){.listing-detail .ld-sim-grid{grid-template-columns:1fr;}}
+.listing-detail .ld-sim-card{text-align:right;background:var(--surface-card);border:1px solid var(--surface-dim);border-radius:1rem;overflow:hidden;cursor:pointer;padding:0;font-family:inherit;transition:all .25s var(--ease);}
+.listing-detail .ld-sim-card:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(15,23,42,.10);border-color:var(--outline-variant);}
+.listing-detail .ld-sim-img{position:relative;aspect-ratio:16/10;background:var(--surface-low);overflow:hidden;}
+.listing-detail .ld-sim-img img{width:100%;height:100%;object-fit:cover;transition:transform .4s var(--ease);}
+.listing-detail .ld-sim-card:hover .ld-sim-img img{transform:scale(1.05);}
+.listing-detail .ld-sim-img .ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--outline);}
+.listing-detail .ld-sim-img .ph .material-symbols-outlined{font-size:40px;}
+.listing-detail .ld-sim-price{position:absolute;bottom:10px;right:10px;background:rgba(255,255,255,.94);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:var(--on-surface);font-size:13px;font-weight:800;padding:5px 11px;border-radius:9999px;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+.listing-detail .ld-sim-body{padding:11px 13px 13px;}
+.listing-detail .ld-sim-title{font-size:14px;font-weight:700;color:var(--on-surface);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.listing-detail .ld-sim-specs{display:flex;gap:14px;margin-top:7px;font-size:12px;color:var(--on-surface-variant);}
+.listing-detail .ld-sim-specs span{display:inline-flex;align-items:center;gap:4px;}
+.listing-detail .ld-sim-specs .material-symbols-outlined{font-size:16px;color:var(--gold);}
