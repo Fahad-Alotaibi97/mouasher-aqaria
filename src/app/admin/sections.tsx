@@ -140,12 +140,14 @@ function StatCard({ label, val, warn, icon, sub, subTone }: { label: string; val
 //    بيضاء فوقه (والذهبي بأيقونة داكنة للتباين) — تعيين ثابت لكل قسم، لا عشوائية.
 // الثيم الداكن: خلفيات شفافة خفيفة بأيقونة بلون مُشِع (زمرّدي/كهرماني/أزرق فولاذي)
 // لتبرز على بطاقة داكنة (بدل المربّعات الكحلية الصلبة الباهتة على الداكن).
+// الهوية الفاتحة: خلفية رقيقة مُلوّنة + أيقونة بلون داكن مُشبَع مقروء على البطاقة البيضاء
+// (أخضر العلامة / ذهبي / سليت / شبه أسود) — مطابقة لروح .site.
 const TONES: Record<string, { bg: string; fg: string }> = {
-  navy: { bg: 'rgba(78,222,163,.15)', fg: '#4edea3' },
-  blue: { bg: 'rgba(78,222,163,.15)', fg: '#4edea3' },
-  steel: { bg: 'rgba(143,170,255,.15)', fg: '#9db4ff' },
-  green: { bg: 'rgba(78,222,163,.15)', fg: '#4edea3' },
-  gold: { bg: 'rgba(255,185,95,.15)', fg: '#ffb95f' },
+  navy: { bg: 'rgba(19,27,46,.08)', fg: '#131b2e' },
+  blue: { bg: 'rgba(0,108,73,.10)', fg: '#006c49' },
+  steel: { bg: 'rgba(51,65,85,.10)', fg: '#334155' },
+  green: { bg: 'rgba(0,108,73,.10)', fg: '#006c49' },
+  gold: { bg: 'rgba(201,168,76,.18)', fg: '#8a6d18' },
 };
 const AIcon: Record<string, React.ReactNode> = {
   star: (<svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>),
@@ -200,14 +202,14 @@ function RankList({ rows, unit }: { rows: { key: string; label: string; sub?: st
         <div key={r.key}>
           <div className="flex items-center justify-between text-xs mb-0.5 gap-2">
             <span className="text-[#0f1a28] font-medium truncate">
-              <span className="text-[#C9A84C] font-bold ml-1">{fmtNum(i + 1)}.</span>
+              <span className="text-[#8a6d18] font-bold ml-1">{fmtNum(i + 1)}.</span>
               {r.label}
               {r.sub && <span className="text-[#5b6b7a] font-normal"> · {r.sub}</span>}
             </span>
             <span className="text-[#0A3D62] font-bold whitespace-nowrap">{fmtNum(r.count)} {unit}</span>
           </div>
           <div className="h-1.5 bg-[#f0f4f8] rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] rounded-full" style={{ width: `${Math.max(6, (r.count / max) * 100)}%` }} />
+            <div className="h-full bg-gradient-to-l from-[#10B981] to-[#006c49] rounded-full" style={{ width: `${Math.max(6, (r.count / max) * 100)}%` }} />
           </div>
         </div>
       ))}
@@ -964,7 +966,7 @@ export function OfficesSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                   {o.verified ? 'إلغاء التوثيق' : 'توثيق ✓'}
                 </button>
                 <button onClick={() => patch(o.id, { active: !o.active })} disabled={busy === o.id}
-                  className={`text-xs px-3 py-1.5 rounded-lg font-bold border disabled:opacity-50 ${o.active ? 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200' : 'bg-[rgba(78,222,163,.12)] text-[var(--adm-primary)] border-[rgba(78,222,163,.32)] hover:bg-[rgba(78,222,163,.2)]'}`}>
+                  className={`text-xs px-3 py-1.5 rounded-lg font-bold border disabled:opacity-50 ${o.active ? 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200' : 'bg-[rgba(0,108,73,.10)] text-[var(--adm-primary)] border-[rgba(0,108,73,.28)] hover:bg-[rgba(0,108,73,.16)]'}`}>
                   {o.active ? 'إيقاف' : 'تفعيل'}
                 </button>
                 <button onClick={() => toggleListings(o.id)}
@@ -1196,7 +1198,7 @@ export function ClientsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                     <div className="font-bold text-[#0f1a28] text-sm flex items-center gap-2 flex-wrap">
                       {c.full_name || '— بلا اسم —'}
                       {c.is_admin && (
-                        <span className="text-[10px] bg-[rgba(255,185,95,.16)] text-[var(--adm-secondary)] border border-[rgba(255,185,95,.32)] px-2 py-0.5 rounded font-bold">مدير المنصة</span>
+                        <span className="text-[10px] bg-[rgba(201,168,76,.16)] text-[var(--adm-secondary)] border border-[rgba(201,168,76,.34)] px-2 py-0.5 rounded font-bold">مدير المنصة</span>
                       )}
                     </div>
                     {c.phone && <div className="text-xs text-[#1B6CA8] mt-0.5" dir="ltr" style={{ textAlign: 'right' }}>{c.phone}</div>}
@@ -1239,11 +1241,11 @@ export function AdminSidebar({ section, setSection, userEmail, onExit, exitLabel
   userEmail: string | null; onExit: () => void; exitLabel: string;
 }) {
   return (
-    <aside className="w-full md:w-[260px] flex-shrink-0 md:sticky md:top-0 md:h-screen bg-[#0b1326] md:border-l border-[var(--adm-outline)] flex flex-col">
+    <aside className="w-full md:w-[260px] flex-shrink-0 md:sticky md:top-0 md:h-screen bg-[var(--adm-card)] md:border-l border-[var(--adm-outline)] flex flex-col">
       {/* العلامة */}
       <div className="px-5 pt-6 pb-5">
         <div className="flex items-center gap-2.5">
-          <span className="w-9 h-9 rounded-xl bg-[rgba(78,222,163,.14)] border border-[rgba(78,222,163,.3)] flex items-center justify-center text-[var(--adm-primary)] flex-shrink-0">
+          <span className="w-9 h-9 rounded-xl bg-[rgba(0,108,73,.10)] border border-[rgba(0,108,73,.22)] flex items-center justify-center text-[var(--adm-primary)] flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 21h18M9 21V7l6-4v18M9 7H3v14" /><path d="M13 11h2M13 15h2M5 11h2M5 15h2" /></svg>
           </span>
           <div className="leading-tight">
@@ -1259,7 +1261,7 @@ export function AdminSidebar({ section, setSection, userEmail, onExit, exitLabel
           const isActive = section === it.id;
           return (
             <button key={it.id} onClick={() => setSection(it.id)}
-              className={`w-full flex items-center gap-3 text-right px-4 py-3 rounded-xl text-sm mb-1 font-medium border-r-[3px] transition-colors ${isActive ? 'bg-[rgba(78,222,163,.12)] text-[var(--adm-primary)] font-bold border-[var(--adm-primary)]' : 'text-[var(--adm-on-variant)] border-transparent hover:bg-[var(--adm-high)] hover:text-[var(--adm-on)]'}`}>
+              className={`w-full flex items-center gap-3 text-right px-4 py-3 rounded-xl text-sm mb-1 font-medium border-r-[3px] transition-colors ${isActive ? 'bg-[rgba(0,108,73,.10)] text-[var(--adm-primary)] font-bold border-[var(--adm-primary)]' : 'text-[var(--adm-on-variant)] border-transparent hover:bg-[var(--adm-high)] hover:text-[var(--adm-on)]'}`}>
               <span className="w-[18px] h-[18px] flex-shrink-0">{SIDEBAR_ICONS[it.id]}</span>
               {it.label}
             </button>

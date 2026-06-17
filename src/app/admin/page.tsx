@@ -430,7 +430,7 @@ export default function AdminPage() {
         {/* عمود المحتوى */}
         <div className="flex-1 min-w-0 flex flex-col">
           {/* ── الشريط العلوي: عنوان القسم + جرس (عدّاد رسائل حقيقي) + هوية المدير ── */}
-          <div className="sticky top-0 z-30 bg-[rgba(11,19,38,.85)] backdrop-blur border-b border-[var(--adm-outline)] px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+          <div className="sticky top-0 z-30 bg-[rgba(246,250,254,.85)] backdrop-blur border-b border-[var(--adm-outline)] px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-base font-extrabold text-[var(--adm-on)] truncate">{SECTION_TITLES[section]}</div>
               <div className="text-[11px] text-[var(--adm-on-variant)]">مؤشر العقارية — لوحة الإدارة</div>
@@ -441,7 +441,7 @@ export default function AdminPage() {
                 onClick={() => setSection('leads')}
                 aria-label="الرسائل والطلبات"
                 title="الرسائل والطلبات"
-                className="relative w-10 h-10 rounded-xl bg-[var(--adm-card)] border border-[var(--adm-outline)] flex items-center justify-center text-[var(--adm-on-variant)] hover:text-[var(--adm-primary)] hover:border-[rgba(78,222,163,.4)] transition-colors"
+                className="relative w-10 h-10 rounded-xl bg-[var(--adm-card)] border border-[var(--adm-outline)] flex items-center justify-center text-[var(--adm-on-variant)] hover:text-[var(--adm-primary)] hover:border-[rgba(0,108,73,.4)] transition-colors"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
                 {!!unhandledLeads && unhandledLeads > 0 && (

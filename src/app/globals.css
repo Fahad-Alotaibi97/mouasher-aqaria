@@ -42,31 +42,30 @@ body {
 .card-fade { animation: cardFade .35s ease; }
 
 /* ════════════════════════════════════════════════════════════
-   لوحة الإدارة فقط — ثيم داكن «Estate Intelligence».
-   مقصور تماماً على /admin عبر الكلاسين .admin-bg / .admin-shell، فلا يمسّ
-   الموقع العام إطلاقاً (لا يحمل أيٌّ من صفحات الزوار هذين الكلاسين).
-   الفكرة: إعادة تلوين توكنات الأسطح/النصوص/الحدود المتكرّرة فقط — نفس البنية،
-   نفس المحتوى والبيانات الحقيقية، مظهر داكن جديد. الشارات الدلالية الفاتحة
-   (أخضر/كهرماني/أحمر للحالات) تبقى رقائق فاتحة مقروءة فوق السطح الداكن.
+   لوحة الإدارة — هوية فاتحة موحّدة مع الموقع العام (.site).
+   مقصورة على /admin عبر .admin-bg / .admin-shell (لا تمسّ الموقع العام).
+   نفس البنية/التخطيط/المحتوى/البيانات تماماً — فقط الأسطح فاتحة والنص داكن
+   بنفس توكنات .site (أخضر #006c49 + ذهبي #C9A84C). طبقة remap تُحوّل أدوات
+   Tailwind/الألوان القديمة إلى التوكنات الفاتحة (نفس فكرة .site و.stitch-home).
    ════════════════════════════════════════════════════════════ */
 .admin-bg {
-  --adm-bg: #0b1326;          /* الخلفية الرئيسية */
-  --adm-lowest: #060e20;
-  --adm-low: #131b2e;
-  --adm-card: #171f33;        /* خلفية البطاقة */
-  --adm-high: #222a3d;        /* بطاقة مرتفعة / hover */
-  --adm-highest: #2d3449;
-  --adm-on: #dae2fd;          /* النص الأساسي */
-  --adm-on-variant: #bbcabf;  /* النص الثانوي المكتوم */
-  --adm-outline: rgba(134,148,138,.18);        /* حدود شعرية خفيفة */
-  --adm-outline-strong: rgba(134,148,138,.32);
-  --adm-primary: #4edea3;     /* الزمرّدي — لون الإبراز */
-  --adm-primary-container: #10b981;
-  --adm-on-primary: #003824;  /* نص فوق الزمرّدي */
-  --adm-secondary: #ffb95f;   /* الكهرماني — تحذيرات/إحصاءات ثانوية */
-  --adm-error: #ffb4ab;
+  --adm-bg: #f6fafe;          /* الخلفية الرئيسية (فاتحة، مطابقة لـ .site) */
+  --adm-lowest: #ffffff;
+  --adm-low: #f0f4f8;         /* سطح خفيف */
+  --adm-card: #ffffff;        /* خلفية البطاقة */
+  --adm-high: #eaeef2;        /* سطح مرتفع / hover */
+  --adm-highest: #e4e9ed;
+  --adm-on: #171c1f;          /* النص الأساسي الداكن */
+  --adm-on-variant: #45464d;  /* النص الثانوي المكتوم */
+  --adm-outline: rgba(19,27,46,.10);            /* حدّ شعري خفيف */
+  --adm-outline-strong: rgba(19,27,46,.20);
+  --adm-primary: #006c49;     /* الأخضر — لون الإبراز (نص/أيقونة/شريط نشط) */
+  --adm-primary-container: #131b2e; /* شبه أسود — خلفيات صلبة (الصورة الرمزية) */
+  --adm-on-primary: #ffffff;  /* نص فوق الأخضر/الأسود */
+  --adm-secondary: #8a6d18;   /* ذهبي مقروء — تحذيرات/إحصاءات ثانوية */
+  --adm-error: #b42318;       /* أحمر مقروء على الفاتح */
   background: var(--adm-bg);
-  color-scheme: dark;
+  color-scheme: light;
 }
 .admin-shell { color: var(--adm-on); }
 
@@ -81,15 +80,16 @@ body {
 .admin-shell .hover\:bg-\[\#f0f4f8\]:hover { background-color: var(--adm-high); }
 .admin-shell .hover\:bg-gray-100:hover { background-color: var(--adm-highest); }
 
-/* لوحات معلومات بخلفية فاتحة مخصّصة تقترن بنص مكتوم → تُعتَّم لتبقى مقروءة */
-.admin-shell .bg-\[\#f0f6fb\] { background-color: rgba(78,222,163,.08); }
-.admin-shell .bg-\[\#f7f3fb\] { background-color: rgba(255,185,95,.08); }
+/* لوحات معلومات بخلفية فاتحة مخصّصة → رقائق أخضر/ذهبي خفيفة على السطح الفاتح */
+.admin-shell .bg-\[\#f0f6fb\] { background-color: rgba(0,108,73,.06); }
+.admin-shell .bg-\[\#f7f3fb\] { background-color: rgba(201,168,76,.12); }
 
 /* النصوص */
 .admin-shell .text-\[\#0f1a28\] { color: var(--adm-on); }
 .admin-shell .text-\[\#33414f\] { color: var(--adm-on-variant); }
 .admin-shell .text-\[\#5b6b7a\] { color: var(--adm-on-variant); }
-.admin-shell .text-\[\#0A3D62\] { color: var(--adm-primary); }
+/* العناوين (الكحلي القديم) → نص داكن مطابق لعناوين .site؛ الأزرق الأفتح والروابط → أخضر الإبراز */
+.admin-shell .text-\[\#0A3D62\] { color: var(--adm-on); }
 .admin-shell .text-\[\#1B6CA8\] { color: var(--adm-primary); }
 .admin-shell .text-blue-600 { color: var(--adm-primary); }
 .admin-shell .text-gray-400 { color: #8593a8; }
@@ -107,13 +107,13 @@ body {
 .admin-shell .border-gray-200 { border-color: var(--adm-outline); }
 .admin-shell .border-gray-300 { border-color: var(--adm-outline-strong); }
 
-/* الأزرار/الأشرطة الأساسية (التدرّج الكحلي→أزرق) → تدرّج زمرّدي على السطح الداكن.
-   يشمل: أزرار الحفظ/الإرسال، أشرطة RankList في التحليلات. */
+/* الأزرار الأساسية (التدرّج الكحلي→أزرق) → تدرّج شبه أسود (هوية primary مطابقة
+   لـ .site) بنص فاتح. أشرطة RankList في التحليلات تُلوّن خضراء في الـ JSX. */
 .admin-shell .bg-gradient-to-l.from-\[\#1B6CA8\] {
-  background-image: linear-gradient(to left, #10b981, #047857);
+  background-image: linear-gradient(to left, #131b2e, #05070d);
 }
 
-/* حقول الإدخال على سطح داكن (الأسعار/التعديل) */
+/* حقول الإدخال على السطح الفاتح (الأسعار/التعديل): أبيض + نص داكن + حدّ شعري */
 .admin-shell input,
 .admin-shell textarea,
 .admin-shell select {
@@ -122,7 +122,15 @@ body {
   border-color: var(--adm-outline-strong);
 }
 .admin-shell input::placeholder,
-.admin-shell textarea::placeholder { color: #7e8aa0; }
+.admin-shell textarea::placeholder { color: #76777d; }
+/* تركيز موحّد على الهوية الفاتحة (يتجاوز حلقة الأزرق القديمة في الحقول) */
+.admin-shell input:focus,
+.admin-shell textarea:focus,
+.admin-shell select:focus {
+  border-color: #131b2e;
+  box-shadow: 0 0 0 3px rgba(19,27,46,.10);
+  outline: none;
+}
 
 /* شريط الإبراز الزمرّدي على بطاقات الإحصاء (تحذيري ⇒ كهرماني) */
 .admin-shell .adm-stat-accent {
