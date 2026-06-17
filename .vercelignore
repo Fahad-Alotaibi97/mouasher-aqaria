@@ -31,3 +31,11 @@ _*.mjs
 # ★ ملفات محذوفة عمداً — تكسر جلسة الأدمن إن نُشرت (انظر tools/guard-no-proxy.mjs)
 src/proxy.ts
 src/app/auth
+
+# ★ غلاف Capacitor للجوال — إضافة منفصلة لا تُرفع لـ Vercel إطلاقاً (تطبيق الويب فقط يُنشر)
+/android
+/ios
+/www
+/resources
+capacitor.config.ts
+capacitor.config.json

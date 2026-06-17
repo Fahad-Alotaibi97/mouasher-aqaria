@@ -7,10 +7,15 @@
     "prebuild": "node tools/guard-no-proxy.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "cap:sync": "cap sync android",
+    "cap:open:android": "cap open android"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/splash-screen": "^8.0.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
     "@types/leaflet": "^1.9.21",
@@ -21,6 +26,8 @@
     "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.4.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
