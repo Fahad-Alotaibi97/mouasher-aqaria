@@ -4,6 +4,19 @@ export type ListingCondition = 'new' | 'good' | 'old';
 export type PropertyType = 'شقة' | 'فيلا' | 'دور' | 'استوديو';
 export type PriceStatus = 'ok' | 'hi' | 'lo'; // مناسب | مرتفع | فرصة
 
+// القطاع: سكني | تجاري. الأنواع التجارية: محل | مكتب | معرض.
+export type Sector = 'residential' | 'commercial';
+export type CommercialType = 'shop' | 'office' | 'showroom';
+
+// صف المؤشر التجاري (جدول commercial_prices) — منفصل تماماً عن متوسطات السكني.
+// يبدأ فارغاً ويُملأ لاحقاً؛ price_per_m2 = الإيجار السنوي للمتر² بالريال.
+export interface CommercialPrice {
+  hood: string;
+  commercial_type: CommercialType;
+  price_per_m2: number | null;
+  sample_size?: number | null;
+}
+
 export interface Neighborhood {
   name: string;
   avg_rent: number; // متوسط الشقة (الإيجار السنوي الأساس)
@@ -27,4 +40,12 @@ export interface Listing {
   fal_license?: string | null;
   lat?: number | null;
   lng?: number | null;
+  // القطاع التجاري (إضافة بنيوية — السكني هو الافتراضي):
+  sector?: Sector;
+  commercial_type?: CommercialType | null;
+  frontage_count?: number | null;   // عدد الواجهات
+  frontage_width?: number | null;    // عرض الواجهة (م)
+  allowed_activity?: string | null;  // النشاط المسموح
+  has_bathroom?: boolean | null;     // دورة مياه
+  floor_info?: string | null;        // الدور/الوحدة
 }

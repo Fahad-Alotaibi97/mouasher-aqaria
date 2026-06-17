@@ -237,6 +237,7 @@ body {
 .stitch-home .v-high{background:rgba(239,68,68,.10);color:#b42318;}
 .stitch-home .v-stable{background:var(--surface-container-high);color:var(--on-surface-variant);}
 .stitch-home .v-opp{background:rgba(16,185,129,.12);color:#047857;}
+.stitch-home .v-comm{background:rgba(201,168,76,.16);color:#8a6d18;}
 .stitch-home .card .loc{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--on-surface-variant);margin-bottom:14px;}
 .stitch-home .card .loc .material-symbols-outlined{font-size:16px;}
 .stitch-home .card .specs{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--on-surface-variant);padding-bottom:14px;border-bottom:1px solid var(--surface-container);margin-bottom:14px;}
@@ -577,3 +578,22 @@ body {
 .listing-detail .ld-sim-specs{display:flex;gap:14px;margin-top:7px;font-size:12px;color:var(--on-surface-variant);}
 .listing-detail .ld-sim-specs span{display:inline-flex;align-items:center;gap:4px;}
 .listing-detail .ld-sim-specs .material-symbols-outlined{font-size:16px;color:var(--gold);}
+
+/* ════════════════════════════════════════════════════════════
+   القطاع التجاري — مبدّل سكني/تجاري (مشترك: البطل/البحث/المؤشر) + عناصر التفاصيل.
+   داخل .site فيرث التوكنات؛ معزول فلا يمسّ /admin.
+   ════════════════════════════════════════════════════════════ */
+.site .sector-toggle{display:inline-flex;gap:4px;background:var(--surface-container);border:1px solid var(--outline-variant);border-radius:9999px;padding:4px;margin-top:1rem;}
+.site .sector-toggle .seg{display:inline-flex;align-items:center;gap:6px;border:none;background:none;font-family:inherit;font-size:14px;font-weight:600;color:var(--on-surface-variant);padding:8px 18px;border-radius:9999px;cursor:pointer;transition:all .2s var(--ease);white-space:nowrap;}
+.site .sector-toggle .seg .material-symbols-outlined{font-size:18px;}
+.site .sector-toggle .seg.active{background:var(--primary);color:var(--on-primary);}
+.site .sector-toggle .seg:not(.active):hover{color:var(--on-surface);}
+
+/* بطاقة تفاصيل الإعلان: حالة المؤشر التجاري «قريباً» + صفوف التفاصيل التجارية */
+.listing-detail .ld-soon{display:flex;align-items:flex-start;gap:12px;background:#f7f1df;border:1px solid #e6d9ad;border-radius:.85rem;padding:1rem;}
+.listing-detail .ld-soon .material-symbols-outlined{font-size:26px;color:#8a6d18;flex-shrink:0;}
+.listing-detail .ld-soon .t{font-weight:800;font-size:15px;color:#7a5f12;margin-bottom:3px;}
+.listing-detail .ld-soon p{font-size:12px;color:#8a6d18;line-height:1.6;}
+.listing-detail .ld-comm-rows{display:flex;flex-direction:column;gap:8px;}
+.listing-detail .ld-comm-rows .row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;font-size:13px;color:var(--on-surface-variant);}
+.listing-detail .ld-comm-rows .row b{font-weight:700;color:var(--on-surface);text-align:left;}

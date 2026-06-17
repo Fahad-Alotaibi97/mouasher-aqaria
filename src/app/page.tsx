@@ -95,6 +95,27 @@ function parseAiType(q: string): string | null {
   return AI_TYPES.find((t) => q.includes(t)) ?? null;
 }
 
+// ── القطاع التجاري: الأنواع + المساعدات (إضافة بنيوية بجانب السكني) ──
+const COMMERCIAL_TYPES = [
+  { key: 'shop', label: 'محل', icon: 'storefront' },
+  { key: 'office', label: 'مكتب', icon: 'business_center' },
+  { key: 'showroom', label: 'معرض', icon: 'storefront' },
+] as const;
+// أنواع البحث السكنية في الفلتر (تبقى كما هي تماماً)
+const RESIDENTIAL_FILTER_TYPES = ['شقة', 'فيلا', 'دور', 'استوديو'];
+// تسمية عربية للنوع التجاري من مفتاحه (shop→محل …)
+const commLabel = (k?: string | null): string => COMMERCIAL_TYPES.find((c) => c.key === k)?.label ?? (k ?? '');
+
+// كشف نيّة تجارية في طلب المساعد الذكي (محلّي بالكامل). يرجع نوعاً تجارياً محدّداً،
+// أو 'any' لنيّة تجارية عامة، أو null (سكني افتراضي). «مكتب» وحده مُبهَم فلا يُعدّ تجارياً.
+function parseAiCommercial(q: string): string | null {
+  if (/مكتب تجاري|مكاتب تجارية/.test(q)) return 'office';
+  if (/(محل|محلات)/.test(q)) return 'shop';
+  if (/(معرض|معارض|صالة عرض)/.test(q)) return 'showroom';
+  if (/(تجاري|تجارية|تجاريّة)/.test(q)) return 'any';
+  return null;
+}
+
 // الحي: أطول اسم حي مطابق أولاً (حتى يفوز «الملك عبدالله» على أي جزء أقصر) — فلتر صارم.
 function parseAiHood(q: string, hoods: string[]): string | null {
   const sorted = [...hoods].sort((a, b) => b.length - a.length);
@@ -137,6 +158,18 @@ function photoSlots(rooms: number, baths: number): PhotoSlot[] {
     { key: 'majlis', label: 'المجلس' },
     { key: 'kitchen', label: 'المطبخ' },
     ...Array.from({ length: baths }, (_, i) => ({ key: `bath${i}`, label: baths > 1 ? `حمام ${i + 1}` : 'الحمام' })),
+  ];
+}
+
+// خانات صور الإعلان التجاري: الواجهة (إلزامية) + لقطات داخلية عامة + مرافق.
+// لا تصنيف غرف (لا غرف نوم/مجلس) — تُحفظ مسطّحة في images والمعرض يعرضها بمسمّيات عامة.
+function commercialPhotoSlots(): PhotoSlot[] {
+  return [
+    { key: 'facade', label: 'الواجهة', req: true },
+    { key: 'c1', label: 'من الداخل ١' },
+    { key: 'c2', label: 'من الداخل ٢' },
+    { key: 'c3', label: 'من الداخل ٣' },
+    { key: 'c4', label: 'دورة المياه / المرافق' },
   ];
 }
 
@@ -222,14 +255,17 @@ export default function Home() {
   const [ctErr, setCtErr] = useState<string | null>(null);
   const [siZone, setSiZone] = useState('النرجس'); // اسم الحي المختار في "جرّب المؤشر"
   const [siType, setSiType] = useState('شقة'); // نوع الوحدة في "جرّب المؤشر"
+  const [siSector, setSiSector] = useState<'residential' | 'commercial'>('residential'); // قطاع المؤشر العام
   const [siPrice, setSiPrice] = useState('');
+  // القطاع المختار في التصفّح/البحث: سكني (افتراضي) | تجاري — التبديل الأساسي
+  const [filterSector, setFilterSector] = useState<'residential' | 'commercial'>('residential');
   const [filterHood, setFilterHood] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterBudget, setFilterBudget] = useState('');
   const [searched, setSearched] = useState(false);
 
   // البيانات الحقيقية من قاعدة البيانات (المتوسطات لها قيم افتراضية؛ الإعلانات لا)
-  const { mktAvg, listings } = useAppData(DEFAULT_MKT_AVG, NO_LISTINGS);
+  const { mktAvg, listings, commIndex } = useAppData(DEFAULT_MKT_AVG, NO_LISTINGS);
 
   // تسجيل الدخول — بالإيميل وكلمة المرور (تبويب: دخول / إنشاء حساب)
   const { user, isAdmin, signInWithPassword, signUpWithPassword, requestPasswordReset, signOut, confirmSession } = useAuth();
@@ -464,9 +500,16 @@ export default function Home() {
   const indicator = checkPrice();
 
   // مصدر الحقيقة الوحيد: قائمة مصفّاة بالمعايير، تُغذّي الخريطة والقائمة معاً.
+  // القطاع هو الفلتر الأساسي: سكني/تجاري؛ والنوع يُطابَق حسب القطاع (سكني: type،
+  // تجاري: commercialType). الإعلانات بلا قطاع تُعدّ سكنية (الافتراضي).
   const filtered = listings.filter(l => {
+    const lSector = l.sector === 'commercial' ? 'commercial' : 'residential';
+    if (lSector !== filterSector) return false;
     if (filterHood && l.hood !== filterHood) return false;
-    if (filterType && l.type !== filterType) return false;
+    if (filterType) {
+      const lType = filterSector === 'commercial' ? l.commercialType : l.type;
+      if (lType !== filterType) return false;
+    }
     if (filterBudget && l.adv > parseInt(filterBudget)) return false;
     return true;
   });
@@ -556,10 +599,21 @@ export default function Home() {
     const reqHood = parseAiHood(q, Object.keys(mktAvg));
     const reqType = parseAiType(q);
     const reqMaxPrice = parseAiMaxPrice(q);
-    // المطابقون فعلاً = الإعلانات الحقيقية التي تحقّق كل معيار صريح (الحي/النوع/السقف).
+    // كشف النيّة التجارية: null=سكني (افتراضي) | 'any' | نوع تجاري محدّد. لا يوجد
+    // عقار تجاري بعد ⇒ أي نيّة تجارية تُرجع «لا تطابق» صادقة (لا عرض تجاري مُفبرك).
+    const reqComm = parseAiCommercial(q);
+    const reqSector: 'residential' | 'commercial' = reqComm ? 'commercial' : 'residential';
+    const reqTypeLabel = reqSector === 'commercial'
+      ? (reqComm === 'any' ? 'عقار تجاري' : commLabel(reqComm))
+      : reqType;
+    // المطابقون فعلاً = الإعلانات الحقيقية التي تحقّق كل معيار صريح (القطاع/الحي/النوع/السقف).
     const pool = listings.filter((l) => {
+      const lSector = l.sector === 'commercial' ? 'commercial' : 'residential';
+      if (lSector !== reqSector) return false;
       if (reqHood && l.hood !== reqHood) return false;
-      if (reqType && l.type !== reqType) return false;
+      if (reqSector === 'commercial') {
+        if (reqComm && reqComm !== 'any' && l.commercialType !== reqComm) return false;
+      } else if (reqType && l.type !== reqType) return false;
       if (reqMaxPrice && l.adv > reqMaxPrice) return false;
       return true;
     });
@@ -569,7 +623,8 @@ export default function Home() {
       source: 'ai',
       q: q.slice(0, 200),
       hood: reqHood,
-      type: reqType,
+      type: reqTypeLabel,
+      sector: reqSector,
       budget: reqMaxPrice,
       matches: pool.length,
     });
@@ -577,13 +632,14 @@ export default function Home() {
     // ── لا تطابق ──────────────────────────────────────────────
     if (pool.length === 0) {
       setAiMatchIds([]);
-      const hasCriteria = !!(reqHood || reqType || reqMaxPrice);
+      const hasCriteria = !!(reqHood || reqType || reqMaxPrice || reqComm);
       if (hasCriteria) {
         // صدق: لا نستبدل الحي ولا ندّعي تطابقاً — نعرض رسالة صريحة + تسجيل الطلب،
         // ونسجّل الرغبة غير المطابقة للمدير (fire-and-forget، لا تحجب ولا تكسر).
-        setAiResult({ kind: 'none', hood: reqHood, type: reqType, maxPrice: reqMaxPrice, raw: q });
+        // النوع المعروض يعكس القطاع (تجاري: محل/مكتب/معرض/عقار تجاري).
+        setAiResult({ kind: 'none', hood: reqHood, type: reqTypeLabel, maxPrice: reqMaxPrice, raw: q });
         setAiReply(null); // اللوحة الصريحة أدناه تحمل الرسالة بدل صندوق الرد
-        trackSearchWish({ neighborhood: reqHood, type: reqType, maxPrice: reqMaxPrice, rawQuery: q });
+        trackSearchWish({ neighborhood: reqHood, type: reqTypeLabel, maxPrice: reqMaxPrice, rawQuery: q });
       } else {
         // بلا أي معيار صريح ولا نتيجة (مثلاً الكتالوج فارغ) — رسالة صادقة عامة
         setAiResult({ kind: 'matches', ids: [] });
@@ -601,9 +657,10 @@ export default function Home() {
     // ── يوجد تطابق: نرتّب المطابقين فقط وفق التفضيلات الناعمة (لا نضيف غيرهم) ──
     const scored = pool.map((l) => {
       let score = 0;
-      const fair = getFair(l);
+      // مؤشر السكني فقط (لا يوجد متوسط تجاري بعد) — تفادي مقارنة تجارية بمتوسط سكني خاطئ
+      const fair = reqSector === 'commercial' ? 0 : getFair(l);
       if (/(رخيص|أرخص|ارخص|أقل سعر|اقل سعر|رخيصة|ميزانية|بسيط)/.test(q)) score += (200000 - l.adv) / 20000; // الرخص
-      if (/(فرص|فرصة|أقل من السوق|اقل من السوق|عادل|تحت السوق)/.test(q) && l.adv < fair) score += 6;          // الفرص
+      if (reqSector !== 'commercial' && /(فرص|فرصة|أقل من السوق|اقل من السوق|عادل|تحت السوق)/.test(q) && l.adv < fair) score += 6; // الفرص
       if (/(قريب|قريبة|خدمات|وسط|مركز)/.test(q) && NEAR_HOODS.has(l.hood)) score += 4;                        // قريبة من الخدمات
       // ── الخصائص المنظّمة (تُطابَق فقط إن ذكرها الباحث ووفّرها المكتب؛ لا خصم على الغياب) ──
       if (/غير مفروش/.test(q)) { if (l.furnished === false) score += 5; }                                    // غير مفروشة
@@ -619,7 +676,7 @@ export default function Home() {
     setAiResult({ kind: 'matches', ids: orderedIds });
     setAiMatchIds(matchIds);
     const best = scored[0].l;
-    const crit = [reqHood, reqType, reqMaxPrice ? `حتى ${reqMaxPrice.toLocaleString('ar-SA')} ريال` : null].filter(Boolean).join(' · ');
+    const crit = [reqHood, reqTypeLabel, reqMaxPrice ? `حتى ${reqMaxPrice.toLocaleString('ar-SA')} ريال` : null].filter(Boolean).join(' · ');
     setAiReply(
       `${pool.length === 1 ? 'إعلان واحد مطابق' : `${pool.length.toLocaleString('ar-SA')} إعلانات مطابقة`}${crit ? ` لطلبك (${crit})` : ' لطلبك'}. الأنسب: ${best.title} في ${best.hood} — ${best.adv.toLocaleString('ar-SA')} ريال.`
     );
@@ -673,15 +730,21 @@ export default function Home() {
   // بطاقة الإعلان بأسلوب Stitch (الصفحة الرئيسية الجديدة) — بيانات حقيقية، نفس
   // النقرة تفتح بطاقة التفاصيل القائمة. الشارة تعكس حكم مؤشر أسعار الحي الحقيقي.
   const renderStitchCard = (l: UIListing, isMatch = false) => {
-    const fair = getFair(l);
-    const st = getSt(l.adv, fair); // hi مرتفع / ok مناسب / lo فرصة
+    const isComm = l.sector === 'commercial';
     const img = l.imagesByCategory?.facade ?? (l.images && l.images.length ? l.images[0] : null);
-    // شارة الحكم تعكس مؤشر أسعار الحي الحقيقي (ألوان صادقة: مرتفع تحذيري، فرصة إيجابي)
-    const v = st === 'hi'
-      ? { cls: 'v-high', icon: 'trending_up', label: 'مؤشر مرتفع' }
-      : st === 'lo'
-        ? { cls: 'v-opp', icon: 'trending_down', label: 'فرصة' }
-        : { cls: 'v-stable', icon: 'remove', label: 'مناسب' };
+    // الشارة: السكني = حكم مؤشر أسعار الحي الحقيقي؛ التجاري = نوع تجاري محايد
+    // (لا مؤشر تجاري بعد ⇒ لا حكم سعري مُفبرك على التجاري).
+    let v: { cls: string; icon: string; label: string };
+    if (isComm) {
+      v = { cls: 'v-comm', icon: COMMERCIAL_TYPES.find((c) => c.key === l.commercialType)?.icon ?? 'storefront', label: commLabel(l.commercialType) };
+    } else {
+      const st = getSt(l.adv, getFair(l)); // hi مرتفع / ok مناسب / lo فرصة
+      v = st === 'hi'
+        ? { cls: 'v-high', icon: 'trending_up', label: 'مؤشر مرتفع' }
+        : st === 'lo'
+          ? { cls: 'v-opp', icon: 'trending_down', label: 'فرصة' }
+          : { cls: 'v-stable', icon: 'remove', label: 'مناسب' };
+    }
     return (
       <div key={l.id} className={`card group reveal${isMatch ? ' is-match' : ''}`} onClick={() => openListing(l)}>
         <div className="media">
@@ -696,14 +759,24 @@ export default function Home() {
         </div>
         <div className="body">
           <div className="topline">
-            <h3>{l.title || `${l.type} — ${l.hood}`}</h3>
+            <h3>{l.title || `${isComm ? commLabel(l.commercialType) : l.type} — ${l.hood}`}</h3>
             <span className={`badge-state ${v.cls}`}>{msi(v.icon)} {v.label}</span>
           </div>
           <div className="loc">{msi('location_on')} {l.hood}، الرياض</div>
           <div className="specs">
-            <span>{msi('bed')} {l.rooms ?? '—'} غرف</span>
-            <span>{msi('bathtub')} {l.baths ?? '—'} حمامات</span>
-            <span>{msi('square_foot')} {l.area ?? '—'} م²</span>
+            {isComm ? (
+              <>
+                <span>{msi('square_foot')} {l.area ?? '—'} م²</span>
+                {l.frontageCount != null && <span>{msi('storefront')} {l.frontageCount.toLocaleString('ar-SA')} واجهات</span>}
+                {l.parking != null && <span>{msi('local_parking')} {l.parking.toLocaleString('ar-SA')} مواقف</span>}
+              </>
+            ) : (
+              <>
+                <span>{msi('bed')} {l.rooms ?? '—'} غرف</span>
+                <span>{msi('bathtub')} {l.baths ?? '—'} حمامات</span>
+                <span>{msi('square_foot')} {l.area ?? '—'} م²</span>
+              </>
+            )}
           </div>
           <div className="foot">
             <div className="price">{l.adv.toLocaleString('ar-SA')} <span>ر.س/سنوياً</span></div>
@@ -715,12 +788,16 @@ export default function Home() {
   };
 
   const renderListing = (l: UIListing, isMatch = false) => {
-    const fair = getFair(l);
-    const st = getSt(l.adv, fair);
+    const isComm = l.sector === 'commercial';
+    const fair = isComm ? 0 : getFair(l);
+    const st = isComm ? 'ok' : getSt(l.adv, fair);
     // الصورة الأساسية: الواجهة أولاً، ثم أي صورة متاحة
     const img = l.imagesByCategory?.facade ?? (l.images && l.images.length ? l.images[0] : null);
-    const chips = attrChips(l);
-    const vBadge = st === 'hi' ? 'bg-[#fff3e0] text-[#C2410C]' : st === 'lo' ? 'bg-[#e8f7ee] text-[#1f7a44]' : 'bg-[#e6f1fb] text-[#1B6CA8]';
+    // التجاري: لا شارات خصائص سكنية — نعرض النشاط المسموح إن وُجد فقط
+    const chips = isComm ? (l.activity ? [l.activity] : []) : attrChips(l);
+    const vBadge = isComm
+      ? 'bg-[#f7f1df] text-[#8a6d18]'
+      : st === 'hi' ? 'bg-[#fff3e0] text-[#C2410C]' : st === 'lo' ? 'bg-[#e8f7ee] text-[#1f7a44]' : 'bg-[#e6f1fb] text-[#1B6CA8]';
     return (
       <div key={l.id} onClick={() => openListing(l)}
         className={`card-fade bg-white rounded-2xl border overflow-hidden cursor-pointer transition-all shadow-sm hover:shadow-lg hover:-translate-y-0.5 ${isMatch ? 'border-[#C9A84C] ring-1 ring-[#C9A84C]/40' : 'border-[#cfd9e4] hover:border-[#1B6CA8]'}`}>
@@ -733,7 +810,7 @@ export default function Home() {
             ) : (
               HousePlaceholder
             )}
-            <span className={`absolute bottom-2 right-2 text-[11px] px-2.5 py-1 rounded-lg font-bold shadow-sm ${vBadge}`}>{rl(st)}</span>
+            <span className={`absolute bottom-2 right-2 text-[11px] px-2.5 py-1 rounded-lg font-bold shadow-sm ${vBadge}`}>{isComm ? commLabel(l.commercialType) : rl(st)}</span>
             {isMatch && (
               <span className="absolute top-0 right-0 bg-[#C9A84C] text-[#0A3D62] text-[10px] font-bold px-2.5 py-1 rounded-bl-xl shadow">الأنسب لطلبك</span>
             )}
@@ -741,17 +818,28 @@ export default function Home() {
           {/* المعلومات (يسار) */}
           <div className="flex-1 min-w-0 p-3.5">
             <div className="font-bold text-[15px] text-[#0f1a28] truncate">{l.title}</div>
-            <div className="text-xs text-[#33414f] mt-0.5 font-medium">{l.type} · {l.hood}</div>
+            <div className="text-xs text-[#33414f] mt-0.5 font-medium">{(isComm ? commLabel(l.commercialType) : l.type)} · {l.hood}</div>
             <div className="mt-2 leading-none">
               <span className="text-[19px] font-extrabold text-[#0A3D62]">{l.adv.toLocaleString('ar-SA')}</span>
               <span className="text-[11px] text-[#33414f] mr-1">ريال/سنة</span>
             </div>
-            <div className="text-[11px] text-[#1B6CA8] font-medium mt-1" title="السعر المتوسط لعدد الصفقات المماثلة بنفس الحي">مؤشر أسعار الحي: {fair.toLocaleString('ar-SA')} ريال</div>
-            <div className="flex items-center gap-4 mt-2.5 pt-2.5 border-t border-[#f0f4f8] text-[11px] text-[#33414f]">
-              <span><b className="text-[#0f1a28]">{l.rooms ?? '—'}</b> غرف</span>
-              <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> م²</span>
-              <span><b className="text-[#0f1a28]">{l.baths ?? '—'}</b> حمام</span>
-            </div>
+            {/* مؤشر أسعار الحي السكني فقط — التجاري لا مؤشر له بعد (لا رقم مُفبرك) */}
+            {!isComm && (
+              <div className="text-[11px] text-[#1B6CA8] font-medium mt-1" title="السعر المتوسط لعدد الصفقات المماثلة بنفس الحي">مؤشر أسعار الحي: {fair.toLocaleString('ar-SA')} ريال</div>
+            )}
+            {isComm ? (
+              <div className="flex items-center gap-4 mt-2.5 pt-2.5 border-t border-[#f0f4f8] text-[11px] text-[#33414f]">
+                <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> م²</span>
+                {l.frontageCount != null && <span><b className="text-[#0f1a28]">{l.frontageCount.toLocaleString('ar-SA')}</b> واجهات</span>}
+                {l.parking != null && <span><b className="text-[#0f1a28]">{l.parking.toLocaleString('ar-SA')}</b> مواقف</span>}
+              </div>
+            ) : (
+              <div className="flex items-center gap-4 mt-2.5 pt-2.5 border-t border-[#f0f4f8] text-[11px] text-[#33414f]">
+                <span><b className="text-[#0f1a28]">{l.rooms ?? '—'}</b> غرف</span>
+                <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> م²</span>
+                <span><b className="text-[#0f1a28]">{l.baths ?? '—'}</b> حمام</span>
+              </div>
+            )}
             {chips.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {chips.map((c) => (
@@ -811,12 +899,25 @@ export default function Home() {
                   />
                   <button onClick={() => runAI()}>{t('hero.searchBtn')}</button>
                 </div>
+                {/* القطاع — التبديل الأساسي سكني/تجاري (يصفّر النوع عند التبديل) */}
+                <div className="sector-toggle">
+                  {([['residential', 'sector.residential', 'home_work'], ['commercial', 'sector.commercial', 'storefront']] as const).map(([s, lbl, ic]) => (
+                    <button key={s} className={`seg ${filterSector === s ? 'active' : ''}`}
+                      onClick={() => {
+                        setFilterSector(s); setFilterType('');
+                        setAiResult(null); setAiReply(null); setSearched(false); setAiShowAlts(false);
+                        setTimeout(() => document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+                      }}>
+                      {msi(ic)} {t(lbl)}
+                    </button>
+                  ))}
+                </div>
+                {/* أنواع القطاع المختار — سكني: فلل/شقق · تجاري: محل/مكتب/معرض */}
                 <div className="type-tabs">
-                  {[
-                    { k: 'فيلا', label: 'type.villa', icon: 'home' },
-                    { k: 'شقة', label: 'type.apartment', icon: 'apartment' },
-                    { k: 'تجاري', label: 'type.commercial', icon: 'storefront' },
-                  ].map((tab) => (
+                  {(filterSector === 'commercial'
+                    ? COMMERCIAL_TYPES.map((c) => ({ k: c.key as string, label: t(`commType.${c.key}`), icon: c.icon as string }))
+                    : [{ k: 'فيلا', label: t('type.villa'), icon: 'home' }, { k: 'شقة', label: t('type.apartment'), icon: 'apartment' }]
+                  ).map((tab) => (
                     <button key={tab.k}
                       className={`pill ${filterType === tab.k ? 'active' : ''}`}
                       onClick={() => {
@@ -825,7 +926,7 @@ export default function Home() {
                         setFilterType(filterType === tab.k ? '' : tab.k);
                         setTimeout(() => document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
                       }}>
-                      {msi(tab.icon)} {t(tab.label)}
+                      {msi(tab.icon)} {tab.label}
                     </button>
                   ))}
                 </div>
@@ -904,7 +1005,7 @@ export default function Home() {
                 <div className="empty-card reveal">
                   {listings.length === 0
                     ? t('listings.emptyNoListings')
-                    : filterType === 'تجاري'
+                    : filterSector === 'commercial'
                       ? t('listings.emptyNoCommercial')
                       : t('listings.emptyNoMatch')}
                 </div>
@@ -958,6 +1059,17 @@ export default function Home() {
                   <div className="text-xs text-gray-500">تتحدّث الخريطة والقائمة فور تغيير أي فلتر</div>
                 </div>
               </div>
+              {/* القطاع — التبديل الأساسي سكني/تجاري (يصفّر النوع عند التبديل) */}
+              <div className="px-4 pt-3">
+                <div className="sector-toggle">
+                  {([['residential', 'سكني', 'home_work'], ['commercial', 'تجاري', 'storefront']] as const).map(([s, lbl, ic]) => (
+                    <button key={s} className={`seg ${filterSector === s ? 'active' : ''}`}
+                      onClick={() => { setFilterSector(s); setFilterType(''); }}>
+                      {msi(ic)} {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="p-4 grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs text-gray-700 block mb-1 font-semibold">الحي</label>
@@ -970,7 +1082,10 @@ export default function Home() {
                   <label className="text-xs text-gray-700 block mb-1 font-semibold">نوع العقار</label>
                   <select value={filterType} onChange={e => setFilterType(e.target.value)} className={selectCls}>
                     <option value="">كل الأنواع</option>
-                    {['شقة', 'فيلا', 'دور', 'استوديو'].map(t => <option key={t} value={t}>{t}</option>)}
+                    {(filterSector === 'commercial'
+                      ? COMMERCIAL_TYPES.map((c) => ({ v: c.key as string, lbl: c.label as string }))
+                      : RESIDENTIAL_FILTER_TYPES.map((rt) => ({ v: rt, lbl: rt }))
+                    ).map((o) => <option key={o.v} value={o.v}>{o.lbl}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1020,7 +1135,11 @@ export default function Home() {
               </div>
               {filtered.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 text-center text-[#33414f] text-sm">
-                  {listings.length === 0 ? 'لا توجد إعلانات متاحة حالياً — تُعرض هنا إعلانات المكاتب فور نشرها.' : 'لا توجد نتائج — جرّب توسيع المعايير.'}
+                  {listings.length === 0
+                    ? 'لا توجد إعلانات متاحة حالياً — تُعرض هنا إعلانات المكاتب فور نشرها.'
+                    : filterSector === 'commercial'
+                      ? 'لا توجد عقارات تجارية مدرجة حتى الآن.'
+                      : 'لا توجد نتائج — جرّب توسيع المعايير.'}
                 </div>
               ) : (
                 <div className="space-y-3">{filtered.map((l) => renderListing(l))}</div>
@@ -1052,44 +1171,63 @@ export default function Home() {
                 </div>
               </div>
               <div className="p-4">
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.hood')}</label>
-                    <select value={siZone} onChange={e => setSiZone(e.target.value)} className={selectCls}>
-                      {Object.keys(mktAvg).map(h => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.unitType')}</label>
-                    <select value={siType} onChange={e => setSiType(e.target.value)} className={selectCls}>
-                      {['شقة', 'فيلا', 'دور', 'دوبلكس', 'استوديو'].map(ut => (
-                        <option key={ut} value={ut}>{ut}</option>
-                      ))}
-                    </select>
-                  </div>
+                {/* القطاع — سكني (المؤشر الحقيقي) | تجاري (قريباً، لا بيانات مُفبركة) */}
+                <div className="sector-toggle mb-3">
+                  {([['residential', 'سكني', 'home_work'], ['commercial', 'تجاري', 'storefront']] as const).map(([s, lbl, ic]) => (
+                    <button key={s} className={`seg ${siSector === s ? 'active' : ''}`} onClick={() => setSiSector(s)}>
+                      {msi(ic)} {lbl}
+                    </button>
+                  ))}
                 </div>
-                <div className="mb-3">
-                  <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.annualRent')}</label>
-                  <input type="number" value={siPrice} onChange={e => setSiPrice(e.target.value)}
-                    placeholder={t('ind.rentPlaceholder')} className={inputCls} />
-                </div>
-                {siPrice && (
-                  <div className={`p-3 rounded-xl flex items-center gap-3 border ${indicator.color}`}>
-                    <div className={indicator.type === 'hi' ? 'text-orange-600' : indicator.type === 'lo' ? 'text-green-600' : 'text-blue-700'}>
-                      {indicator.icon}
-                    </div>
-                    <div>
-                      <div className={`font-bold text-sm ${indicator.type === 'hi' ? 'text-orange-700' : indicator.type === 'lo' ? 'text-green-700' : 'text-blue-800'}`}>{indicator.title}</div>
-                      {indicator.detail && <div className="text-xs text-gray-600 mt-0.5">{indicator.detail}</div>}
-                    </div>
+                {siSector === 'commercial' ? (
+                  // المؤشر التجاري قيد الإعداد — حالة صادقة (الجدول فارغ بعد)
+                  <div className="p-5 rounded-xl bg-[#f7f1df] border border-[#e6d9ad] text-center">
+                    <div className="text-[#8a6d18] mb-2 flex justify-center">{msi('storefront')}</div>
+                    <div className="font-bold text-sm text-[#7a5f12] mb-1">{t('comm.soonShort')} — المؤشر التجاري قيد الإعداد</div>
+                    <div className="text-xs text-[#8a6d18] leading-relaxed">{t('comm.indexSoon')}</div>
                   </div>
-                )}
-                {!siPrice && (
-                  <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-center text-sm text-gray-500">
-                    {t('ind.prompt')}
-                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.hood')}</label>
+                        <select value={siZone} onChange={e => setSiZone(e.target.value)} className={selectCls}>
+                          {Object.keys(mktAvg).map(h => (
+                            <option key={h} value={h}>{h}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.unitType')}</label>
+                        <select value={siType} onChange={e => setSiType(e.target.value)} className={selectCls}>
+                          {['شقة', 'فيلا', 'دور', 'دوبلكس', 'استوديو'].map(ut => (
+                            <option key={ut} value={ut}>{ut}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.annualRent')}</label>
+                      <input type="number" value={siPrice} onChange={e => setSiPrice(e.target.value)}
+                        placeholder={t('ind.rentPlaceholder')} className={inputCls} />
+                    </div>
+                    {siPrice && (
+                      <div className={`p-3 rounded-xl flex items-center gap-3 border ${indicator.color}`}>
+                        <div className={indicator.type === 'hi' ? 'text-orange-600' : indicator.type === 'lo' ? 'text-green-600' : 'text-blue-700'}>
+                          {indicator.icon}
+                        </div>
+                        <div>
+                          <div className={`font-bold text-sm ${indicator.type === 'hi' ? 'text-orange-700' : indicator.type === 'lo' ? 'text-green-700' : 'text-blue-800'}`}>{indicator.title}</div>
+                          {indicator.detail && <div className="text-xs text-gray-600 mt-0.5">{indicator.detail}</div>}
+                        </div>
+                      </div>
+                    )}
+                    {!siPrice && (
+                      <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-center text-sm text-gray-500">
+                        {t('ind.prompt')}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1431,11 +1569,12 @@ export default function Home() {
       {/* تفاصيل الإعلان */}
       {selectedListing && (() => {
         const l = selectedListing;
-        // مؤشر الحي الحقيقي: متوسط الحي للنوع (من جدول neighborhoods عبر /admin) + الحكم.
-        // إن لم يوجد متوسط لهذا الحي/النوع ⇒ لا نُظهر المؤشر إطلاقاً (لا رقم مُفبرك).
+        const isComm = l.sector === 'commercial';
+        // مؤشر الحي الحقيقي (السكني فقط): متوسط الحي للنوع + الحكم. التجاري لا مؤشر له
+        // بعد ⇒ يُعرض حال «قريباً/لا توجد بيانات كافية» بدلاً منه (لا رقم مُفبرك إطلاقاً).
         const m = mktAvg[l.hood];
-        const fair = m ? fairForType(m, l.type) : 0;
-        const hasFair = fair > 0;
+        const fair = (!isComm && m) ? fairForType(m, l.type) : 0;
+        const hasFair = !isComm && fair > 0;
         const st = hasFair ? getSt(l.adv, fair) : 'ok';
         const vColor = st === 'hi' ? '#F59E0B' : st === 'lo' ? '#10B981' : '#3B82F6';
         const ratio = hasFair ? l.adv / fair : 1;
@@ -1460,28 +1599,51 @@ export default function Home() {
         const thumbs = shots.slice(0, THUMBS);
         const overflow = shots.length - THUMBS; // >0 ⇒ صور إضافية تُفتح عبر «+N»/المعرض
 
-        // التفاصيل الرئيسية — الخانة تظهر فقط إن توفّرت قيمتها الحقيقية (المساحة تختفي إن غابت)
+        // التفاصيل الرئيسية — الخانة تظهر فقط إن توفّرت قيمتها الحقيقية.
+        // التجاري: المساحة/الواجهات/المواقف (لا غرف ولا دورات مياه كعدد).
         const keys: { icon: string; val: number; label: string }[] = [];
         if (l.area != null) keys.push({ icon: 'square_foot', val: l.area, label: 'م²' });
-        if (l.rooms != null) keys.push({ icon: 'bed', val: l.rooms, label: 'غرف' });
-        if (l.baths != null) keys.push({ icon: 'bathtub', val: l.baths, label: 'دورات المياه' });
+        if (isComm) {
+          if (l.frontageCount != null) keys.push({ icon: 'storefront', val: l.frontageCount, label: 'واجهات' });
+          if (l.parking != null) keys.push({ icon: 'local_parking', val: l.parking, label: 'مواقف' });
+        } else {
+          if (l.rooms != null) keys.push({ icon: 'bed', val: l.rooms, label: 'غرف' });
+          if (l.baths != null) keys.push({ icon: 'bathtub', val: l.baths, label: 'دورات المياه' });
+        }
 
-        // المزايا — حقول منظّمة حقيقية فقط (المتوفّرة = true). لا مزايا مُفبركة (مسبح/سمارت هوم…)
+        // المزايا — حقول منظّمة حقيقية فقط (المتوفّرة = true). لا مزايا مُفبركة.
+        // التجاري: دورة مياه + مواقف (الحقول السكنية لا تُعرض للتجاري).
         const amen: string[] = [];
-        if (l.furnished) amen.push('مفروشة');
-        if (l.kitchen) amen.push('مطبخ راكب');
-        if (l.ac) amen.push('مكيّفة');
-        if (l.parking && l.parking >= 1) amen.push(l.parking > 1 ? `${l.parking.toLocaleString('ar-SA')} مواقف` : 'موقف سيارة');
+        if (isComm) {
+          if (l.hasBathroom) amen.push('دورة مياه');
+          if (l.parking && l.parking >= 1) amen.push(l.parking > 1 ? `${l.parking.toLocaleString('ar-SA')} مواقف` : 'موقف سيارة');
+        } else {
+          if (l.furnished) amen.push('مفروشة');
+          if (l.kitchen) amen.push('مطبخ راكب');
+          if (l.ac) amen.push('مكيّفة');
+          if (l.parking && l.parking >= 1) amen.push(l.parking > 1 ? `${l.parking.toLocaleString('ar-SA')} مواقف` : 'موقف سيارة');
+        }
+        // تفاصيل تجارية نصّية إضافية (تظهر فقط إن وُجدت قيمتها الحقيقية)
+        const commRows: { label: string; val: string }[] = [];
+        if (isComm) {
+          if (l.activity) commRows.push({ label: 'النشاط المسموح', val: l.activity });
+          if (l.frontageWidth != null) commRows.push({ label: 'عرض الواجهة', val: `${l.frontageWidth.toLocaleString('ar-SA')} م` });
+          if (l.floorInfo) commRows.push({ label: 'الدور/الوحدة', val: l.floorInfo });
+        }
 
         // تواصل المكتب الحقيقي (offices.phone) — أزرار الاتصال/واتساب تظهر فقط بتوفّر رقم صالح
         const oWa = waNumber(selectedOffice?.phone);
         const oTel = telNumber(selectedOffice?.phone);
-        const waText = `مرحباً، لديّ استفسار عن إعلان: ${l.title || l.type} — ${l.hood}، ${l.adv.toLocaleString('en-US')} ريال/سنة.`;
+        const typeLabel = isComm ? commLabel(l.commercialType) : l.type;
+        const waText = `مرحباً، لديّ استفسار عن إعلان: ${l.title || typeLabel} — ${l.hood}، ${l.adv.toLocaleString('en-US')} ريال/سنة.`;
         const maps = listingMapsHref(l);
 
-        // عقارات مشابهة: من نفس الحي، الأقرب نوعاً أولاً، باستثناء الحالي، بحد أقصى 3 (تُخفى إن لم توجد)
-        const similar = [...listings.filter((x) => x.hood === l.hood && x.id !== l.id)]
-          .sort((a, b) => Number(b.type === l.type) - Number(a.type === l.type))
+        // عقارات مشابهة: نفس الحي ونفس القطاع، الأقرب نوعاً أولاً، باستثناء الحالي، حد 3
+        // (التجاري فارغ الآن ⇒ القسم يُخفى تلقائياً — لا بطاقات مُفبركة).
+        const simSectorOf = (x: UIListing) => (x.sector === 'commercial' ? 'commercial' : 'residential');
+        const simMatch = (x: UIListing) => isComm ? x.commercialType === l.commercialType : x.type === l.type;
+        const similar = [...listings.filter((x) => x.hood === l.hood && x.id !== l.id && simSectorOf(x) === (isComm ? 'commercial' : 'residential'))]
+          .sort((a, b) => Number(simMatch(b)) - Number(simMatch(a)))
           .slice(0, 3);
 
         return (
@@ -1499,7 +1661,7 @@ export default function Home() {
                       : <div className="ld-main-ph">{msi('home_work')}</div>}
                     <div className="ld-pills">
                       <span className="ld-pill"><span className="dot" />متاح</span>
-                      <span className="ld-pill">{msi('home_work')}{l.type}</span>
+                      <span className="ld-pill">{msi(isComm ? 'storefront' : 'home_work')}{typeLabel}</span>
                     </div>
                     {hasPhotos && (
                       <button className="ld-zoom" onClick={(e) => { e.stopPropagation(); setLightbox({ shots, idx: mainIdx }); }} aria-label="تكبير الصور">
@@ -1528,7 +1690,7 @@ export default function Home() {
                 {/* ── لوحة المعلومات (قابلة للتمرير) ── */}
                 <div className="ld-info">
                   <div className="ld-head">
-                    <h2 className="ld-title">{l.title || `${l.type} — ${l.hood}`}</h2>
+                    <h2 className="ld-title">{l.title || `${typeLabel} — ${l.hood}`}</h2>
                     <div className="ld-loc">{msi('location_on')}<span>{l.hood}، الرياض</span></div>
                     <div className="ld-price-row">
                       <div className="ld-price">{l.adv.toLocaleString('ar-SA')}<span>ريال/سنة</span></div>
@@ -1536,8 +1698,20 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* مؤشر الحي — مقياس نصف دائري يعكس الحكم الحقيقي + متوسط الحي + الفرق بالريال */}
-                  {hasFair && (
+                  {/* مؤشر الحي — السكني: مقياس نصف دائري بالحكم الحقيقي + متوسط الحي + الفرق.
+                      التجاري: حالة صادقة «قريباً / لا توجد بيانات كافية» (لا حكم/رقم مُفبرك). */}
+                  {isComm ? (
+                    <div className="ld-card ld-soon-card">
+                      <div className="ld-card-h">{msi('analytics')}<span>المؤشر التجاري</span></div>
+                      <div className="ld-soon">
+                        {msi('hourglass_empty')}
+                        <div>
+                          <div className="t">{t('comm.soonShort')}</div>
+                          <p>{t('comm.indexSoon')}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : hasFair ? (
                     <div className="ld-card ld-gauge">
                       <div className="ld-card-h">{msi('analytics')}<span>مؤشر الحي</span></div>
                       <PriceGauge ratio={ratio} color={vColor} />
@@ -1553,7 +1727,7 @@ export default function Home() {
                       </div>
                       <p className="ld-gauge-note">بناءً على متوسط إيجار {l.type} في حي {l.hood} (مؤشر أسعار الحي).</p>
                     </div>
-                  )}
+                  ) : null}
 
                   {keys.length > 0 && (
                     <div className="ld-keys">
@@ -1564,6 +1738,17 @@ export default function Home() {
                           <span>{k.label}</span>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {commRows.length > 0 && (
+                    <div className="ld-card">
+                      <div className="ld-card-h">{msi('storefront')}<span>تفاصيل تجارية</span></div>
+                      <div className="ld-comm-rows">
+                        {commRows.map((r) => (
+                          <div key={r.label} className="row"><span>{r.label}</span><b>{r.val}</b></div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -1865,6 +2050,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
 
   // حقول نموذج إضافة الوحدة (مربوطة بقاعدة البيانات)
   const [fType, setFType] = useState('شقة');
+  // القطاع + النوع التجاري + الحقول التجارية (تُستخدم عند fSector='commercial')
+  const [fSector, setFSector] = useState<'residential' | 'commercial'>('residential');
+  const [fCommType, setFCommType] = useState('shop');     // shop | office | showroom
+  const [fFrontage, setFFrontage] = useState('');         // عدد الواجهات
+  const [fFrontageWidth, setFFrontageWidth] = useState(''); // عرض الواجهة (م)
+  const [fActivity, setFActivity] = useState('');         // النشاط المسموح (حر)
+  const [fHasBathroom, setFHasBathroom] = useState('');   // '' غير محدّد | yes | no
+  const [fFloorInfo, setFFloorInfo] = useState('');       // الدور/الوحدة (حر)
   const [fHood, setFHood] = useState('النرجس');
   const [fRent, setFRent] = useState('');
   const [fArea, setFArea] = useState('');
@@ -1973,6 +2166,8 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     setFType('شقة'); setFHood('النرجس'); setFRent(''); setFArea('');
     setFRooms('2'); setFBaths('1'); setFCond('حالة جيدة');
     setFFurniture(''); setFKitchen(''); setFAc(''); setFParking(''); setFDesc('');
+    setFSector('residential'); setFCommType('shop'); setFFrontage(''); setFFrontageWidth('');
+    setFActivity(''); setFHasBathroom(''); setFFloorInfo('');
     setFLocMethod('link'); setFMapsLink(''); setFLat(null); setFLng(null);
     Object.values(fPhotos).forEach((p) => { if (p) URL.revokeObjectURL(p.preview); });
     setFPhotos({});
@@ -1999,8 +2194,13 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     const sb = createClient();
     // نتدرّج كقراءة useAppData: مع الأعمدة الاختيارية أولاً ثم الأساسية إن غابت
     let r = await sb.from('listings')
-      .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,kitchen,ac,parking,description,images,images_by_category,lat,lng,maps_url')
+      .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,kitchen,ac,parking,description,images,images_by_category,lat,lng,maps_url,sector,commercial_type,frontage_count,frontage_width,allowed_activity,has_bathroom,floor_info')
       .eq('id', id).single();
+    if (r.error) {
+      r = await sb.from('listings')
+        .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,kitchen,ac,parking,description,images,images_by_category,lat,lng,maps_url')
+        .eq('id', id).single();
+    }
     if (r.error) {
       r = await sb.from('listings')
         .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,kitchen,ac,parking,description,images,images_by_category,lat,lng')
@@ -2016,7 +2216,16 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       setEditLoading(null); return;
     }
     const d = r.data as Record<string, unknown>;
-    setFType((d.type as string) || 'شقة');
+    // القطاع + الحقول التجارية (إن وُجدت أعمدتها) — السكني افتراضي
+    const dSector: 'residential' | 'commercial' = (d.sector as string) === 'commercial' ? 'commercial' : 'residential';
+    setFSector(dSector);
+    setFCommType((d.commercial_type as string) || 'shop');
+    setFFrontage(d.frontage_count != null ? String(d.frontage_count) : '');
+    setFFrontageWidth(d.frontage_width != null ? String(d.frontage_width) : '');
+    setFActivity((d.allowed_activity as string) || '');
+    setFHasBathroom(d.has_bathroom == null ? '' : d.has_bathroom ? 'yes' : 'no');
+    setFFloorInfo((d.floor_info as string) || '');
+    setFType(dSector === 'commercial' ? 'شقة' : ((d.type as string) || 'شقة'));
     setFHood((d.hood as string) || 'النرجس');
     setFRent(d.advertised != null ? String(d.advertised) : '');
     setFArea(d.area != null ? String(d.area) : '');
@@ -2203,8 +2412,10 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       if (!myOffice.active) {
         setPublishMsg({ ok: false, text: 'مكتبك موقوف حالياً من الإدارة — لا يمكنك النشر. تواصل مع الإدارة.' }); setPublishing(false); return;
       }
-      // ── رفع الصور المصنّفة (الواجهة أولاً) — فشل رفع صورة لا يُفشل النشر ──
-      const slots = photoSlots(parseInt(fRooms) || 1, parseInt(fBaths) || 1);
+      const isComm = fSector === 'commercial';
+      // ── رفع الصور (الواجهة أولاً) — فشل رفع صورة لا يُفشل النشر ──
+      // التجاري: خانات عامة (لا تصنيف غرف) ⇒ تُحفظ مسطّحة في images و images_by_category=null.
+      const slots = isComm ? commercialPhotoSlots() : photoSlots(parseInt(fRooms) || 1, parseInt(fBaths) || 1);
       const byCat: { facade: string | null; hall: string | null; majlis: string | null; kitchen: string | null; bedrooms: string[]; bathrooms: string[] } =
         { facade: null, hall: null, majlis: null, kitchen: null, bedrooms: [], bathrooms: [] };
       const urls: string[] = []; // مصفوفة مسطّحة متوافقة مع عمود images القديم (الواجهة أولاً)
@@ -2239,11 +2450,17 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       //    يدخل إعلانه «بانتظار الموافقة» ويُعتمد من الإدارة إعلاناً بإعلان.
       //    القاعدة تفرض القاعدة نفسها بـ trigger مهما أرسل العميل.
       const autoApproved = !!myOffice.verified;
-      // بيانات الإعلان الأساسية — الرخصة تُسحب تلقائياً من سجل المكتب (لا إعادة إدخال)
+      // بيانات الإعلان الأساسية — الرخصة تُسحب تلقائياً من سجل المكتب (لا إعادة إدخال).
+      // التجاري: العنوان والنوع من النوع التجاري؛ لا غرف. type يحمل التسمية العربية (غير فارغ).
       const core: Record<string, unknown> = {
-        title: `${fType} ${fRooms} غرف — ${fHood}`.replace('استوديو 1 غرف','استوديو'),
-        hood: fHood, type: fType, advertised: parseInt(fRent) || 0,
-        area: fArea ? parseInt(fArea) : null, rooms: parseInt(fRooms) || null,
+        title: isComm
+          ? `${commLabel(fCommType)} — ${fHood}`
+          : `${fType} ${fRooms} غرف — ${fHood}`.replace('استوديو 1 غرف', 'استوديو'),
+        hood: fHood,
+        type: isComm ? commLabel(fCommType) : fType,
+        advertised: parseInt(fRent) || 0,
+        area: fArea ? parseInt(fArea) : null,
+        rooms: isComm ? null : (parseInt(fRooms) || null),
         condition: condMap[fCond] || 'good', cond_label: fCond,
       };
       if (!editingId) {
@@ -2253,27 +2470,39 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         core.status = autoApproved ? 'approved' : 'pending';
         core.fal_license = myOffice.fal_license || null;
       }
-      // خصائص اختيارية ('' ⇒ null = غير محدّد) — أعمدتها تُضاف بـ supabase/listing_attributes.sql
+      // خصائص اختيارية ('' ⇒ null) — أعمدتها تُضاف عبر ترحيلات (listing_attributes / commercial_sector).
+      // كل الأعمدة الجديدة (sector/commercial_*) داخل attrs ليُسقطها مسار التراجع الآمن
+      // (PGRST204/42703) إن لم تُنشأ بعد، فلا ينكسر النشر السكني قبل تشغيل commercial_sector.sql.
       const attrs: Record<string, unknown> = {
-        baths: parseInt(fBaths) || null,
-        furnished: fFurniture === '' ? null : fFurniture === 'مفروشة',
-        kitchen: fKitchen === '' ? null : fKitchen === 'راكب',
-        ac: fAc === '' ? null : fAc === 'مكيّفة',
         parking: fParking === '' ? null : parseInt(fParking),
         description: fDesc.trim() || null,
-        // موقع الوحدة: الإحداثيات (من الخريطة أو من تحليل الرابط) + الرابط الملصوق
-        // كما هو (للروابط المختصرة) — زر «الموقع على الخريطة» يفضّل الإحداثيات.
-        // تحليل احتياطي وقت الحفظ: إن لم تُضبط الإحداثيات بعد لكن الرابط الملصوق
-        // رابط كامل يحوي إحداثيات، نستخرجها ونخزّنها رقمياً ليظهر الدبوس مباشرة.
+        // القطاع + النوع التجاري (سكني افتراضي) — قابلة للإسقاط الآمن قبل الترحيل
+        sector: fSector,
+        commercial_type: isComm ? fCommType : null,
+        // موقع الوحدة: الإحداثيات (من الخريطة أو من تحليل الرابط) + الرابط الملصوق كما هو.
         lat: fLat ?? parseMapsUrl(fMapsLink)?.lat ?? null,
         lng: fLng ?? parseMapsUrl(fMapsLink)?.lng ?? null,
         maps_url: isMapsUrl(fMapsLink) ? fMapsLink.trim() : null,
       };
+      if (isComm) {
+        // حقول تجارية فقط؛ والحقول السكنية تُصفّر (تفادي بقايا عند التحويل سكني→تجاري)
+        attrs.frontage_count = fFrontage ? parseInt(fFrontage) : null;
+        attrs.frontage_width = fFrontageWidth ? parseFloat(fFrontageWidth) : null;
+        attrs.allowed_activity = fActivity.trim() || null;
+        attrs.has_bathroom = fHasBathroom === '' ? null : fHasBathroom === 'yes';
+        attrs.floor_info = fFloorInfo.trim() || null;
+        attrs.baths = null; attrs.furnished = null; attrs.kitchen = null; attrs.ac = null;
+      } else {
+        attrs.baths = parseInt(fBaths) || null;
+        attrs.furnished = fFurniture === '' ? null : fFurniture === 'مفروشة';
+        attrs.kitchen = fKitchen === '' ? null : fKitchen === 'راكب';
+        attrs.ac = fAc === '' ? null : fAc === 'مكيّفة';
+      }
       // أعمدة الصور: تُكتب دائماً عند الإدراج؛ وعند التعديل فقط إن وُجدت صور جديدة
-      // أو صور مصنّفة قائمة (إعلان قديم بصور مسطّحة غير مصنّفة يُترك كما هو بلا مسح).
+      // أو صور مصنّفة قائمة. التجاري بلا تصنيف غرف ⇒ images_by_category = null.
       if (!editingId || hasNewPhotos || existingPhotos) {
         attrs.images = urls;
-        attrs.images_by_category = byCat;
+        attrs.images_by_category = isComm ? null : byCat;
       }
       const payload: Record<string, unknown> = { ...core, ...attrs };
       const dropped: string[] = [];
@@ -2556,9 +2785,26 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
             {addStep === 1 && (
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                 <div className="font-bold text-gray-900 mb-4">بيانات العقار</div>
+                {/* القطاع: التبديل الأساسي — سكني (الحقول الحالية) | تجاري (حقول تجارية) */}
+                <div className="mb-4">
+                  <label className="text-xs text-gray-700 font-semibold block mb-1.5">القطاع</label>
+                  <div className="sector-toggle">
+                    {([['residential', 'سكني', 'home_work'], ['commercial', 'تجاري', 'storefront']] as const).map(([s, lbl, ic]) => (
+                      <button type="button" key={s} className={`seg ${fSector === s ? 'active' : ''}`} onClick={() => setFSector(s)}>
+                        {msi(ic)} {lbl}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">نوع العقار</label>
-                    <select className={selectCls} value={fType} onChange={e=>setFType(e.target.value)}><option>شقة</option><option>فيلا</option><option>دور</option><option>دوبلكس</option><option>استوديو</option></select></div>
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">{fSector === 'commercial' ? 'النوع التجاري' : 'نوع العقار'}</label>
+                    {fSector === 'commercial' ? (
+                      <select className={selectCls} value={fCommType} onChange={e=>setFCommType(e.target.value)}>
+                        {COMMERCIAL_TYPES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                      </select>
+                    ) : (
+                      <select className={selectCls} value={fType} onChange={e=>setFType(e.target.value)}><option>شقة</option><option>فيلا</option><option>دور</option><option>دوبلكس</option><option>استوديو</option></select>
+                    )}</div>
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحي</label>
                     {/* مصدر واحد للأحياء: نفس قائمة جدول neighborhoods (mktAvg) المعروضة في الأدمن والفلاتر */}
                     <select className={selectCls} value={fHood} onChange={e=>setFHood(e.target.value)}>
@@ -2571,26 +2817,53 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">المساحة م²</label>
                     <input type="number" value={fArea} onChange={e=>setFArea(e.target.value)} placeholder="120" className={inputCls} /></div>
                 </div>
-                <div className="grid grid-cols-3 gap-3 mb-3">
-                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">الغرف</label>
-                    <select className={selectCls} value={fRooms} onChange={e=>setFRooms(e.target.value)}><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
-                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">دورات المياه</label>
-                    <select className={selectCls} value={fBaths} onChange={e=>setFBaths(e.target.value)}><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
-                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحالة</label>
-                    <select className={selectCls} value={fCond} onChange={e=>setFCond(e.target.value)}><option>جديد</option><option>حالة جيدة</option><option>يحتاج ترميم</option></select></div>
-                </div>
-                {/* خصائص منظّمة اختيارية — تصبح معايير بحث يستخدمها المساعد الذكي */}
-                <div className="text-xs text-gray-500 mb-2">خصائص إضافية (اختيارية) — تساعد المساعد الذكي على مطابقة طلب الباحث بدقّة:</div>
-                <div className="grid grid-cols-2 gap-3 mb-1">
-                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">الأثاث</label>
-                    <select className={selectCls} value={fFurniture} onChange={e=>setFFurniture(e.target.value)}><option value="">غير محدّد</option><option value="مفروشة">مفروشة</option><option value="غير مفروشة">غير مفروشة</option></select></div>
-                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">المطبخ</label>
-                    <select className={selectCls} value={fKitchen} onChange={e=>setFKitchen(e.target.value)}><option value="">غير محدّد</option><option value="راكب">راكب</option><option value="غير راكب">غير راكب</option></select></div>
-                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">المكيفات</label>
-                    <select className={selectCls} value={fAc} onChange={e=>setFAc(e.target.value)}><option value="">غير محدّد</option><option value="مكيّفة">مكيّفة</option><option value="غير مكيّفة">غير مكيّفة</option></select></div>
-                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">المواقف</label>
-                    <select className={selectCls} value={fParking} onChange={e=>setFParking(e.target.value)}><option value="">غير محدّد</option><option value="0">لا يوجد</option><option value="1">موقف واحد</option><option value="2">موقفان</option><option value="3">ثلاثة فأكثر</option></select></div>
-                </div>
+                {fSector === 'commercial' ? (
+                  // ── حقول تجارية (لا غرف/دورات مياه كعدد سكني) ──
+                  <>
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">عدد الواجهات</label>
+                        <input type="number" value={fFrontage} onChange={e=>setFFrontage(e.target.value)} placeholder="1" className={inputCls} /></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">عرض الواجهة (م)</label>
+                        <input type="number" value={fFrontageWidth} onChange={e=>setFFrontageWidth(e.target.value)} placeholder="8" className={inputCls} /></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحالة</label>
+                        <select className={selectCls} value={fCond} onChange={e=>setFCond(e.target.value)}><option>جديد</option><option>حالة جيدة</option><option>يحتاج ترميم</option></select></div>
+                    </div>
+                    <div className="mb-3"><label className="text-xs text-gray-700 font-semibold block mb-1">النشاط المسموح</label>
+                      <input type="text" value={fActivity} onChange={e=>setFActivity(e.target.value)} placeholder="مثال: مطعم / صيدلية / مكتب إداري" className={inputCls} /></div>
+                    <div className="grid grid-cols-3 gap-3 mb-1">
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">المواقف</label>
+                        <select className={selectCls} value={fParking} onChange={e=>setFParking(e.target.value)}><option value="">غير محدّد</option><option value="0">لا يوجد</option><option value="1">موقف واحد</option><option value="2">موقفان</option><option value="3">ثلاثة فأكثر</option></select></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">دورة مياه</label>
+                        <select className={selectCls} value={fHasBathroom} onChange={e=>setFHasBathroom(e.target.value)}><option value="">غير محدّد</option><option value="yes">نعم</option><option value="no">لا</option></select></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">الدور/الوحدة</label>
+                        <input type="text" value={fFloorInfo} onChange={e=>setFFloorInfo(e.target.value)} placeholder="الدور الأرضي" className={inputCls} /></div>
+                    </div>
+                  </>
+                ) : (
+                  // ── حقول سكنية (كما هي تماماً) ──
+                  <>
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">الغرف</label>
+                        <select className={selectCls} value={fRooms} onChange={e=>setFRooms(e.target.value)}><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">دورات المياه</label>
+                        <select className={selectCls} value={fBaths} onChange={e=>setFBaths(e.target.value)}><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">الحالة</label>
+                        <select className={selectCls} value={fCond} onChange={e=>setFCond(e.target.value)}><option>جديد</option><option>حالة جيدة</option><option>يحتاج ترميم</option></select></div>
+                    </div>
+                    {/* خصائص منظّمة اختيارية — تصبح معايير بحث يستخدمها المساعد الذكي */}
+                    <div className="text-xs text-gray-500 mb-2">خصائص إضافية (اختيارية) — تساعد المساعد الذكي على مطابقة طلب الباحث بدقّة:</div>
+                    <div className="grid grid-cols-2 gap-3 mb-1">
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">الأثاث</label>
+                        <select className={selectCls} value={fFurniture} onChange={e=>setFFurniture(e.target.value)}><option value="">غير محدّد</option><option value="مفروشة">مفروشة</option><option value="غير مفروشة">غير مفروشة</option></select></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">المطبخ</label>
+                        <select className={selectCls} value={fKitchen} onChange={e=>setFKitchen(e.target.value)}><option value="">غير محدّد</option><option value="راكب">راكب</option><option value="غير راكب">غير راكب</option></select></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">المكيفات</label>
+                        <select className={selectCls} value={fAc} onChange={e=>setFAc(e.target.value)}><option value="">غير محدّد</option><option value="مكيّفة">مكيّفة</option><option value="غير مكيّفة">غير مكيّفة</option></select></div>
+                      <div><label className="text-xs text-gray-700 font-semibold block mb-1">المواقف</label>
+                        <select className={selectCls} value={fParking} onChange={e=>setFParking(e.target.value)}><option value="">غير محدّد</option><option value="0">لا يوجد</option><option value="1">موقف واحد</option><option value="2">موقفان</option><option value="3">ثلاثة فأكثر</option></select></div>
+                    </div>
+                  </>
+                )}
 
                 {/* ── موقع الوحدة (اختياري لكنه مهم للباحث) — طريقتان: رابط أو خريطة ── */}
                 <div className="mt-4 pt-4 border-t border-gray-100">
@@ -2724,13 +2997,15 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
             {/* Step 3: Images & Description */}
             {addStep === 3 && (
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                <div className="font-bold text-gray-900 mb-1">صور الوحدة حسب الغرفة</div>
+                <div className="font-bold text-gray-900 mb-1">{fSector === 'commercial' ? 'صور العقار التجاري' : 'صور الوحدة حسب الغرفة'}</div>
                 <div className="text-sm text-gray-500 mb-4">
                   صورة الواجهة إلزامية؛ البقية اختيارية لكنها ترفع فرص تواصل الباحثين.
-                  خانات غرف النوم والحمامات تتبع ما اخترته في «بيانات العقار» ({fRooms} غرف · {fBaths} دورات مياه).
+                  {fSector === 'commercial'
+                    ? ' أضف لقطات داخلية للعقار والمرافق.'
+                    : ` خانات غرف النوم والحمامات تتبع ما اخترته في «بيانات العقار» (${fRooms} غرف · ${fBaths} دورات مياه).`}
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-                  {photoSlots(parseInt(fRooms) || 1, parseInt(fBaths) || 1).map((s) => {
+                  {(fSector === 'commercial' ? commercialPhotoSlots() : photoSlots(parseInt(fRooms) || 1, parseInt(fBaths) || 1)).map((s) => {
                     const ph = fPhotos[s.key];
                     // في وضع التعديل: الصورة الحالية تُعرض وتبقى ما لم يُختر ملف جديد يستبدلها
                     const existing = !ph && editingId ? existingUrlFor(s.key) : null;

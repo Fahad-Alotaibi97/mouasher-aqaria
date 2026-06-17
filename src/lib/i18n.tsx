@@ -46,6 +46,16 @@ export const STRINGS: Record<string, Entry> = {
   'type.apartment': { ar: 'شقق', en: 'Apartments' },
   'type.commercial': { ar: 'تجاري', en: 'Commercial' },
 
+  // القطاع (سكني/تجاري) + الأنواع التجارية
+  'sector.label': { ar: 'القطاع', en: 'Sector' },
+  'sector.residential': { ar: 'سكني', en: 'Residential' },
+  'sector.commercial': { ar: 'تجاري', en: 'Commercial' },
+  'commType.shop': { ar: 'محل', en: 'Shop' },
+  'commType.office': { ar: 'مكتب', en: 'Office' },
+  'commType.showroom': { ar: 'معرض', en: 'Showroom' },
+  'comm.soonShort': { ar: 'قريباً', en: 'Coming soon' },
+  'comm.indexSoon': { ar: 'المؤشر التجاري قيد الإعداد — لا توجد بيانات كافية بعد لعرض متوسط تجاري لهذا الحي.', en: 'The commercial index is being prepared — not enough data yet to show a commercial average for this neighborhood.' },
+
   // عبارات المساعد الذكي (التسمية فقط؛ الاستعلام يبقى عربياً للمطابقة المحلّية)
   'ai.cheapest': { ar: 'أرخص شقة متاحة', en: 'Cheapest available apartment' },
   'ai.villaHittin': { ar: 'فيلا في حطين', en: 'Villa in Hittin' },

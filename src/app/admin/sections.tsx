@@ -84,7 +84,7 @@ const statusMeta: Record<string, { cls: string; label: string }> = {
 //     نقرات الإعلانات، استخدام المؤشر بحكمه، البحث بالفلاتر والمساعد).
 //     لا أرقام وهمية أبداً — كل قسم بلا بيانات يقولها بصراحة.
 // ════════════════════════════════════════════════════════════
-interface AnaListing { id: string; title: string; hood: string; type: string; status: string | null; active: boolean; office_id: string | null }
+interface AnaListing { id: string; title: string; hood: string; type: string; status: string | null; active: boolean; office_id: string | null; sector?: string | null }
 interface AnaOffice { id: string; name: string; status: string | null; active: boolean; verified: boolean }
 interface AnaLead { listing_id: string | null; office_id: string | null; kind: string | null; created_at: string }
 interface AnaEvent { type: string; ref_id: string | null; meta: Record<string, unknown> | null; created_at: string }
@@ -241,17 +241,24 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const [profilesErr, setProfilesErr] = useState<PgErr | null>(null);
   const [err, setErr] = useState<PgErr | null>(null);
   const [loading, setLoading] = useState(true);
+  // عدد صفوف المؤشر التجاري (commercial_prices) — null = الجدول غير منشأ بعد (قبل الترحيل)
+  const [commPricesCount, setCommPricesCount] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
     const sb = createClient();
-    const [lr, or_, ldr, evr, pr0] = await Promise.all([
-      sb.from('listings').select('id,title,hood,type,status,active,office_id'),
+    const [lr0, or_, ldr, evr, pr0] = await Promise.all([
+      sb.from('listings').select('id,title,hood,type,status,active,office_id,sector'),
       sb.from('offices').select('id,name,status,active,verified'),
       sb.from('leads').select('listing_id,office_id,kind,created_at'),
       sb.from('analytics_events').select('type,ref_id,meta,created_at').order('created_at', { ascending: false }).limit(EVENTS_CAP),
       sb.from('profiles').select('role,is_admin,created_at'),
     ]);
+    // عمود sector قد يغيب قبل commercial_sector.sql — نرجع للأعمدة الأساسية بلا انكسار
+    let lr = lr0;
+    if (lr.error && (lr.error.code === '42703' || /sector/i.test(lr.error.message || ''))) {
+      lr = await sb.from('listings').select('id,title,hood,type,status,active,office_id') as typeof lr0;
+    }
     // المستخدمون المسجّلون — قراءة غير قاتلة: فشلها لا يُسقط اللوحة (تظهر رسالة مفهومة)
     let pr = pr0;
     if (pr.error && pr.error.code === '42703') {
@@ -307,7 +314,10 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
       if (wr.error.code === '42P01' || wr.error.code === 'PGRST205') { setWishesMissing(true); setWishes([]); }
       else { setWishesMissing(false); setWishes([]); } // خطأ آخر (نادر) ⇒ نتركه فارغاً بلا إسقاط اللوحة
     } else { setWishesMissing(false); setWishes((wr.data ?? []) as SearchWish[]); }
-    setListings((lr.data ?? []) as AnaListing[]);
+    // المؤشر التجاري — عدد الصفوف (COUNT خفيف، غير قاتل). null = الجدول غير منشأ بعد.
+    const cpr = await sb.from('commercial_prices').select('id', { count: 'exact', head: true });
+    setCommPricesCount(cpr.error ? null : (cpr.count ?? 0));
+    setListings((lr.data ?? []) as unknown as AnaListing[]);
     setOffices((or_.data ?? []) as AnaOffice[]);
     setLeads(leadRows);
     setLoading(false);
@@ -430,6 +440,28 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
               sub={`+${fmtNum(inquiriesWeek.length)} هذا الأسبوع`} subTone="up" />
             <StatCard label="بانتظار الاعتماد" val={pendingListings.length + pendingOffices.length} warn icon="list"
               sub={`إعلانات ${fmtNum(pendingListings.length)} · مكاتب ${fmtNum(pendingOffices.length)}`} subTone="warn" />
+          </div>
+
+          {/* ── القطاع التجاري — عدّ حقيقي (يقرأ 0 الآن) + حالة المؤشر التجاري الصادقة ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <StatCard
+              label="الإعلانات التجارية"
+              val={listings.filter((l) => l.sector === 'commercial').length}
+              icon="coins"
+              sub={listings.some((l) => l.sector === 'commercial') ? 'منشورة' : 'لا توجد إعلانات تجارية بعد'}
+              subTone="up"
+            />
+            <SubCard title="المؤشر التجاري" hint="مؤشر أسعار تجاري منفصل تماماً عن السكني" icon="chart" tone="gold" accent="secondary">
+              <div className="text-xs text-[#5b6b7a] leading-relaxed">
+                {commPricesCount === null ? (
+                  <>بانتظار البيانات — جدول <b>commercial_prices</b> غير منشأ بعد. شغّل <b>supabase/commercial_index.sql</b> مرة واحدة، ثم يُملأ لاحقاً (حي + نوع تجاري + سعر المتر²).</>
+                ) : commPricesCount === 0 ? (
+                  <>بانتظار البيانات — جدول <b>commercial_prices</b> فارغ حالياً (٠ صف). يُملأ لاحقاً فيظهر المؤشر التجاري للعامة. لا متوسطات مُفبركة.</>
+                ) : (
+                  <>عدد صفوف المؤشر التجاري: <b>{fmtNum(commPricesCount)}</b> (حي + نوع تجاري + سعر المتر²).</>
+                )}
+              </div>
+            </SubCard>
           </div>
 
           {/* ── المستخدمون المسجّلون (حسابات فعلية معروفة — بعكس الزيارات المجهولة) ── */}
@@ -668,7 +700,19 @@ interface ListingRow {
   id: string; title: string; hood: string; type: string; advertised: number;
   status: string; active: boolean; office_id: string | null; created_at: string;
   rejection_note: string | null;
+  sector?: string | null; commercial_type?: string | null;
 }
+// تسمية النوع التجاري بالعربية (للوحة الإدارة)
+const COMM_LABEL: Record<string, string> = { shop: 'محل', office: 'مكتب', showroom: 'معرض' };
+type ListFilter = 'all' | 'residential' | 'commercial' | 'shop' | 'office' | 'showroom';
+const LIST_FILTERS: { key: ListFilter; label: string }[] = [
+  { key: 'all', label: 'الكل' },
+  { key: 'residential', label: 'سكني' },
+  { key: 'commercial', label: 'تجاري' },
+  { key: 'shop', label: 'محل' },
+  { key: 'office', label: 'مكتب' },
+  { key: 'showroom', label: 'معرض' },
+];
 export function ListingsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const [rows, setRows] = useState<ListingRow[]>([]);
   const [officeMap, setOfficeMap] = useState<Record<string, string>>({});
@@ -676,19 +720,24 @@ export function ListingsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ id: string; title: string; advertised: string } | null>(null);
+  const [filter, setFilter] = useState<ListFilter>('all');
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
     const sb = createClient();
-    const [lr, or_] = await Promise.all([
-      sb.from('listings').select('id,title,hood,type,advertised,status,active,office_id,created_at,rejection_note').order('created_at', { ascending: false }),
+    // نتدرّج: مع أعمدة القطاع (بعد commercial_sector.sql) ثم بدونها (فلا تنكسر القراءة قبل الترحيل)
+    const COLS = 'id,title,hood,type,advertised,status,active,office_id,created_at,rejection_note';
+    const [lr0, or_] = await Promise.all([
+      sb.from('listings').select(COLS + ',sector,commercial_type').order('created_at', { ascending: false }),
       sb.from('offices').select('id,name'),
     ]);
+    let lr = lr0;
+    if (lr.error) lr = await sb.from('listings').select(COLS).order('created_at', { ascending: false }) as typeof lr0;
     if (lr.error) { setErr(lr.error); setLoading(false); return; }
     const omap: Record<string, string> = {};
     ((or_.data ?? []) as { id: string; name: string }[]).forEach((o) => { omap[o.id] = o.name; });
     setOfficeMap(omap);
-    setRows((lr.data ?? []) as ListingRow[]);
+    setRows((lr.data ?? []) as unknown as ListingRow[]);
     setLoading(false);
   }, []);
 
@@ -727,11 +776,39 @@ export function ListingsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
     <>
       <SectionHead title="إدارة الإعلانات" subtitle="كل الإعلانات من جدول listings — اعتماد/رفض/تعديل/حذف (يظهر للعامة المعتمد فقط)" onRefresh={load} />
       {err && <ErrBox e={err} />}
-      {loading ? <Loading /> : rows.length === 0 && !err ? (
+      {/* فلتر القطاع/النوع التجاري — عدّ حقيقي بجانب كل خيار */}
+      {!loading && rows.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {LIST_FILTERS.map((f) => {
+            const n = f.key === 'all' ? rows.length
+              : f.key === 'residential' ? rows.filter((r) => (r.sector === 'commercial' ? 'commercial' : 'residential') === 'residential').length
+              : f.key === 'commercial' ? rows.filter((r) => r.sector === 'commercial').length
+              : rows.filter((r) => r.commercial_type === f.key).length;
+            const active = filter === f.key;
+            return (
+              <button key={f.key} onClick={() => setFilter(f.key)}
+                className={`text-xs px-3 py-1.5 rounded-lg font-bold border transition-colors ${active ? 'bg-[#0A3D62] text-white border-[#0A3D62]' : 'bg-white border-[#cfd9e4] text-[#0A3D62] hover:bg-[#f0f4f8]'}`}>
+                {f.label} <span className={active ? 'opacity-80' : 'text-[#5b6b7a]'}>({fmtNum(n)})</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {(() => {
+        const shown = rows.filter((l) => {
+          const sec = l.sector === 'commercial' ? 'commercial' : 'residential';
+          if (filter === 'all') return true;
+          if (filter === 'residential') return sec === 'residential';
+          if (filter === 'commercial') return sec === 'commercial';
+          return l.commercial_type === filter;
+        });
+        return loading ? <Loading /> : rows.length === 0 && !err ? (
         <Empty text="لا توجد إعلانات بعد — ستظهر هنا عندما تنشر المكاتب إعلاناتها." />
+      ) : shown.length === 0 ? (
+        <Empty text="لا توجد إعلانات مطابقة لهذا الفلتر." />
       ) : (
         <div className="space-y-3">
-          {rows.map((l) => {
+          {shown.map((l) => {
             const sm = statusMeta[l.status] ?? statusMeta.pending;
             const isEditing = edit?.id === l.id;
             return (
@@ -752,8 +829,11 @@ export function ListingsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="font-bold text-[#0f1a28] text-sm truncate">{l.title}</div>
-                        <div className="text-xs text-[#33414f] mt-0.5">
-                          {l.type} · {l.hood} · {fmtNum(l.advertised)} ريال/سنة
+                        <div className="text-xs text-[#33414f] mt-0.5 flex flex-wrap items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded font-bold ${l.sector === 'commercial' ? 'bg-[#f7f1df] text-[#8a6d18]' : 'bg-[#eef4fb] text-[#1B6CA8]'}`}>
+                            {l.sector === 'commercial' ? `تجاري · ${COMM_LABEL[l.commercial_type ?? ''] ?? 'تجاري'}` : 'سكني'}
+                          </span>
+                          <span>{l.type} · {l.hood} · {fmtNum(l.advertised)} ريال/سنة</span>
                         </div>
                         <div className="text-xs text-[#33414f] mt-0.5">
                           المكتب: {l.office_id ? (officeMap[l.office_id] ?? '—') : '—'} · {fmtDate(l.created_at)}
@@ -786,7 +866,8 @@ export function ListingsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
             );
           })}
         </div>
-      )}
+      );
+      })()}
     </>
   );
 }
