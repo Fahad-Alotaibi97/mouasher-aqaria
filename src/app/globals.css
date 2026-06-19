@@ -393,6 +393,8 @@ body {
 .site .site-foot .foot-brand .b .material-symbols-outlined{font-size:22px;color:var(--gold);}
 .site .site-foot .foot-brand p{font-size:12px;color:var(--on-surface-variant);}
 .site .site-foot .foot-bottom{border-top:1px solid var(--outline-variant);padding-top:1.25rem;text-align:center;font-size:13px;color:var(--outline);}
+/* روابط التنقّل/التذييل/الدرج صارت <a href> حقيقية (SEO/تبويب جديد) — نُلغي تسطير المتصفح الافتراضي */
+.site .nav-center a,.site .site-foot .foot-col a,.site .drawer-link{text-decoration:none;}
 
 /* ════════════════════════════════════════════════════════════
    طبقة إعادة التلوين (remap) — تُحوّل أدوات Tailwind/الألوان القديمة

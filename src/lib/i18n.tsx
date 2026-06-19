@@ -17,8 +17,10 @@ const LS_KEY = 'maq_lang';
 type Entry = { ar: string; en: string };
 
 export const STRINGS: Record<string, Entry> = {
-  // العلامة
-  'brand': { ar: 'مؤشر العقارية', en: 'Aqaria Index' },
+  // العلامة — الاسم الإنجليزي «Mouasher» (نقحرة مؤشر = Index) كعلامة نظيفة بدل
+  // النقحرة الركيكة «Aqaria Index»؛ وصف «Riyadh rental index» يحمله الشعار/العناوين.
+  'brand': { ar: 'مؤشر العقارية', en: 'Mouasher' },
+  'brand.full': { ar: 'مؤشر العقارية', en: 'Mouasher — Riyadh Rental Index' },
 
   // الشريط العلوي
   'nav.home': { ar: 'الرئيسية', en: 'Home' },
@@ -72,8 +74,47 @@ export const STRINGS: Record<string, Entry> = {
   'listings.emptyNoCommercial': { ar: 'لا توجد عقارات تجارية متاحة حالياً.', en: 'No commercial properties available right now.' },
   'listings.emptyNoMatch': { ar: 'لا توجد نتائج مطابقة — جرّب نوعاً آخر أو امسح الفلتر.', en: 'No matching results — try another type or clear the filter.' },
 
+  // تسميات بطاقة الإعلان الثابتة (الترجمة فقط؛ قيم المستخدم تبقى كما أُدخلت)
+  'card.forRent': { ar: 'للإيجار', en: 'For rent' },
+  'card.forSale': { ar: 'للبيع', en: 'For sale' },
+  'card.bestMatch': { ar: 'الأنسب لطلبك', en: 'Best match' },
+  'card.rooms': { ar: 'غرف', en: 'rooms' },
+  'card.baths': { ar: 'حمامات', en: 'baths' },
+  'card.bath': { ar: 'حمام', en: 'bath' },
+  'card.area': { ar: 'م²', en: 'm²' },
+  'card.frontages': { ar: 'واجهات', en: 'frontages' },
+  'card.parkings': { ar: 'مواقف', en: 'parking' },
+  'card.perYear': { ar: 'ريال/سنة', en: 'SAR/yr' },
+  'card.perYearShort': { ar: 'ر.س/سنوياً', en: 'SAR/yr' },
+  'card.priceIndex': { ar: 'مؤشر أسعار الحي', en: 'Neighborhood index' },
+  'card.city': { ar: 'الرياض', en: 'Riyadh' },
+  'card.sar': { ar: 'ريال', en: 'SAR' },
+  // شارات الخصائص على بطاقة البحث (chrome مُترجَم؛ القيمة مشتقّة من حقول حقيقية)
+  'chip.furnished': { ar: 'مفروشة', en: 'Furnished' },
+  'chip.unfurnished': { ar: 'غير مفروشة', en: 'Unfurnished' },
+  'chip.kitchen': { ar: 'مطبخ راكب', en: 'Fitted kitchen' },
+  'chip.noKitchen': { ar: 'مطبخ غير راكب', en: 'No fitted kitchen' },
+  'chip.ac': { ar: 'مكيّفة', en: 'Air-conditioned' },
+  'chip.noAc': { ar: 'غير مكيّفة', en: 'No A/C' },
+  'chip.noParking': { ar: 'بدون موقف', en: 'No parking' },
+  'card.mapsBtn': { ar: 'الموقع على الخريطة', en: 'View on map' },
+  'verdict.high': { ar: 'مرتفع', en: 'Above market' },
+  'verdict.highIndex': { ar: 'مؤشر مرتفع', en: 'Above index' },
+  'verdict.opp': { ar: 'فرصة', en: 'Deal' },
+  'verdict.fair': { ar: 'مناسب', en: 'Fair' },
+
+  // إجابات السوق من المساعد الذكي (المتوسطات والمقارنات) — item 3
+  'mkt.title': { ar: 'متوسط السوق', en: 'Market average' },
+  'mkt.compareTitle': { ar: 'مقارنة متوسطات الأحياء', en: 'Neighborhood comparison' },
+  'mkt.perYear': { ar: 'ريال/سنة', en: 'SAR/yr' },
+  'mkt.perM2': { ar: 'ريال/م² سنوياً', en: 'SAR/m²/yr' },
+  'mkt.deals': { ar: 'عدد الصفقات', en: 'deals' },
+  'mkt.noData': { ar: 'لا تتوفّر بيانات كافية لهذا الحي بعد', en: 'Not enough data for this neighborhood yet' },
+  'mkt.lowerBy': { ar: 'أقل بـ', en: 'lower by' },
+  'mkt.cheaperHood': { ar: 'الأرخص', en: 'cheaper' },
+
   // قسم «لماذا تختار»
-  'why.title': { ar: 'لماذا تختار مؤشر العقارية؟', en: 'Why choose Aqaria Index?' },
+  'why.title': { ar: 'لماذا تختار مؤشر العقارية؟', en: 'Why choose Mouasher?' },
   'why.sub': { ar: 'نلتزم بتجربة عقارية مبنية على الشفافية والدقة لتسهيل قراراتك.', en: 'We’re committed to a real-estate experience built on transparency and accuracy to make your decisions easier.' },
   'why.c1t': { ar: 'دقة البيانات أولاً', en: 'Data accuracy first' },
   'why.c1d': { ar: 'مؤشر أسعار الحي مبني على متوسطات السوق المُدارة، لتقارن قبل توقيع العقد.', en: 'The neighborhood price index is built on managed market averages, so you can compare before signing.' },
@@ -92,7 +133,7 @@ export const STRINGS: Record<string, Entry> = {
   'foot.privacy': { ar: 'سياسة الخصوصية', en: 'Privacy Policy' },
   'foot.contact': { ar: 'تواصل معنا', en: 'Contact us' },
   'foot.tagline': { ar: 'دقّة عقارية للرياض — سوق الإيجار بكل وضوح © 2026.', en: 'Real-estate accuracy for Riyadh — the rental market made clear © 2026.' },
-  'foot.rights': { ar: 'جميع الحقوق محفوظة — مؤشر العقارية · الرياض', en: 'All rights reserved — Aqaria Index · Riyadh' },
+  'foot.rights': { ar: 'جميع الحقوق محفوظة — مؤشر العقارية · الرياض', en: 'All rights reserved — Mouasher · Riyadh' },
 
   // مؤشر أسعار الحي (الصفحة العامة) — التسميات
   'ind.title': { ar: 'مؤشر أسعار الحي', en: 'Neighborhood Price Index' },

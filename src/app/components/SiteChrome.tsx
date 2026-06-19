@@ -43,6 +43,10 @@ const SECONDARY: { id: string; key: string; icon: string }[] = [
   { id: 'about', key: 'nav.about', icon: 'info' },
 ];
 
+// رابط حقيقي لكل وجهة (SEO + فتح في تبويب جديد + مشاركة). الرئيسية = «/»، والبقية
+// hash-route على الصفحة الواحدة («/#search»…) يقرؤها page.tsx عند التحميل.
+const hrefFor = (id: string) => (id === 'home' ? '/' : '/#' + id);
+
 export function SiteHeader({ active, onNavigate, user, isAdmin, isOffice, onSignOut }: SiteHeaderProps) {
   const [open, setOpen] = useState(false);
   const { t, lang, dir, setLang } = useLang();
@@ -50,7 +54,7 @@ export function SiteHeader({ active, onNavigate, user, isAdmin, isOffice, onSign
   const go = (id: string) => {
     setOpen(false);
     if (onNavigate) { onNavigate(id); if (typeof window !== 'undefined') window.scrollTo(0, 0); }
-    else if (typeof window !== 'undefined') window.location.href = '/#' + id;
+    else if (typeof window !== 'undefined') window.location.href = hrefFor(id);
   };
 
   // مبدّل اللغة (ع / EN) — يظهر على كل الصفحات العامة، سطح المكتب والجوال
@@ -90,9 +94,10 @@ export function SiteHeader({ active, onNavigate, user, isAdmin, isOffice, onSign
   };
 
   const drawerItem = (it: { id: string; key: string; icon: string }) => (
-    <button key={it.id} className={`drawer-link${active === it.id ? ' active' : ''}`} onClick={() => go(it.id)}>
+    <a key={it.id} href={hrefFor(it.id)} className={`drawer-link${active === it.id ? ' active' : ''}`}
+      onClick={(e) => { e.preventDefault(); go(it.id); }}>
       {msi(it.icon)} {t(it.key)}
-    </button>
+    </a>
   );
 
   return (
@@ -104,10 +109,11 @@ export function SiteHeader({ active, onNavigate, user, isAdmin, isOffice, onSign
             <span>{t('brand')}</span>{msi('real_estate_agent')}
           </button>
 
-          {/* روابط وسطية (سطح المكتب) */}
+          {/* روابط وسطية (سطح المكتب) — روابط حقيقية بـ href (SEO/تبويب جديد) مع تنقّل SPA */}
           <nav className="nav-center">
             {PRIMARY.map((it) => (
-              <a key={it.id} className={active === it.id ? 'active' : ''} onClick={() => go(it.id)}>{t(it.key)}</a>
+              <a key={it.id} href={hrefFor(it.id)} className={active === it.id ? 'active' : ''}
+                onClick={(e) => { e.preventDefault(); go(it.id); }}>{t(it.key)}</a>
             ))}
           </nav>
 
@@ -154,28 +160,32 @@ export function SiteFooter({ onNavigate }: SiteFooterProps) {
   const { t } = useLang();
   const go = (id: string) => {
     if (onNavigate) { onNavigate(id); if (typeof window !== 'undefined') window.scrollTo(0, 0); }
-    else if (typeof window !== 'undefined') window.location.href = '/#' + id;
+    else if (typeof window !== 'undefined') window.location.href = hrefFor(id);
   };
+  // رابط تذييل حقيقي بـ href (SEO/تبويب جديد) مع تنقّل SPA عند النقر العادي
+  const fl = (id: string, label: string) => (
+    <a href={hrefFor(id)} onClick={(e) => { e.preventDefault(); go(id); }}>{label}</a>
+  );
   return (
     <footer className="site-foot">
       <div className="wrap">
         <div className="foot-grid">
           <div className="foot-col">
             <h4>{t('foot.quickLinks')}</h4>
-            <a onClick={() => go('home')}>{t('nav.home')}</a>
-            <a onClick={() => go('search')}>{t('nav.search')}</a>
-            <a onClick={() => go('indicator')}>{t('nav.indicator')}</a>
+            {fl('home', t('nav.home'))}
+            {fl('search', t('nav.search'))}
+            {fl('indicator', t('nav.indicator'))}
           </div>
           <div className="foot-col">
             <h4>{t('foot.legal')}</h4>
-            <a onClick={() => go('terms')}>{t('foot.terms')}</a>
-            <a onClick={() => go('privacy')}>{t('foot.privacy')}</a>
+            {fl('terms', t('foot.terms'))}
+            {fl('privacy', t('foot.privacy'))}
           </div>
           <div className="foot-col">
             <h4>{t('foot.company')}</h4>
-            <a onClick={() => go('about')}>{t('nav.about')}</a>
-            <a onClick={() => go('inquiries')}>{t('foot.contact')}</a>
-            <a onClick={() => go('pricing')}>{t('nav.pricing')}</a>
+            {fl('about', t('nav.about'))}
+            {fl('inquiries', t('foot.contact'))}
+            {fl('pricing', t('nav.pricing'))}
           </div>
           <div className="foot-col foot-brand">
             <div className="b"><span>{t('brand')}</span>{msi('real_estate_agent')}</div>

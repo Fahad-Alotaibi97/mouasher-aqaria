@@ -122,6 +122,18 @@ function parseAiHood(q: string, hoods: string[]): string | null {
   return sorted.find((h) => h && q.includes(h)) ?? null;
 }
 
+// كل الأحياء المذكورة في الطلب (للمقارنة «قارن X وY») — الأطول أولاً، ونمسح المطابَق من
+// نسخة العمل حتى لا يتكرّر اسم قصير كجزء من اسم أطول.
+function parseAiHoodsAll(q: string, hoods: string[]): string[] {
+  const sorted = [...hoods].sort((a, b) => b.length - a.length);
+  let work = q;
+  const found: string[] = [];
+  for (const h of sorted) {
+    if (h && work.includes(h)) { found.push(h); work = work.split(h).join(' '); }
+  }
+  return found;
+}
+
 // السقف السعري: نتعرّف على رقم ميزانية صريح فقط (مع «ألف» أو رقم كبير) فلا نخلط
 // «3 غرف» بسعر. «أرخص/رخيص» نيّة ترتيب لا سقفاً (تُعالَج في الترتيب لا كفلتر).
 function parseAiMaxPrice(qRaw: string): number | null {
@@ -208,17 +220,25 @@ const HousePlaceholder = (
   </svg>
 );
 
+// وجهات الصفحة الواحدة الصالحة كـ hash-route (لعناوين قابلة للمشاركة + حارس قيمة)
+const PAGES = ['home', 'search', 'indicator', 'finance', 'inquiries', 'pricing', 'office', 'privacy', 'terms', 'about'] as const;
+type PageId = typeof PAGES[number];
+const isPageId = (s: string): s is PageId => (PAGES as readonly string[]).includes(s);
+
 export default function Home() {
-  const [page, setPage] = useState<'home' | 'search' | 'indicator' | 'finance' | 'inquiries' | 'pricing' | 'office' | 'privacy' | 'terms' | 'about'>('home');
+  const [page, setPage] = useState<PageId>('home');
   // المساعد الذكي — منطق محلّي بالكلمات المفتاحية (بدون أي استدعاء API)
   const [aiQuery, setAiQuery] = useState('');
   const [aiReply, setAiReply] = useState<string | null>(null);
   const [aiMatchIds, setAiMatchIds] = useState<(string | number)[]>([]);
   // نتيجة المساعد الذكي: إمّا قائمة معرّفات مطابقة مرتّبة، أو «لا تطابق» مع المعايير
   // الصريحة (حي/نوع/سقف) — تُغذّي العرض الصادق وزر تسجيل الطلب وتسجيل الرغبة.
+  // صف إجابة سوق: حي + تسمية النوع + القيمة (متوسط) + عدد الصفقات + وحدة القياس
+  type MarketRow = { hood: string; typeLabel: string; value: number | null; sampleSize: number | null; unit: 'perYear' | 'perM2' };
   type AiResult =
     | { kind: 'matches'; ids: (string | number)[] }
     | { kind: 'none'; hood: string | null; type: string | null; maxPrice: number | null; raw: string }
+    | { kind: 'market'; mode: 'single' | 'compare'; sector: 'residential' | 'commercial'; rows: MarketRow[] }
     | null;
   const [aiResult, setAiResult] = useState<AiResult>(null);
   const [aiShowAlts, setAiShowAlts] = useState(false); // كشف «الخيارات الأخرى المتاحة» في حال لا تطابق
@@ -272,7 +292,13 @@ export default function Home() {
   const { user, isAdmin, signInWithPassword, signUpWithPassword, requestPasswordReset, signOut, confirmSession } = useAuth();
 
   // اللغة/الاتجاه (i18n) — عربي افتراضي (RTL)، إنجليزي اختياري (LTR)
-  const { t, dir } = useLang();
+  const { t, dir, lang } = useLang();
+  // تنسيق رقمي يتبع اللغة: أرقام عربية-هندية بالعربي، لاتينية بالإنجليزي (تجنّب chrome نصف-عربي)
+  const nf = (n: number) => n.toLocaleString(lang === 'en' ? 'en-US' : 'ar-SA');
+  // تسمية النوع التجاري حسب اللغة (الإنجليزية من قاموس commType.*)
+  const commT = (k?: string | null) => (lang === 'en' ? t(`commType.${k || 'shop'}`) : commLabel(k));
+  // حكم مؤشر الحي مُترجَماً (مرتفع/مناسب/فرصة)
+  const verdictT = (st: string) => (st === 'hi' ? t('verdict.high') : st === 'lo' ? t('verdict.opp') : t('verdict.fair'));
 
   // هل الحساب الحالي يملك مكتباً؟ ⇒ زر «لوحة المكتب» الذهبي في الدرج
   const [hasOffice, setHasOffice] = useState(false);
@@ -519,20 +545,44 @@ export default function Home() {
   const filteredMapPoints = toPoints(filtered);
 
   // ── التنقّل الموحّد (يُمرَّر للدرج الجانبي) — كل بند صفحة مستقلّة ──
-  const go = (id: string) => {
-    setPage(id as typeof page);
-    if (typeof window !== 'undefined') window.scrollTo(0, 0);
+  // يضبط أيضاً الـ hash في العنوان فتصبح كل وجهة قابلة للمشاركة (search/indicator…)
+  // بلا كسر الـ SPA: الرئيسية بلا hash، والبقية «/#id» يضيف سجلّ تصفّح فيعمل زرّا الرجوع/التقدّم.
+  const go = (raw: string) => {
+    const id: PageId = isPageId(raw) ? raw : 'home';
+    setPage(id);
+    if (typeof window !== 'undefined') {
+      const cur = window.location.hash.replace('#', '');
+      if (id === 'home') {
+        if (cur) window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      } else if (cur !== id) {
+        window.location.hash = id;
+      }
+      window.scrollTo(0, 0);
+    }
   };
 
-  // قراءة الـ hash عند التحميل (للقدوم من صفحات أخرى مثل /admin عبر '/#map')
+  // قراءة الـ hash عند التحميل (لمشاركة رابط مباشر للوجهة، أو القدوم من /admin عبر '/#search')
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const h = window.location.hash.replace('#', '');
-    if (h) go(h);
+    if (h && isPageId(h)) go(h);
     // زيارة واحدة لكل تحميل صفحة (حارس داخل trackPageView ضد التكرار) —
     // بعد التركيب فقط، بنفس عميل singleton، ولا تمسّ المصادقة بشيء.
     trackPageView(h || 'home');
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // مزامنة الـ hash مع الوجهة عند تغيّره خارجياً (زرّا الرجوع/التقدّم في المتصفح، أو رابط مُشارَك)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onHash = () => {
+      const h = window.location.hash.replace('#', '');
+      const next: PageId = h && isPageId(h) ? h : 'home';
+      setPage((cur) => (cur === next ? cur : next));
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   // استخدام ميزة «خيارات تقسيط الإيجار»: يُسجَّل عند كل دخول فعلي للصفحة
@@ -608,6 +658,39 @@ export default function Home() {
     const reqTypeLabel = reqSector === 'commercial'
       ? (reqComm === 'any' ? 'عقار تجاري' : commLabel(reqComm))
       : reqType;
+    // نيّة «الأرخص»: ترتيب تصاعدي صريح بالسعر (لا سقف). يُعرَض الأرخص فعلاً أولاً ويُسمّى صراحةً.
+    const cheapestIntent = /(رخيص|أرخص|ارخص|أقل سعر|اقل سعر|رخيصة|الأرخص|بسيط|ميزانية)/.test(q);
+
+    // ── مسار بيانات السوق: أسئلة المتوسطات/المقارنات تُجاب من بيانات المؤشر الحقيقية ──
+    //   السكني من mktAvg (متوسط الحي للنوع)، التجاري من commIndex (ريال/م² + عدد الصفقات).
+    //   لا بحث إعلانات هنا — إجابة معرفية صادقة؛ وإن غاب حي بيانياً نقولها بصراحة (لا فبركة).
+    {
+      const hoodsAll = parseAiHoodsAll(q, Object.keys(mktAvg));
+      const avgIntent = /متوسط|المعدل|(كم|بكم)\s*[^؟?]{0,14}(إيجار|ايجار|سعر|يكلف|تكلف|تكلفة)|كم سعر|كم يكلف|كم الإيجار|كم الايجار/.test(q);
+      const compareIntent = /(قارن|قارني|قارنّ|مقارنة|الفرق بين|مقابل|أيهما|ايهما|\bvs\b)/.test(q);
+      const wantsMarket = hoodsAll.length >= 1 && (compareIntent || avgIntent);
+      if (wantsMarket) {
+        const mktSector: 'residential' | 'commercial' = reqComm ? 'commercial' : 'residential';
+        const ct = reqComm && reqComm !== 'any' ? reqComm : 'shop';
+        const rows: MarketRow[] = hoodsAll.map((h) => {
+          if (mktSector === 'commercial') {
+            const c = commIndex[`${h}|${ct}`];
+            return { hood: h, typeLabel: commT(ct), value: c?.pricePerM2 ?? null, sampleSize: c?.sampleSize ?? null, unit: 'perM2' as const };
+          }
+          const m = mktAvg[h];
+          const v = m ? fairForType(m, reqType ?? 'شقة') : 0;
+          return { hood: h, typeLabel: reqType ?? (lang === 'en' ? t('type.apartment') : 'شقة'), value: v > 0 ? v : null, sampleSize: null, unit: 'perYear' as const };
+        });
+        setAiMatchIds([]);
+        setAiReply(null);
+        setAiResult({ kind: 'market', mode: hoodsAll.length >= 2 ? 'compare' : 'single', sector: mktSector, rows });
+        track('search', null, { source: 'ai', q: q.slice(0, 200), kind: 'market', sector: mktSector, hoods: hoodsAll.join('،'), matches: rows.filter((r) => r.value != null).length });
+        setSearched(true);
+        scrollToListings();
+        return;
+      }
+    }
+
     // المطابقون فعلاً = الإعلانات الحقيقية التي تحقّق كل معيار صريح (القطاع/الحي/النوع/السقف).
     const pool = listings.filter((l) => {
       const lSector = l.sector === 'commercial' ? 'commercial' : 'residential';
@@ -661,7 +744,7 @@ export default function Home() {
       let score = 0;
       // مؤشر السكني فقط (لا يوجد متوسط تجاري بعد) — تفادي مقارنة تجارية بمتوسط سكني خاطئ
       const fair = reqSector === 'commercial' ? 0 : getFair(l);
-      if (/(رخيص|أرخص|ارخص|أقل سعر|اقل سعر|رخيصة|ميزانية|بسيط)/.test(q)) score += (200000 - l.adv) / 20000; // الرخص
+      if (cheapestIntent) score += (200000 - l.adv) / 20000; // الرخص (نيّة الأرخص)
       if (reqSector !== 'commercial' && /(فرص|فرصة|أقل من السوق|اقل من السوق|عادل|تحت السوق)/.test(q) && l.adv < fair) score += 6; // الفرص
       if (/(قريب|قريبة|خدمات|وسط|مركز)/.test(q) && NEAR_HOODS.has(l.hood)) score += 4;                        // قريبة من الخدمات
       // ── الخصائص المنظّمة (تُطابَق فقط إن ذكرها الباحث ووفّرها المكتب؛ لا خصم على الغياب) ──
@@ -672,16 +755,31 @@ export default function Home() {
       if (/(موقف|مواقف|كراج|باركن)/.test(q) && (l.parking ?? 0) >= 1) score += 5;                            // مواقف
       return { l, score };
     });
-    scored.sort((a, b) => b.score - a.score || a.l.adv - b.l.adv); // عند التعادل: الأرخص أولاً (قيمة أفضل)
+    // نيّة «الأرخص» ⇒ الترتيب الأساسي تصاعدي بالسعر (يُعرَض الأرخص فعلاً أولاً، وتُطابقه
+    // التسمية أدناه)؛ غير ذلك ⇒ الترتيب بالنقاط ثم الأرخص عند التعادل (قيمة أفضل).
+    if (cheapestIntent) scored.sort((a, b) => a.l.adv - b.l.adv || b.score - a.score);
+    else scored.sort((a, b) => b.score - a.score || a.l.adv - b.l.adv);
     const orderedIds = scored.map((s) => s.l.id);
     const matchIds = orderedIds.slice(0, Math.min(2, orderedIds.length));
     setAiResult({ kind: 'matches', ids: orderedIds });
     setAiMatchIds(matchIds);
-    const best = scored[0].l;
-    const crit = [reqHood, reqTypeLabel, reqMaxPrice ? `حتى ${reqMaxPrice.toLocaleString('ar-SA')} ريال` : null].filter(Boolean).join(' · ');
-    setAiReply(
-      `${pool.length === 1 ? 'إعلان واحد مطابق' : `${pool.length.toLocaleString('ar-SA')} إعلانات مطابقة`}${crit ? ` لطلبك (${crit})` : ' لطلبك'}. الأنسب: ${best.title} في ${best.hood} — ${best.adv.toLocaleString('ar-SA')} ريال.`
-    );
+    const best = scored[0].l; // مع نيّة الأرخص = الأقل سعراً فعلاً بين المطابقين
+    if (cheapestIntent) {
+      // تسمية صريحة تعكس السعر الأدنى الحقيقي لنفس النوع المطلوب (لا التباس بأنواع أخرى).
+      const lowest = pool.reduce((a, b) => (b.adv < a.adv ? b : a));
+      const typeWord = reqTypeLabel || (lang === 'en' ? 'property' : 'عقار');
+      const inHood = reqHood ? (lang === 'en' ? ` in ${reqHood}` : ` في ${reqHood}`) : '';
+      setAiReply(
+        lang === 'en'
+          ? `Cheapest available ${typeWord}${inHood}: ${lowest.title} — ${nf(lowest.adv)} ${t('mkt.perYear')}.`
+          : `أرخص ${typeWord}${inHood}: ${lowest.title} — ${nf(lowest.adv)} ريال/سنة.`
+      );
+    } else {
+      const crit = [reqHood, reqTypeLabel, reqMaxPrice ? `حتى ${nf(reqMaxPrice)} ريال` : null].filter(Boolean).join(' · ');
+      setAiReply(
+        `${pool.length === 1 ? 'إعلان واحد مطابق' : `${nf(pool.length)} إعلانات مطابقة`}${crit ? ` لطلبك (${crit})` : ' لطلبك'}. الأنسب: ${best.title} في ${best.hood} — ${nf(best.adv)} ريال.`
+      );
+    }
     setSearched(true);
     scrollToListings();
   };
@@ -704,7 +802,7 @@ export default function Home() {
   const displayList: UIListing[] =
     aiResult?.kind === 'matches'
       ? (aiResult.ids.map((id) => listings.find((l) => l.id === id)).filter(Boolean) as UIListing[])
-      : aiResult?.kind === 'none'
+      : aiResult?.kind === 'none' || aiResult?.kind === 'market'
         ? []
         : filtered;
 
@@ -713,10 +811,10 @@ export default function Home() {
   // هذه نفسها الحقول التي يطابق عليها المساعد الذكي (furnished/kitchen/ac/parking).
   const attrChips = (l: UIListing): string[] => {
     const c: string[] = [];
-    if (l.furnished != null) c.push(l.furnished ? 'مفروشة' : 'غير مفروشة');
-    if (l.kitchen != null) c.push(l.kitchen ? 'مطبخ راكب' : 'مطبخ غير راكب');
-    if (l.ac != null) c.push(l.ac ? 'مكيّفة' : 'غير مكيّفة');
-    if (l.parking != null) c.push(l.parking >= 1 ? `${l.parking} موقف` : 'بدون موقف');
+    if (l.furnished != null) c.push(l.furnished ? t('chip.furnished') : t('chip.unfurnished'));
+    if (l.kitchen != null) c.push(l.kitchen ? t('chip.kitchen') : t('chip.noKitchen'));
+    if (l.ac != null) c.push(l.ac ? t('chip.ac') : t('chip.noAc'));
+    if (l.parking != null) c.push(l.parking >= 1 ? `${nf(l.parking)} ${t('card.parkings')}` : t('chip.noParking'));
     return c;
   };
 
@@ -738,14 +836,14 @@ export default function Home() {
     // (لا مؤشر تجاري بعد ⇒ لا حكم سعري مُفبرك على التجاري).
     let v: { cls: string; icon: string; label: string };
     if (isComm) {
-      v = { cls: 'v-comm', icon: COMMERCIAL_TYPES.find((c) => c.key === l.commercialType)?.icon ?? 'storefront', label: commLabel(l.commercialType) };
+      v = { cls: 'v-comm', icon: COMMERCIAL_TYPES.find((c) => c.key === l.commercialType)?.icon ?? 'storefront', label: commT(l.commercialType) };
     } else {
       const st = getSt(l.adv, getFair(l)); // hi مرتفع / ok مناسب / lo فرصة
       v = st === 'hi'
-        ? { cls: 'v-high', icon: 'trending_up', label: 'مؤشر مرتفع' }
+        ? { cls: 'v-high', icon: 'trending_up', label: t('verdict.highIndex') }
         : st === 'lo'
-          ? { cls: 'v-opp', icon: 'trending_down', label: 'فرصة' }
-          : { cls: 'v-stable', icon: 'remove', label: 'مناسب' };
+          ? { cls: 'v-opp', icon: 'trending_down', label: t('verdict.opp') }
+          : { cls: 'v-stable', icon: 'remove', label: t('verdict.fair') };
     }
     return (
       <div key={l.id} className={`card group reveal${isMatch ? ' is-match' : ''}`} onClick={() => openListing(l)}>
@@ -757,32 +855,32 @@ export default function Home() {
               : <div className="ph">{msi('home_work')}</div>}
           </div>
           {/* شارة الحالة: نقطة ذهبية للإيجار (لو توفّر للبيع مستقبلاً: نقطة خضراء) */}
-          <span className="tag"><span className="dot" />{isMatch ? 'الأنسب لطلبك' : 'للإيجار'}</span>
+          <span className="tag"><span className="dot" />{isMatch ? t('card.bestMatch') : t('card.forRent')}</span>
         </div>
         <div className="body">
           <div className="topline">
-            <h3>{l.title || `${isComm ? commLabel(l.commercialType) : l.type} — ${l.hood}`}</h3>
+            <h3>{l.title || `${isComm ? commT(l.commercialType) : l.type} — ${l.hood}`}</h3>
             <span className={`badge-state ${v.cls}`}>{msi(v.icon)} {v.label}</span>
           </div>
-          <div className="loc">{msi('location_on')} {l.hood}، الرياض</div>
+          <div className="loc">{msi('location_on')} {l.hood}{lang === 'en' ? ', ' : '، '}{t('card.city')}</div>
           <div className="specs">
             {isComm ? (
               <>
-                <span>{msi('square_foot')} {l.area ?? '—'} م²</span>
-                {l.frontageCount != null && <span>{msi('storefront')} {l.frontageCount.toLocaleString('ar-SA')} واجهات</span>}
-                {l.parking != null && <span>{msi('local_parking')} {l.parking.toLocaleString('ar-SA')} مواقف</span>}
+                <span>{msi('square_foot')} {l.area ?? '—'} {t('card.area')}</span>
+                {l.frontageCount != null && <span>{msi('storefront')} {nf(l.frontageCount)} {t('card.frontages')}</span>}
+                {l.parking != null && <span>{msi('local_parking')} {nf(l.parking)} {t('card.parkings')}</span>}
               </>
             ) : (
               <>
-                <span>{msi('bed')} {l.rooms ?? '—'} غرف</span>
-                <span>{msi('bathtub')} {l.baths ?? '—'} حمامات</span>
-                <span>{msi('square_foot')} {l.area ?? '—'} م²</span>
+                <span>{msi('bed')} {l.rooms ?? '—'} {t('card.rooms')}</span>
+                <span>{msi('bathtub')} {l.baths ?? '—'} {t('card.baths')}</span>
+                <span>{msi('square_foot')} {l.area ?? '—'} {t('card.area')}</span>
               </>
             )}
           </div>
           <div className="foot">
-            <div className="price">{l.adv.toLocaleString('ar-SA')} <span>ر.س/سنوياً</span></div>
-            <button className="save" aria-label="حفظ" onClick={(e) => e.stopPropagation()}>{msi('bookmark_border')}</button>
+            <div className="price">{nf(l.adv)} <span>{t('card.perYearShort')}</span></div>
+            <button className="save" aria-label={lang === 'en' ? 'Save' : 'حفظ'} onClick={(e) => e.stopPropagation()}>{msi('bookmark_border')}</button>
           </div>
         </div>
       </div>
@@ -812,34 +910,34 @@ export default function Home() {
             ) : (
               HousePlaceholder
             )}
-            <span className={`absolute bottom-2 right-2 text-[11px] px-2.5 py-1 rounded-lg font-bold shadow-sm ${vBadge}`}>{isComm ? commLabel(l.commercialType) : rl(st)}</span>
+            <span className={`absolute bottom-2 right-2 text-[11px] px-2.5 py-1 rounded-lg font-bold shadow-sm ${vBadge}`}>{isComm ? commT(l.commercialType) : verdictT(st)}</span>
             {isMatch && (
-              <span className="absolute top-0 right-0 bg-[#C9A84C] text-[#0A3D62] text-[10px] font-bold px-2.5 py-1 rounded-bl-xl shadow">الأنسب لطلبك</span>
+              <span className="absolute top-0 right-0 bg-[#C9A84C] text-[#0A3D62] text-[10px] font-bold px-2.5 py-1 rounded-bl-xl shadow">{t('card.bestMatch')}</span>
             )}
           </div>
           {/* المعلومات (يسار) */}
           <div className="flex-1 min-w-0 p-3.5">
             <div className="font-bold text-[15px] text-[#0f1a28] truncate">{l.title}</div>
-            <div className="text-xs text-[#33414f] mt-0.5 font-medium">{(isComm ? commLabel(l.commercialType) : l.type)} · {l.hood}</div>
+            <div className="text-xs text-[#33414f] mt-0.5 font-medium">{(isComm ? commT(l.commercialType) : l.type)} · {l.hood}</div>
             <div className="mt-2 leading-none">
-              <span className="text-[19px] font-extrabold text-[#0A3D62]">{l.adv.toLocaleString('ar-SA')}</span>
-              <span className="text-[11px] text-[#33414f] mr-1">ريال/سنة</span>
+              <span className="text-[19px] font-extrabold text-[#0A3D62]">{nf(l.adv)}</span>
+              <span className="text-[11px] text-[#33414f] mr-1">{t('card.perYear')}</span>
             </div>
             {/* مؤشر أسعار الحي السكني فقط — التجاري لا مؤشر له بعد (لا رقم مُفبرك) */}
             {!isComm && (
-              <div className="text-[11px] text-[#1B6CA8] font-medium mt-1" title="السعر المتوسط لعدد الصفقات المماثلة بنفس الحي">مؤشر أسعار الحي: {fair.toLocaleString('ar-SA')} ريال</div>
+              <div className="text-[11px] text-[#1B6CA8] font-medium mt-1" title={t('ind.sub')}>{t('card.priceIndex')}: {nf(fair)} {t('card.sar')}</div>
             )}
             {isComm ? (
               <div className="flex items-center gap-4 mt-2.5 pt-2.5 border-t border-[#f0f4f8] text-[11px] text-[#33414f]">
-                <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> م²</span>
-                {l.frontageCount != null && <span><b className="text-[#0f1a28]">{l.frontageCount.toLocaleString('ar-SA')}</b> واجهات</span>}
-                {l.parking != null && <span><b className="text-[#0f1a28]">{l.parking.toLocaleString('ar-SA')}</b> مواقف</span>}
+                <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> {t('card.area')}</span>
+                {l.frontageCount != null && <span><b className="text-[#0f1a28]">{nf(l.frontageCount)}</b> {t('card.frontages')}</span>}
+                {l.parking != null && <span><b className="text-[#0f1a28]">{nf(l.parking)}</b> {t('card.parkings')}</span>}
               </div>
             ) : (
               <div className="flex items-center gap-4 mt-2.5 pt-2.5 border-t border-[#f0f4f8] text-[11px] text-[#33414f]">
-                <span><b className="text-[#0f1a28]">{l.rooms ?? '—'}</b> غرف</span>
-                <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> م²</span>
-                <span><b className="text-[#0f1a28]">{l.baths ?? '—'}</b> حمام</span>
+                <span><b className="text-[#0f1a28]">{l.rooms ?? '—'}</b> {t('card.rooms')}</span>
+                <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> {t('card.area')}</span>
+                <span><b className="text-[#0f1a28]">{l.baths ?? '—'}</b> {t('card.bath')}</span>
               </div>
             )}
             {chips.length > 0 && (
@@ -859,7 +957,7 @@ export default function Home() {
                 className="inline-flex items-center gap-1.5 mt-2.5 bg-[#0F6E56] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
               >
                 {Icons.pin}
-                الموقع على الخريطة
+                {t('card.mapsBtn')}
               </a>
             )}
           </div>
@@ -963,7 +1061,51 @@ export default function Home() {
                 <div className="ai-reply reveal">{msi('auto_awesome')}<span>{aiReply}</span></div>
               )}
 
-              {aiResult?.kind === 'none' ? (
+              {aiResult?.kind === 'market' ? (
+                // ── إجابة سوق: متوسط حي أو مقارنة أحياء من بيانات المؤشر الحقيقية ──
+                (() => {
+                  const r = aiResult;
+                  const unitLabel = (u: 'perYear' | 'perM2') => (u === 'perM2' ? t('mkt.perM2') : t('mkt.perYear'));
+                  const withData = r.rows.filter((x) => x.value != null);
+                  let cmp: { cheaper: string; diff: number; unit: 'perYear' | 'perM2' } | null = null;
+                  if (r.mode === 'compare' && withData.length >= 2) {
+                    const sorted = [...withData].sort((a, b) => (a.value as number) - (b.value as number));
+                    cmp = { cheaper: sorted[0].hood, diff: (sorted[sorted.length - 1].value as number) - (sorted[0].value as number), unit: sorted[0].unit };
+                  }
+                  return (
+                    <div className="reveal in">
+                      <div className="bg-white border border-[#cfd9e4] rounded-2xl p-5 shadow-sm">
+                        <div className="flex items-center gap-2 font-bold text-[#0A3D62] mb-3">
+                          {msi('insights')}<span>{r.mode === 'compare' ? t('mkt.compareTitle') : t('mkt.title')}</span>
+                        </div>
+                        <div className="space-y-2.5">
+                          {r.rows.map((x) => (
+                            <div key={x.hood + x.typeLabel} className="flex items-center justify-between gap-3 border-b border-[#f0f4f8] pb-2.5 last:border-0 last:pb-0">
+                              <div className="text-sm font-bold text-[#0f1a28]">{x.hood} <span className="text-xs font-medium text-[#5b6b7a]">· {x.typeLabel}</span></div>
+                              {x.value != null ? (
+                                <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
+                                  <div className="text-[15px] font-extrabold text-[#0A3D62]">{nf(x.value)} <span className="text-[11px] font-medium text-[#5b6b7a]">{unitLabel(x.unit)}</span></div>
+                                  {x.sampleSize != null && x.sampleSize > 0 && (
+                                    <div className="text-[11px] text-[#8a6d18]">{t('mkt.deals')}: {nf(x.sampleSize)}</div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-[#9aa6b2]">{t('mkt.noData')}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {cmp && (
+                          <div className="mt-3 pt-3 border-t border-[#f0f4f8] text-sm font-semibold text-[#1f7a44] flex items-center gap-1.5">
+                            {msi('trending_down')}
+                            <span>{cmp.cheaper} {t('mkt.cheaperHood')} — {t('mkt.lowerBy')} {nf(cmp.diff)} {unitLabel(cmp.unit)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : aiResult?.kind === 'none' ? (
                 // ── لا تطابق: رسالة صادقة + تسجيل الطلب + خيارات أخرى (لا استبدال للحي) ──
                 (() => {
                   const crit = [
@@ -1185,8 +1327,11 @@ export default function Home() {
                   // المؤشر التجاري — يقرأ المتوسط المحفوظ (commercial_prices) للحي+النوع.
                   // مُعبّأ ⇒ نعرض المتوسط ونقارن إيجار المتر² المُدخَل؛ فارغ ⇒ حالة صادقة «قريباً».
                   const cAvg = commIndex[`${siZone}|${siCommType}`]?.pricePerM2 ?? null;
+                  const cSample = commIndex[`${siZone}|${siCommType}`]?.sampleSize ?? null;
                   const cPrice = parseInt(siPrice) || 0;
-                  const avgTxt = cAvg != null ? `متوسط ${commLabel(siCommType)} في ${siZone}: ${cAvg.toLocaleString('ar-SA')} ريال/م² سنوياً` : '';
+                  // عدد الصفقات (sample_size) يُعرَض بجانب المتوسط — مصداقية المؤشر التجاري
+                  const dealsTxt = cSample != null && cSample > 0 ? ` · عدد الصفقات: ${cSample.toLocaleString('ar-SA')}` : '';
+                  const avgTxt = cAvg != null ? `متوسط ${commLabel(siCommType)} في ${siZone}: ${cAvg.toLocaleString('ar-SA')} ريال/م² سنوياً${dealsTxt}` : '';
                   return (
                     <>
                       <div className="grid grid-cols-2 gap-3 mb-3">
@@ -1625,6 +1770,7 @@ export default function Home() {
         // القيمة ريال/م² سنوياً. إن وُجد متوسط محفوظ نعرضه (وحُكماً إن أمكن حساب سعر متر
         // الإعلان من مساحته)؛ وإلا تبقى الحالة الصادقة «قريباً». لا رقم مُفبرك إطلاقاً.
         const commAvg = isComm ? (commIndex[`${l.hood}|${l.commercialType}`]?.pricePerM2 ?? null) : null;
+        const commSample = isComm ? (commIndex[`${l.hood}|${l.commercialType}`]?.sampleSize ?? null) : null;
         const listPerM2 = (isComm && l.area && l.area > 0) ? Math.round(l.adv / l.area) : null;
         const commHasIdx = commAvg != null && commAvg > 0;
         const commCmp = commHasIdx && listPerM2 != null;
@@ -1762,6 +1908,7 @@ export default function Home() {
                         {commCmp && <div className="ld-verdict" style={{ color: commColor }}>{rl(commSt)}</div>}
                         <div className="ld-gauge-rows">
                           <div className="row"><span>متوسط الحي التجاري ({commLabel(l.commercialType)})</span><b>{commAvg!.toLocaleString('ar-SA')} ريال/م²</b></div>
+                          {commSample != null && commSample > 0 && <div className="row"><span>عدد الصفقات</span><b>{commSample.toLocaleString('ar-SA')}</b></div>}
                           {listPerM2 != null && <div className="row"><span>سعر متر هذا الإعلان</span><b>{listPerM2.toLocaleString('ar-SA')} ريال/م²</b></div>}
                           {commCmp && (
                             <div className="row cmp" style={{ color: commColor }}>
@@ -3080,6 +3227,11 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                   {fSector === 'commercial'
                     ? ' أضف لقطات داخلية للعقار والمرافق.'
                     : ` خانات غرف النوم والحمامات تتبع ما اخترته في «بيانات العقار» (${fRooms} غرف · ${fBaths} دورات مياه).`}
+                </div>
+                {/* تنبيه إرشادي ودّي بجودة الصور (إعلامي فقط — بلا تحقّق أو تغيير على الصور) */}
+                <div className="flex items-start gap-2 bg-blue-50/70 border border-blue-200 rounded-xl p-3 mb-4 text-[13px] text-[#0A3D62] leading-relaxed">
+                  <span className="material-symbols-outlined flex-shrink-0" style={{ fontSize: 20 }}>photo_camera</span>
+                  <span>يُفضّل رفع صور واضحة وعالية الجودة للعقار لإبراز إعلانك بشكل أفضل وزيادة فرص تواصل الباحثين.</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
                   {(fSector === 'commercial' ? commercialPhotoSlots() : photoSlots(parseInt(fRooms) || 1, parseInt(fBaths) || 1)).map((s) => {
