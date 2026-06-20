@@ -76,12 +76,39 @@ function fairForType(
   return m.avg; // شقة
 }
 
+// ترتيب أنواع الوحدات السكنية في إجابة «المتوسطات» (الشقة أولاً) والحقل المقابل في
+// جدول الأحياء. لا اشتقاق هنا: نعرض المحفوظ فعلاً فقط (صدق — لا رقم مُفبرك).
+const RESIDENTIAL_AVG_TYPES: { type: string; field: 'avg' | 'villa' | 'floor' | 'studio' | 'duplex' }[] = [
+  { type: 'شقة', field: 'avg' },
+  { type: 'فيلا', field: 'villa' },
+  { type: 'دور', field: 'floor' },
+  { type: 'استوديو', field: 'studio' },
+  { type: 'دوبلكس', field: 'duplex' },
+];
+
+// المتوسطات السكنية المحفوظة فعلاً لحيٍّ معيّن — تُحذف الأنواع التي لا قيمة محفوظة لها
+// (لا صفر ولا تقدير مُشتقّ). «شقة» = avg الأساس؛ والبقية من أعمدتها الاختيارية إن وُجدت.
+function savedHoodAverages(
+  m: { avg: number; villa?: number; studio?: number; floor?: number; duplex?: number } | undefined,
+): { type: string; value: number }[] {
+  if (!m) return [];
+  const rec = m as unknown as Record<string, number | undefined>;
+  return RESIDENTIAL_AVG_TYPES
+    .map(({ type, field }) => ({ type, value: rec[field] ?? 0 }))
+    .filter((r) => typeof r.value === 'number' && r.value > 0);
+}
+
+// تسميات الأنواع بالإنجليزية (لإجابة المتوسطات حين تكون الواجهة EN)
+const AR_TYPE_EN: Record<string, string> = {
+  'شقة': 'Apartment', 'فيلا': 'Villa', 'دور': 'Floor', 'استوديو': 'Studio', 'دوبلكس': 'Duplex',
+};
+
 // أحياء مركزية قريبة من الخدمات — تُستخدم في منطق المساعد الذكي المحلّي (heuristic).
 const NEAR_HOODS = new Set(['العليا', 'الملقا', 'حطين', 'الياسمين']);
 
 // ── تحليل معايير المساعد الذكي من نص الطلب (محلّي بالكامل، بلا أي API) ──
-// أنواع الوحدات المعروفة. «بيت/منزل/سكن» كلمات عامة وليست نوعاً محدّداً ⇒ لا تُعدّ فلتراً.
-const AI_TYPES = ['شقة', 'فيلا', 'دوبلكس', 'استوديو', 'دور'];
+// «بيت/منزل/سكن» كلمات عامة وليست نوعاً محدّداً ⇒ لا تُعدّ فلتراً. الأنواع تُكتشف
+// في parseAiType أدناه (مع تساهل في الصياغة: مفرد/جمع/تهجئة).
 
 // تحويل الأرقام العربية/الفارسية إلى لاتينية حتى نتعرّف على الميزانية المكتوبة عربياً.
 function toAsciiDigits(s: string): string {
@@ -90,9 +117,30 @@ function toAsciiDigits(s: string): string {
     .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
 }
 
-// النوع: أول نوع معروف يُذكر صراحةً (فلتر صارم).
+// تطبيع النص العربي لمطابقة مرنة (أسماء الأحياء والأنواع): إزالة التشكيل والتطويل،
+// توحيد الألف (أ/إ/آ/ٱ→ا) والياء (ى→ي) والتاء المربوطة (ة→ه)، وتنظيف المسافات.
+// لا يغيّر القيم المخزّنة — يُستخدم للمطابقة فقط، والدوال تُرجع الاسم الأصلي.
+function normalizeArabic(s: string): string {
+  return s
+    .replace(/[ً-ْٰ]/g, '')
+    .replace(/ـ/g, '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// النوع: يتعرّف على النوع المذكور صراحةً مع تساهل في الصياغة (مفرد/جمع/تهجئة)،
+// ويُرجع التسمية المعتمدة (المطابِقة لقيمة l.type في القاعدة). فلتر صارم.
 function parseAiType(q: string): string | null {
-  return AI_TYPES.find((t) => q.includes(t)) ?? null;
+  const nq = normalizeArabic(q); // ملاحظة: ة→ه فتصبح «شقة»→«شقه»
+  if (/شقق|شقه/.test(nq)) return 'شقة';
+  if (/فلل|فيلا|فيله/.test(nq)) return 'فيلا';
+  if (/دوبلكس|دبلكس/.test(nq)) return 'دوبلكس';
+  if (/استوديو|ستوديو|استديو/.test(nq)) return 'استوديو';
+  if (/ادوار|دور/.test(nq)) return 'دور';
+  return null;
 }
 
 // ── القطاع التجاري: الأنواع + المساعدات (إضافة بنيوية بجانب السكني) ──
@@ -118,18 +166,20 @@ function parseAiCommercial(q: string): string | null {
 
 // الحي: أطول اسم حي مطابق أولاً (حتى يفوز «الملك عبدالله» على أي جزء أقصر) — فلتر صارم.
 function parseAiHood(q: string, hoods: string[]): string | null {
+  const nq = normalizeArabic(q);
   const sorted = [...hoods].sort((a, b) => b.length - a.length);
-  return sorted.find((h) => h && q.includes(h)) ?? null;
+  return sorted.find((h) => h && nq.includes(normalizeArabic(h))) ?? null;
 }
 
 // كل الأحياء المذكورة في الطلب (للمقارنة «قارن X وY») — الأطول أولاً، ونمسح المطابَق من
 // نسخة العمل حتى لا يتكرّر اسم قصير كجزء من اسم أطول.
 function parseAiHoodsAll(q: string, hoods: string[]): string[] {
   const sorted = [...hoods].sort((a, b) => b.length - a.length);
-  let work = q;
+  let work = normalizeArabic(q);
   const found: string[] = [];
   for (const h of sorted) {
-    if (h && work.includes(h)) { found.push(h); work = work.split(h).join(' '); }
+    const nh = normalizeArabic(h);
+    if (nh && work.includes(nh)) { found.push(h); work = work.split(nh).join(' '); }
   }
   return found;
 }
@@ -666,24 +716,58 @@ export default function Home() {
     //   لا بحث إعلانات هنا — إجابة معرفية صادقة؛ وإن غاب حي بيانياً نقولها بصراحة (لا فبركة).
     {
       const hoodsAll = parseAiHoodsAll(q, Object.keys(mktAvg));
-      const avgIntent = /متوسط|المعدل|(كم|بكم)\s*[^؟?]{0,14}(إيجار|ايجار|سعر|يكلف|تكلف|تكلفة)|كم سعر|كم يكلف|كم الإيجار|كم الايجار/.test(q);
-      const compareIntent = /(قارن|قارني|قارنّ|مقارنة|الفرق بين|مقابل|أيهما|ايهما|\bvs\b)/.test(q);
+      const nq = normalizeArabic(q);
+      // تسمية النوع السكني حسب اللغة (إنجليزي حين تكون الواجهة EN)
+      const tLabel = (ar: string) => (lang === 'en' ? (AR_TYPE_EN[ar] ?? ar) : ar);
+      // إشارات بحث الإعلانات (تمنع تفسير الطلب كسؤال متوسط)
+      const hasBudget = reqMaxPrice != null;
+      const searchVerb = /(ابحث|ابغى|ابغا|ابي|اريد|عايز|عاوز|دور لي|دورلي|لاقي|وفر|وريني|اعرض)/.test(nq);
+      // نيّة المتوسط/السعر — مرنة (تفهم الصياغة لا الحرفية): متوسط/معدل/أسعار/كم… أقوى،
+      // و«سعر/إيجار» إشارة أضعف تُعتمد فقط حين لا ميزانية ولا فعل بحث، و«مجرّد اسم الحي».
+      const strongAvg = /(متوسط|المتوسط|معدل|المعدل|كم|بكم|كام|بكام|اسعار)/.test(nq);
+      const softPrice = /(سعر|الايجار|ايجار|تكلفه|يكلف|تكلف)/.test(nq);
+      const bareHood = hoodsAll.length >= 1 && !reqType && !hasBudget && !searchVerb && !reqComm;
+      const compareIntent = /(قارن|قارني|قارنّ|مقارنه|الفرق بين|مقابل|ايهما|\bvs\b)/.test(nq);
+      const avgIntent =
+        hoodsAll.length >= 1 &&
+        (strongAvg || (softPrice && !hasBudget && !searchVerb) || bareHood);
       const wantsMarket = hoodsAll.length >= 1 && (compareIntent || avgIntent);
       if (wantsMarket) {
         const mktSector: 'residential' | 'commercial' = reqComm ? 'commercial' : 'residential';
         const ct = reqComm && reqComm !== 'any' ? reqComm : 'shop';
-        const rows: MarketRow[] = hoodsAll.map((h) => {
-          if (mktSector === 'commercial') {
+        const isCompare = compareIntent || hoodsAll.length >= 2;
+        let rows: MarketRow[];
+        if (mktSector === 'commercial') {
+          // تجاري: سعر المتر² المحفوظ للحي + النوع التجاري (أو «محل» افتراضاً) — حقيقي أو فارغ.
+          rows = hoodsAll.map((h) => {
             const c = commIndex[`${h}|${ct}`];
             return { hood: h, typeLabel: commT(ct), value: c?.pricePerM2 ?? null, sampleSize: c?.sampleSize ?? null, unit: 'perM2' as const };
-          }
+          });
+        } else if (isCompare) {
+          // مقارنة أحياء: قيمة واحدة لكل حي (النوع المطلوب أو الشقة) للمقارنة جنباً إلى جنب.
+          rows = hoodsAll.map((h) => {
+            const m = mktAvg[h];
+            const v = m ? fairForType(m, reqType ?? 'شقة') : 0;
+            return { hood: h, typeLabel: tLabel(reqType ?? 'شقة'), value: v > 0 ? v : null, sampleSize: null, unit: 'perYear' as const };
+          });
+        } else {
+          // حيٌّ واحد: نوع محدّد ⇒ صفّه فقط؛ وإلا كل المتوسطات السكنية المحفوظة فعلاً لهذا الحي
+          // (شقة/فيلا/دور/استوديو/دوبلكس متى وُجدت قيمتها — نحذف ما لا متوسط محفوظ له، لا فبركة).
+          const h = hoodsAll[0];
           const m = mktAvg[h];
-          const v = m ? fairForType(m, reqType ?? 'شقة') : 0;
-          return { hood: h, typeLabel: reqType ?? (lang === 'en' ? t('type.apartment') : 'شقة'), value: v > 0 ? v : null, sampleSize: null, unit: 'perYear' as const };
-        });
+          if (reqType) {
+            const v = m ? fairForType(m, reqType) : 0;
+            rows = [{ hood: h, typeLabel: tLabel(reqType), value: v > 0 ? v : null, sampleSize: null, unit: 'perYear' as const }];
+          } else {
+            const saved = savedHoodAverages(m);
+            rows = saved.length
+              ? saved.map((s) => ({ hood: h, typeLabel: tLabel(s.type), value: s.value, sampleSize: null, unit: 'perYear' as const }))
+              : [{ hood: h, typeLabel: tLabel('شقة'), value: null, sampleSize: null, unit: 'perYear' as const }];
+          }
+        }
         setAiMatchIds([]);
         setAiReply(null);
-        setAiResult({ kind: 'market', mode: hoodsAll.length >= 2 ? 'compare' : 'single', sector: mktSector, rows });
+        setAiResult({ kind: 'market', mode: isCompare ? 'compare' : 'single', sector: mktSector, rows });
         track('search', null, { source: 'ai', q: q.slice(0, 200), kind: 'market', sector: mktSector, hoods: hoodsAll.join('،'), matches: rows.filter((r) => r.value != null).length });
         setSearched(true);
         scrollToListings();
@@ -1034,6 +1118,7 @@ export default function Home() {
                 <div className="ai-strip">
                   <span className="lbl">{msi('auto_awesome')} {t('hero.aiLabel')}</span>
                   {[
+                    { q: 'متوسط العليا', k: 'ai.avgExample' },
                     { q: 'أرخص شقة متاحة', k: 'ai.cheapest' },
                     { q: 'فيلا في حطين', k: 'ai.villaHittin' },
                     { q: 'فرص بأقل من السوق', k: 'ai.belowMarket' },
@@ -1072,16 +1157,18 @@ export default function Home() {
                     const sorted = [...withData].sort((a, b) => (a.value as number) - (b.value as number));
                     cmp = { cheaper: sorted[0].hood, diff: (sorted[sorted.length - 1].value as number) - (sorted[0].value as number), unit: sorted[0].unit };
                   }
+                  // حيٌّ واحد (كل الأنواع): نضع اسم الحي في العنوان ونعرض النوع لكل صف بلا تكرار الحي.
+                  const sameHood = r.rows.length > 0 && r.rows.every((x) => x.hood === r.rows[0].hood);
                   return (
                     <div className="reveal in">
                       <div className="bg-white border border-[#cfd9e4] rounded-2xl p-5 shadow-sm">
                         <div className="flex items-center gap-2 font-bold text-[#0A3D62] mb-3">
-                          {msi('insights')}<span>{r.mode === 'compare' ? t('mkt.compareTitle') : t('mkt.title')}</span>
+                          {msi('insights')}<span>{r.mode === 'compare' ? t('mkt.compareTitle') : sameHood ? `${t('mkt.title')} — ${r.rows[0].hood}` : t('mkt.title')}</span>
                         </div>
                         <div className="space-y-2.5">
                           {r.rows.map((x) => (
                             <div key={x.hood + x.typeLabel} className="flex items-center justify-between gap-3 border-b border-[#f0f4f8] pb-2.5 last:border-0 last:pb-0">
-                              <div className="text-sm font-bold text-[#0f1a28]">{x.hood} <span className="text-xs font-medium text-[#5b6b7a]">· {x.typeLabel}</span></div>
+                              <div className="text-sm font-bold text-[#0f1a28]">{sameHood ? x.typeLabel : <>{x.hood} <span className="text-xs font-medium text-[#5b6b7a]">· {x.typeLabel}</span></>}</div>
                               {x.value != null ? (
                                 <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
                                   <div className="text-[15px] font-extrabold text-[#0A3D62]">{nf(x.value)} <span className="text-[11px] font-medium text-[#5b6b7a]">{unitLabel(x.unit)}</span></div>

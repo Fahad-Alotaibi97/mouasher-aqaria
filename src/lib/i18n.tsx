@@ -59,6 +59,7 @@ export const STRINGS: Record<string, Entry> = {
   'comm.indexSoon': { ar: 'المؤشر التجاري قيد الإعداد — لا توجد بيانات كافية بعد لعرض متوسط تجاري لهذا الحي.', en: 'The commercial index is still being built — not enough data yet to show a commercial average for this neighborhood.' },
 
   // عبارات المساعد الذكي (التسمية فقط؛ الاستعلام يبقى عربياً للمطابقة المحلّية)
+  'ai.avgExample': { ar: 'متوسط أسعار العليا', en: 'Average prices in Al-Olaya' },
   'ai.cheapest': { ar: 'أرخص شقة متاحة الآن', en: 'Cheapest apartment available' },
   'ai.villaHittin': { ar: 'فيلا في حطين', en: 'Villa in Hittin' },
   'ai.belowMarket': { ar: 'فرص بأقل من السوق', en: 'Below-market deals' },
@@ -120,7 +121,7 @@ export const STRINGS: Record<string, Entry> = {
   'why.c1d': { ar: 'مؤشر أسعار الحي يقارن أي إيجار بمتوسط صفقات حيّه، فتفاوض وتوقّع وأنت على بيّنة.', en: 'The neighborhood index compares any rent to its area’s average, so you negotiate and sign informed.' },
   'why.c2t': { ar: 'مكاتب موثّقة', en: 'Verified offices' },
   'why.c2d': { ar: 'نوثّق المكاتب عبر رخصة فال، ونحمي بياناتك وفق سياسة خصوصية واضحة.', en: 'We verify offices through their FAL license and protect your data under a clear privacy policy.' },
-  'why.c3t': { ar: 'وصول أسرع للمناسب', en: 'Reach the right place faster' },
+  'why.c3t': { ar: 'وصول أسرع للعقار المناسب', en: 'Find the right place, faster' },
   'why.c3d': { ar: 'بحث وخريطة تفاعلية ومساعد يفهم طلبك بكلامك — يوصلك للعقار المناسب بخطوات أقل.', en: 'Search, an interactive map, and an assistant that understands plain language get you there in fewer steps.' },
   'why.c4t': { ar: 'نتابع طلبك', en: 'We follow up on your request' },
   'why.c4d': { ar: 'أرسل استفسارك ويصل للمكاتب وفريق المنصة، فيتواصلون معك بخصوص طلبك دون رسوم.', en: 'Send your inquiry — it reaches offices and our team, who follow up with you, free.' },
