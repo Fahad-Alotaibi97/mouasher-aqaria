@@ -60,6 +60,8 @@ export const STRINGS: Record<string, Entry> = {
 
   // عبارات المساعد الذكي (التسمية فقط؛ الاستعلام يبقى عربياً للمطابقة المحلّية)
   'ai.avgExample': { ar: 'متوسط أسعار العليا', en: 'Average prices in Al-Olaya' },
+  'ai.compareExample': { ar: 'قارن العليا والنرجس', en: 'Compare Al-Olaya & Al-Narjis' },
+  'ai.cheapestOlaya': { ar: 'أرخص شقة في العليا', en: 'Cheapest apartment in Al-Olaya' },
   'ai.cheapest': { ar: 'أرخص شقة متاحة الآن', en: 'Cheapest apartment available' },
   'ai.villaHittin': { ar: 'فيلا في حطين', en: 'Villa in Hittin' },
   'ai.belowMarket': { ar: 'فرص بأقل من السوق', en: 'Below-market deals' },
@@ -112,7 +114,8 @@ export const STRINGS: Record<string, Entry> = {
   'mkt.deals': { ar: 'عدد الصفقات', en: 'deals' },
   'mkt.noData': { ar: 'لا تتوفّر بيانات كافية لهذا الحي بعد', en: 'Not enough data for this neighborhood yet' },
   'mkt.lowerBy': { ar: 'أقل بـ', en: 'lower by' },
-  'mkt.cheaperHood': { ar: 'الأرخص', en: 'cheaper' },
+  'mkt.cheaperHood': { ar: 'الأرخص', en: 'cheapest' },
+  'mkt.cheaperBy': { ar: 'أرخص بـ', en: 'cheaper by' },
 
   // قسم «لماذا تختار» — عناوين تقود بالمنفعة، ونصوص محدّدة وصادقة
   'why.title': { ar: 'لماذا تختار مؤشر العقارية؟', en: 'Why choose Mouasher?' },

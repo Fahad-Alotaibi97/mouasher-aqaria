@@ -285,10 +285,12 @@ export default function Home() {
   // الصريحة (حي/نوع/سقف) — تُغذّي العرض الصادق وزر تسجيل الطلب وتسجيل الرغبة.
   // صف إجابة سوق: حي + تسمية النوع + القيمة (متوسط) + عدد الصفقات + وحدة القياس
   type MarketRow = { hood: string; typeLabel: string; value: number | null; sampleSize: number | null; unit: 'perYear' | 'perM2' };
+  // صف مقارنة بحسب النوع: قيمة كل حي + الوحدة (لمقارنة الأحياء جنباً إلى جنب لكل نوع)
+  type CompareRow = { typeLabel: string; unit: 'perYear' | 'perM2'; cells: { hood: string; value: number | null }[] };
   type AiResult =
     | { kind: 'matches'; ids: (string | number)[] }
     | { kind: 'none'; hood: string | null; type: string | null; maxPrice: number | null; raw: string }
-    | { kind: 'market'; mode: 'single' | 'compare'; sector: 'residential' | 'commercial'; rows: MarketRow[] }
+    | { kind: 'market'; mode: 'single' | 'compare'; sector: 'residential' | 'commercial'; rows: MarketRow[]; compareRows?: CompareRow[]; note?: string }
     | null;
   const [aiResult, setAiResult] = useState<AiResult>(null);
   const [aiShowAlts, setAiShowAlts] = useState(false); // كشف «الخيارات الأخرى المتاحة» في حال لا تطابق
@@ -709,7 +711,7 @@ export default function Home() {
       ? (reqComm === 'any' ? 'عقار تجاري' : commLabel(reqComm))
       : reqType;
     // نيّة «الأرخص»: ترتيب تصاعدي صريح بالسعر (لا سقف). يُعرَض الأرخص فعلاً أولاً ويُسمّى صراحةً.
-    const cheapestIntent = /(رخيص|أرخص|ارخص|أقل سعر|اقل سعر|رخيصة|الأرخص|بسيط|ميزانية)/.test(q);
+    const cheapestIntent = /(ارخص|رخيص|رخيصه|اقل سعر|اقل الاسعار|الارخص|بسيط|ميزانيه|اوفر)/.test(normalizeArabic(q));
 
     // ── مسار بيانات السوق: أسئلة المتوسطات/المقارنات تُجاب من بيانات المؤشر الحقيقية ──
     //   السكني من mktAvg (متوسط الحي للنوع)، التجاري من commIndex (ريال/م² + عدد الصفقات).
@@ -736,38 +738,78 @@ export default function Home() {
         const mktSector: 'residential' | 'commercial' = reqComm ? 'commercial' : 'residential';
         const ct = reqComm && reqComm !== 'any' ? reqComm : 'shop';
         const isCompare = compareIntent || hoodsAll.length >= 2;
+        // القيمة المحفوظة فعلاً لنوع سكني في حي (لا اشتقاق) — null إن لم تُحفظ.
+        const savedResVal = (h: string, ty: string): number | null => {
+          const rec = mktAvg[h] as unknown as Record<string, number | undefined> | undefined;
+          if (!rec) return null;
+          const field = RESIDENTIAL_AVG_TYPES.find((t) => t.type === ty)?.field ?? 'avg';
+          const v = rec[field] ?? 0;
+          return v > 0 ? v : null;
+        };
+
+        if (isCompare) {
+          // ── مقارنة الأحياء بحسب كل نوع ── (سكني: كل الأنواع المحفوظة؛ تجاري: كل الأنواع التجارية)
+          // نُدرج النوع فقط إن وُجدت قيمة محفوظة في أحد الأحياء على الأقل (لا صفر/فبركة).
+          let compareRows: CompareRow[];
+          if (mktSector === 'commercial') {
+            const ctypes = reqComm && reqComm !== 'any' ? [reqComm] : COMMERCIAL_TYPES.map((c) => c.key as string);
+            compareRows = ctypes
+              .map((ck) => ({
+                typeLabel: commT(ck),
+                unit: 'perM2' as const,
+                cells: hoodsAll.map((h) => ({ hood: h, value: commIndex[`${h}|${ck}`]?.pricePerM2 ?? null })),
+              }))
+              .filter((cr) => cr.cells.some((c) => c.value != null && c.value > 0));
+          } else {
+            const rtypes = reqType ? [reqType] : RESIDENTIAL_AVG_TYPES.map((t) => t.type);
+            compareRows = rtypes
+              .map((ty) => ({
+                typeLabel: tLabel(ty),
+                unit: 'perYear' as const,
+                cells: hoodsAll.map((h) => ({ hood: h, value: savedResVal(h, ty) })),
+              }))
+              .filter((cr) => cr.cells.some((c) => c.value != null));
+          }
+          setAiMatchIds([]);
+          setAiReply(null);
+          setAiResult({ kind: 'market', mode: 'compare', sector: mktSector, rows: [], compareRows });
+          track('search', null, { source: 'ai', q: q.slice(0, 200), kind: 'market', sector: mktSector, hoods: hoodsAll.join('،'), matches: compareRows.reduce((n, cr) => n + cr.cells.filter((c) => c.value != null).length, 0) });
+          setSearched(true);
+          scrollToListings();
+          return;
+        }
+
+        // ── حيٌّ واحد: متوسط ──
+        const h = hoodsAll[0];
         let rows: MarketRow[];
         if (mktSector === 'commercial') {
-          // تجاري: سعر المتر² المحفوظ للحي + النوع التجاري (أو «محل» افتراضاً) — حقيقي أو فارغ.
-          rows = hoodsAll.map((h) => {
-            const c = commIndex[`${h}|${ct}`];
-            return { hood: h, typeLabel: commT(ct), value: c?.pricePerM2 ?? null, sampleSize: c?.sampleSize ?? null, unit: 'perM2' as const };
-          });
-        } else if (isCompare) {
-          // مقارنة أحياء: قيمة واحدة لكل حي (النوع المطلوب أو الشقة) للمقارنة جنباً إلى جنب.
-          rows = hoodsAll.map((h) => {
-            const m = mktAvg[h];
-            const v = m ? fairForType(m, reqType ?? 'شقة') : 0;
-            return { hood: h, typeLabel: tLabel(reqType ?? 'شقة'), value: v > 0 ? v : null, sampleSize: null, unit: 'perYear' as const };
-          });
-        } else {
-          // حيٌّ واحد: نوع محدّد ⇒ صفّه فقط؛ وإلا كل المتوسطات السكنية المحفوظة فعلاً لهذا الحي
-          // (شقة/فيلا/دور/استوديو/دوبلكس متى وُجدت قيمتها — نحذف ما لا متوسط محفوظ له، لا فبركة).
-          const h = hoodsAll[0];
-          const m = mktAvg[h];
-          if (reqType) {
-            const v = m ? fairForType(m, reqType) : 0;
-            rows = [{ hood: h, typeLabel: tLabel(reqType), value: v > 0 ? v : null, sampleSize: null, unit: 'perYear' as const }];
+          // تجاري: نوع محدّد ⇒ صفّه؛ وإلا كل الأنواع التجارية المحفوظة لهذا الحي (محل/مكتب/معرض) — لا فارغ.
+          if (reqComm && reqComm !== 'any') {
+            const c = commIndex[`${h}|${reqComm}`];
+            rows = [{ hood: h, typeLabel: commT(reqComm), value: c?.pricePerM2 ?? null, sampleSize: c?.sampleSize ?? null, unit: 'perM2' as const }];
           } else {
-            const saved = savedHoodAverages(m);
-            rows = saved.length
-              ? saved.map((s) => ({ hood: h, typeLabel: tLabel(s.type), value: s.value, sampleSize: null, unit: 'perYear' as const }))
-              : [{ hood: h, typeLabel: tLabel('شقة'), value: null, sampleSize: null, unit: 'perYear' as const }];
+            const savedC = COMMERCIAL_TYPES
+              .map((c) => ({ key: c.key as string, ci: commIndex[`${h}|${c.key}`] }))
+              .filter((x) => x.ci?.pricePerM2 != null && (x.ci.pricePerM2 as number) > 0);
+            rows = savedC.length
+              ? savedC.map((x) => ({ hood: h, typeLabel: commT(x.key), value: x.ci!.pricePerM2 ?? null, sampleSize: x.ci!.sampleSize ?? null, unit: 'perM2' as const }))
+              : [{ hood: h, typeLabel: commT(ct), value: null, sampleSize: null, unit: 'perM2' as const }];
           }
+        } else if (reqType) {
+          // نوع سكني محدّد ⇒ صفّه فقط (قيمة مؤشر الحي لهذا النوع)
+          const m = mktAvg[h];
+          const v = m ? fairForType(m, reqType) : 0;
+          rows = [{ hood: h, typeLabel: tLabel(reqType), value: v > 0 ? v : null, sampleSize: null, unit: 'perYear' as const }];
+        } else {
+          // كل المتوسطات السكنية المحفوظة فعلاً لهذا الحي (نحذف ما لا متوسط محفوظ له — لا فبركة)
+          const saved = savedHoodAverages(mktAvg[h]);
+          rows = saved.length
+            ? saved.map((s) => ({ hood: h, typeLabel: tLabel(s.type), value: s.value, sampleSize: null, unit: 'perYear' as const }))
+            : [{ hood: h, typeLabel: tLabel('شقة'), value: null, sampleSize: null, unit: 'perYear' as const }];
         }
         setAiMatchIds([]);
         setAiReply(null);
-        setAiResult({ kind: 'market', mode: isCompare ? 'compare' : 'single', sector: mktSector, rows });
+        setAiResult({ kind: 'market', mode: 'single', sector: mktSector, rows });
         track('search', null, { source: 'ai', q: q.slice(0, 200), kind: 'market', sector: mktSector, hoods: hoodsAll.join('،'), matches: rows.filter((r) => r.value != null).length });
         setSearched(true);
         scrollToListings();
@@ -801,6 +843,28 @@ export default function Home() {
     // ── لا تطابق ──────────────────────────────────────────────
     if (pool.length === 0) {
       setAiMatchIds([]);
+      // نيّة «الأرخص» بحيٍّ + نوع سكني ولا إعلانات مطابقة ⇒ رجوع صادق لمتوسط الحي المحفوظ
+      // لذلك النوع (إن وُجد) مع ملاحظة صريحة؛ وإن لم يوجد متوسط محفوظ نُكمل للوحة «لا تطابق».
+      if (cheapestIntent && reqSector === 'residential' && reqHood && reqType) {
+        const rec = mktAvg[reqHood] as unknown as Record<string, number | undefined> | undefined;
+        const field = RESIDENTIAL_AVG_TYPES.find((t) => t.type === reqType)?.field ?? 'avg';
+        const avgVal = rec ? (rec[field] ?? 0) : 0;
+        if (avgVal > 0) {
+          const tl = lang === 'en' ? (AR_TYPE_EN[reqType] ?? reqType) : reqType;
+          setAiResult({
+            kind: 'market', mode: 'single', sector: 'residential',
+            rows: [{ hood: reqHood, typeLabel: tl, value: avgVal, sampleSize: null, unit: 'perYear' }],
+            note: lang === 'en'
+              ? `No matching listings right now — here’s the saved average for ${tl} in ${reqHood}.`
+              : `لا توجد إعلانات مطابقة حالياً — هذا متوسط ${reqType} المحفوظ في ${reqHood}.`,
+          });
+          setAiReply(null);
+          trackSearchWish({ neighborhood: reqHood, type: reqTypeLabel, maxPrice: reqMaxPrice, rawQuery: q });
+          setSearched(true);
+          scrollToListings();
+          return;
+        }
+      }
       const hasCriteria = !!(reqHood || reqType || reqMaxPrice || reqComm);
       if (hasCriteria) {
         // صدق: لا نستبدل الحي ولا ندّعي تطابقاً — نعرض رسالة صريحة + تسجيل الطلب،
@@ -1119,6 +1183,8 @@ export default function Home() {
                   <span className="lbl">{msi('auto_awesome')} {t('hero.aiLabel')}</span>
                   {[
                     { q: 'متوسط العليا', k: 'ai.avgExample' },
+                    { q: 'قارن العليا والنرجس', k: 'ai.compareExample' },
+                    { q: 'أرخص شقة في العليا', k: 'ai.cheapestOlaya' },
                     { q: 'أرخص شقة متاحة', k: 'ai.cheapest' },
                     { q: 'فيلا في حطين', k: 'ai.villaHittin' },
                     { q: 'فرص بأقل من السوق', k: 'ai.belowMarket' },
@@ -1151,20 +1217,68 @@ export default function Home() {
                 (() => {
                   const r = aiResult;
                   const unitLabel = (u: 'perYear' | 'perM2') => (u === 'perM2' ? t('mkt.perM2') : t('mkt.perYear'));
-                  const withData = r.rows.filter((x) => x.value != null);
-                  let cmp: { cheaper: string; diff: number; unit: 'perYear' | 'perM2' } | null = null;
-                  if (r.mode === 'compare' && withData.length >= 2) {
-                    const sorted = [...withData].sort((a, b) => (a.value as number) - (b.value as number));
-                    cmp = { cheaper: sorted[0].hood, diff: (sorted[sorted.length - 1].value as number) - (sorted[0].value as number), unit: sorted[0].unit };
+
+                  // ── مقارنة الأحياء بحسب كل نوع (سكني/تجاري) ──
+                  if (r.mode === 'compare' && r.compareRows) {
+                    const hoodsLabel = r.compareRows[0]?.cells.map((c) => c.hood).join(' · ') ?? '';
+                    return (
+                      <div className="reveal in">
+                        <div className="bg-white border border-[#cfd9e4] rounded-2xl p-5 shadow-sm">
+                          <div className="flex items-center gap-2 font-bold text-[#0A3D62] mb-3">
+                            {msi('insights')}<span>{t('mkt.compareTitle')}{hoodsLabel ? ` — ${hoodsLabel}` : ''}</span>
+                          </div>
+                          {r.compareRows.length === 0 ? (
+                            <div className="text-sm text-[#9aa6b2]">{t('mkt.noData')}</div>
+                          ) : (
+                            <div className="space-y-3">
+                              {r.compareRows.map((cr) => {
+                                const present = cr.cells.filter((c) => c.value != null) as { hood: string; value: number }[];
+                                const sorted = [...present].sort((a, b) => a.value - b.value);
+                                const cheaper = sorted[0]?.hood ?? null;
+                                const diff = sorted.length >= 2 ? sorted[sorted.length - 1].value - sorted[0].value : null;
+                                return (
+                                  <div key={cr.typeLabel} className="border-b border-[#f0f4f8] pb-3 last:border-0 last:pb-0">
+                                    <div className="text-sm font-bold text-[#0f1a28] mb-1.5">{cr.typeLabel}</div>
+                                    <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+                                      {cr.cells.map((c) => (
+                                        <div key={c.hood} className="text-xs">
+                                          <span className="text-[#5b6b7a]">{c.hood}: </span>
+                                          {c.value != null ? (
+                                            <span className="font-extrabold text-[#0A3D62]">{nf(c.value)} <span className="text-[10px] font-medium text-[#5b6b7a]">{unitLabel(cr.unit)}</span></span>
+                                          ) : (
+                                            <span className="text-[#9aa6b2]">{t('mkt.noData')}</span>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                    {cheaper && diff != null && diff > 0 && (
+                                      <div className="text-xs font-semibold text-[#1f7a44] mt-1.5 flex items-center gap-1">
+                                        {msi('trending_down')}
+                                        <span>{sorted.length > 2 ? `${cheaper} ${t('mkt.cheaperHood')}` : `${cheaper} ${t('mkt.cheaperBy')} ${nf(diff)} ${unitLabel(cr.unit)}`}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
                   }
-                  // حيٌّ واحد (كل الأنواع): نضع اسم الحي في العنوان ونعرض النوع لكل صف بلا تكرار الحي.
+
+                  // ── حيٌّ واحد: متوسط (كل الأنواع أو نوع محدّد) ──
+                  // نضع اسم الحي في العنوان ونعرض النوع لكل صف بلا تكرار الحي.
                   const sameHood = r.rows.length > 0 && r.rows.every((x) => x.hood === r.rows[0].hood);
                   return (
                     <div className="reveal in">
                       <div className="bg-white border border-[#cfd9e4] rounded-2xl p-5 shadow-sm">
-                        <div className="flex items-center gap-2 font-bold text-[#0A3D62] mb-3">
-                          {msi('insights')}<span>{r.mode === 'compare' ? t('mkt.compareTitle') : sameHood ? `${t('mkt.title')} — ${r.rows[0].hood}` : t('mkt.title')}</span>
+                        <div className="flex items-center gap-2 font-bold text-[#0A3D62] mb-2">
+                          {msi('insights')}<span>{sameHood ? `${t('mkt.title')} — ${r.rows[0].hood}` : t('mkt.title')}</span>
                         </div>
+                        {r.note && (
+                          <div className="mb-3 text-xs text-[#8a6d18] bg-[#f7f1df] border border-[#e6d9ad] rounded-lg px-3 py-2">{r.note}</div>
+                        )}
                         <div className="space-y-2.5">
                           {r.rows.map((x) => (
                             <div key={x.hood + x.typeLabel} className="flex items-center justify-between gap-3 border-b border-[#f0f4f8] pb-2.5 last:border-0 last:pb-0">
@@ -1182,12 +1296,6 @@ export default function Home() {
                             </div>
                           ))}
                         </div>
-                        {cmp && (
-                          <div className="mt-3 pt-3 border-t border-[#f0f4f8] text-sm font-semibold text-[#1f7a44] flex items-center gap-1.5">
-                            {msi('trending_down')}
-                            <span>{cmp.cheaper} {t('mkt.cheaperHood')} — {t('mkt.lowerBy')} {nf(cmp.diff)} {unitLabel(cmp.unit)}</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
