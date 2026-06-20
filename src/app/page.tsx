@@ -517,11 +517,11 @@ export default function Home() {
     const avg = m ? fairForType(m, siType) : 0;
     const price = parseInt(siPrice) || 0;
     const ref = `متوسط ${siType} في ${zoneName}`;
-    if (!avg) return { type: 'none', icon: Icons.chart, title: 'لا يوجد متوسط لهذا النوع في هذا الحي بعد', detail: '', color: 'bg-gray-50 border-gray-200' };
-    if (!price) return { type: 'none', icon: Icons.chart, title: 'أدخل قيمة الإيجار للمقارنة', detail: '', color: 'bg-gray-50 border-gray-200' };
-    if (price > avg * 1.12) return { type: 'hi', icon: Icons.warning, title: 'السعر مرتفع', detail: `أعلى بـ ${(price - avg).toLocaleString('ar-SA')} ريال من ${ref}`, color: 'bg-orange-50 border-orange-300' };
-    if (price < avg * 0.85) return { type: 'lo', icon: Icons.target, title: 'فرصة ممتازة', detail: `أقل بـ ${(avg - price).toLocaleString('ar-SA')} ريال من ${ref}`, color: 'bg-green-50 border-green-300' };
-    return { type: 'ok', icon: Icons.okCircle, title: 'السعر مناسب للسوق', detail: `${ref} حوالي ${avg.toLocaleString('ar-SA')} ريال سنوياً`, color: 'bg-blue-50 border-blue-200' };
+    if (!avg) return { type: 'none', icon: Icons.chart, title: t('ind.noAvg'), detail: '', color: 'bg-gray-50 border-gray-200' };
+    if (!price) return { type: 'none', icon: Icons.chart, title: t('ind.prompt'), detail: '', color: 'bg-gray-50 border-gray-200' };
+    if (price > avg * 1.12) return { type: 'hi', icon: Icons.warning, title: t('ind.vHiTitle'), detail: `أعلى بـ ${(price - avg).toLocaleString('ar-SA')} ريال من ${ref}`, color: 'bg-orange-50 border-orange-300' };
+    if (price < avg * 0.85) return { type: 'lo', icon: Icons.target, title: t('ind.vLoTitle'), detail: `أقل بـ ${(avg - price).toLocaleString('ar-SA')} ريال من ${ref}`, color: 'bg-green-50 border-green-300' };
+    return { type: 'ok', icon: Icons.okCircle, title: t('ind.vOkTitle'), detail: `${ref} حوالي ${avg.toLocaleString('ar-SA')} ريال سنوياً`, color: 'bg-blue-50 border-blue-200' };
   };
 
   const indicator = checkPrice();
@@ -1119,17 +1119,17 @@ export default function Home() {
                         <div className="nm-head">
                           {msi('search_off')}
                           <div>
-                            <div className="t">لا توجد حالياً عقارات مطابقة{crit ? ` (${crit})` : ''}.</div>
-                            <div className="d">لا نعرض لك عقارات في أحياء أخرى ونزعم أنها تطابق طلبك — هذي خياراتك:</div>
+                            <div className="t">{t('ai.nmTitle')}{crit ? ` (${crit})` : ''}.</div>
+                            <div className="d">{t('ai.nmBody')}</div>
                           </div>
                         </div>
                         <div className="nm-actions">
                           <button className="login-btn" onClick={registerWish}>
-                            <span>سجّل طلبك — يصل للمكاتب فتتواصل معك عند توفّر ما يناسبك</span>{msi('arrow_back')}
+                            <span>{t('ai.nmRegister')}</span>{msi('arrow_back')}
                           </button>
                           {listings.length > 0 && (
                             <button className="ghost-btn" onClick={() => setAiShowAlts((v) => !v)}>
-                              <span>{aiShowAlts ? 'إخفاء الخيارات الأخرى' : `تصفّح الخيارات الأخرى المتاحة (${listings.length.toLocaleString('ar-SA')})`}</span>
+                              <span>{aiShowAlts ? t('ai.nmShowAlts') : `${t('ai.nmBrowseAlts')} (${nf(listings.length)})`}</span>
                             </button>
                           )}
                         </div>
@@ -1137,7 +1137,7 @@ export default function Home() {
                       {aiShowAlts && (
                         <div style={{ marginTop: 20 }}>
                           <p style={{ fontSize: 13, color: 'var(--on-surface-variant)', marginBottom: 12 }}>
-                            خيارات أخرى متاحة — لا تطابق طلبك تماماً (أحياء/أنواع مختلفة):
+                            {t('ai.nmAltsTitle')}
                           </p>
                           <div className="cards">{listings.map((l) => renderStitchCard(l))}</div>
                         </div>
@@ -1187,8 +1187,8 @@ export default function Home() {
           <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-6 text-center text-white relative">
             <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#F5F8FB] rounded-t-3xl" />
             <div className="relative z-10">
-              <h1 className="text-xl font-bold mb-1">ابحث عن إيجارك</h1>
-              <p className="text-white/85 text-sm">حدّد المعايير وشاهد العقارات على الخريطة مباشرة</p>
+              <h1 className="text-xl font-bold mb-1">{t('search.h1')}</h1>
+              <p className="text-white/85 text-sm">{t('search.sub')}</p>
             </div>
           </div>
           <div className="px-4 pt-3 pb-6 space-y-4">
@@ -1199,8 +1199,8 @@ export default function Home() {
                   {Icons.search}
                 </div>
                 <div>
-                  <div className="font-bold text-sm text-gray-900">صفِّ النتائج</div>
-                  <div className="text-xs text-gray-500">تتحدّث الخريطة والقائمة فور تغيير أي فلتر</div>
+                  <div className="font-bold text-sm text-gray-900">{t('search.filterTitle')}</div>
+                  <div className="text-xs text-gray-500">{t('search.filterSub')}</div>
                 </div>
               </div>
               {/* القطاع — التبديل الأساسي سكني/تجاري (يصفّر النوع عند التبديل) */}
@@ -1209,7 +1209,7 @@ export default function Home() {
                   {([['residential', 'سكني', 'home_work'], ['commercial', 'تجاري', 'storefront']] as const).map(([s, lbl, ic]) => (
                     <button key={s} className={`seg ${filterSector === s ? 'active' : ''}`}
                       onClick={() => { setFilterSector(s); setFilterType(''); }}>
-                      {msi(ic)} {lbl}
+                      {msi(ic)} {lang === 'en' ? t('sector.' + s) : lbl}
                     </button>
                   ))}
                 </div>
@@ -1252,7 +1252,7 @@ export default function Home() {
             <div className="relative z-0 isolate bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
                 <span className="text-[#1B6CA8]">{Icons.map}</span>
-                <span className="font-bold text-sm text-gray-900">الخريطة التفاعلية</span>
+                <span className="font-bold text-sm text-gray-900">{t('search.mapTitle')}</span>
                 <span className="text-xs text-[#33414f] mr-auto">{filteredMapPoints.length} عقار على الخريطة</span>
               </div>
               {/* الخريطة تُعرض دائماً وتفاعلية (تحمّل Leaflet دائماً) — الإعلانات بلا
@@ -1265,8 +1265,8 @@ export default function Home() {
               {filteredMapPoints.length === 0 && (
                 <div className="px-4 py-3 text-center text-[#33414f] text-xs border-t border-gray-100">
                   {listings.length === 0
-                    ? 'لا توجد إعلانات متاحة حالياً — تصفّح الخريطة، وتظهر الدبابيس فور نشر المكاتب لإعلاناتها بمواقعها.'
-                    : 'لا توجد عقارات بإحداثيات ضمن الفلاتر الحالية — تصفّح الخريطة، وتظهر الدبابيس للإعلانات التي حُدّد موقعها على الخريطة.'}
+                    ? t('search.mapEmptyAll')
+                    : t('search.mapEmptyFiltered')}
                 </div>
               )}
             </div>
@@ -1274,16 +1274,16 @@ export default function Home() {
             {/* القائمة المطابقة — نفس مصدر الفلاتر */}
             <div>
               <div className="flex justify-between items-center mb-3 px-1">
-                <h2 className="font-bold text-[#0f1a28] text-lg sec-underline">العقارات المطابقة</h2>
+                <h2 className="font-bold text-[#0f1a28] text-lg sec-underline">{t('search.resultsTitle')}</h2>
                 <div className="text-xs text-[#33414f] flex items-center gap-1">{Icons.chart} {filtered.length} نتيجة</div>
               </div>
               {filtered.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 text-center text-[#33414f] text-sm">
                   {listings.length === 0
-                    ? 'لا توجد إعلانات متاحة حالياً — تُعرض هنا إعلانات المكاتب فور نشرها.'
+                    ? t('search.emptyNoListings')
                     : filterSector === 'commercial'
-                      ? 'لا توجد عقارات تجارية مدرجة حتى الآن.'
-                      : 'لا توجد نتائج — جرّب توسيع المعايير.'}
+                      ? t('search.emptyNoCommercial')
+                      : t('search.emptyNoMatch')}
                 </div>
               ) : (
                 <div className="space-y-3">{filtered.map((l) => renderListing(l))}</div>
@@ -1319,7 +1319,7 @@ export default function Home() {
                 <div className="sector-toggle mb-3">
                   {([['residential', 'سكني', 'home_work'], ['commercial', 'تجاري', 'storefront']] as const).map(([s, lbl, ic]) => (
                     <button key={s} className={`seg ${siSector === s ? 'active' : ''}`} onClick={() => setSiSector(s)}>
-                      {msi(ic)} {lbl}
+                      {msi(ic)} {lang === 'en' ? t('sector.' + s) : lbl}
                     </button>
                   ))}
                 </div>
@@ -1342,9 +1342,9 @@ export default function Home() {
                           </select>
                         </div>
                         <div>
-                          <label className="text-xs text-gray-700 block mb-1 font-semibold">النوع التجاري</label>
+                          <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.commType')}</label>
                           <select value={siCommType} onChange={e => setSiCommType(e.target.value as 'shop' | 'office' | 'showroom')} className={selectCls}>
-                            <option value="shop">محل</option><option value="office">مكتب</option><option value="showroom">معرض</option>
+                            <option value="shop">{commT('shop')}</option><option value="office">{commT('office')}</option><option value="showroom">{commT('showroom')}</option>
                           </select>
                         </div>
                       </div>
@@ -1357,15 +1357,15 @@ export default function Home() {
                       ) : (
                         <>
                           <div className="mb-3">
-                            <label className="text-xs text-gray-700 block mb-1 font-semibold">إيجارك السنوي للمتر² (ريال/م²)</label>
+                            <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('ind.m2Rent')}</label>
                             <input type="number" value={siPrice} onChange={e => setSiPrice(e.target.value)} placeholder="مثال: 1800" className={inputCls} />
                           </div>
                           {!cPrice ? (
-                            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-800"><b>{avgTxt}.</b><div className="text-xs mt-0.5 text-gray-600">أدخل إيجارك للمتر² للمقارنة بمتوسط الحي التجاري.</div></div>
+                            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-sm text-blue-800"><b>{avgTxt}.</b><div className="text-xs mt-0.5 text-gray-600">{t('ind.m2Prompt')}</div></div>
                           ) : (() => {
                             const hi = cPrice > cAvg * 1.12, lo = cPrice < cAvg * 0.85;
                             const cls = hi ? 'bg-orange-50 border-orange-300 text-orange-700' : lo ? 'bg-green-50 border-green-300 text-green-700' : 'bg-blue-50 border-blue-200 text-blue-800';
-                            const ttl = hi ? 'السعر مرتفع عن متوسط الحي التجاري' : lo ? 'فرصة — أقل من متوسط الحي التجاري' : 'السعر مناسب لمتوسط الحي التجاري';
+                            const ttl = hi ? t('ind.commHi') : lo ? t('ind.commLo') : t('ind.commOk');
                             return <div className={`p-3 rounded-xl border ${cls}`}><div className="font-bold text-sm">{ttl}</div><div className="text-xs mt-0.5 text-gray-600">{avgTxt} · الفرق {Math.abs(cPrice - cAvg).toLocaleString('ar-SA')} ريال/م².</div></div>;
                           })()}
                         </>
@@ -1428,43 +1428,43 @@ export default function Home() {
           <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-6 text-center text-white relative">
             <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#F5F8FB] rounded-t-3xl" />
             <div className="relative z-10">
-              <h1 className="text-xl font-bold mb-1">خيارات تقسيط الإيجار</h1>
-              <p className="text-white/85 text-sm">حلول تقسيط ميسّرة تناسب ميزانيتك</p>
+              <h1 className="text-xl font-bold mb-1">{t('fin.h1')}</h1>
+              <p className="text-white/85 text-sm">{t('fin.sub')}</p>
             </div>
           </div>
           <div className="px-4 pt-5 pb-6 space-y-4 max-w-xl mx-auto">
             <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] rounded-2xl p-6 text-center shadow-xl">
               <div className="flex justify-center mb-3 text-white opacity-90">{Icons.bank}</div>
-              <div className="text-white font-bold text-lg mb-2">تحتاج تمويلاً عقارياً؟</div>
-              <div className="text-white/85 text-sm mb-4 leading-relaxed max-w-sm mx-auto">نربطك مباشرة بشركائنا من الجهات التمويلية المعتمدة لتحصل على أفضل عرض يناسبك</div>
-              <button onClick={() => { if (!leadMsg.trim()) setLeadMsg('أرغب بطلب تمويل عقاري — أرجو التواصل معي.'); document.getElementById('finance-lead-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} className="bg-white text-[#0A3D62] px-8 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all">
-                اطلب التمويل الآن
+              <div className="text-white font-bold text-lg mb-2">{t('fin.heroTitle')}</div>
+              <div className="text-white/85 text-sm mb-4 leading-relaxed max-w-sm mx-auto">{t('fin.heroBody')}</div>
+              <button onClick={() => { if (!leadMsg.trim()) setLeadMsg(t('fin.defaultMsg')); document.getElementById('finance-lead-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }} className="bg-white text-[#0A3D62] px-8 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all">
+                {t('fin.heroCta')}
               </button>
-              <div className="text-white/70 text-xs mt-3">خدمة مجانية · ردود سريعة · مقارنة عروض</div>
+              <div className="text-white/70 text-xs mt-3">{t('fin.heroNote')}</div>
             </div>
 
             {/* تواصل — اترك رسالة */}
             <div id="finance-lead-form" className="bg-white rounded-2xl overflow-hidden border border-blue-200 shadow-sm">
               <div className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] px-4 py-3">
-                <div className="text-white font-bold text-sm">اترك رسالة وسنتواصل معك</div>
-                <div className="text-white/80 text-xs">اكتب طلبك أو استفسارك ونرجع لك قريباً</div>
+                <div className="text-white font-bold text-sm">{t('fin.leadTitle')}</div>
+                <div className="text-white/80 text-xs">{t('fin.leadSub')}</div>
               </div>
               <div className="p-4">
                 {leadSent ? (
                   <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl p-4 text-sm text-center font-medium">
-                    شكراً لك! وصلتنا رسالتك وسنتواصل معك قريباً.
+                    {t('fin.success')}
                   </div>
                 ) : (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                      <input value={leadName} onChange={e => setLeadName(e.target.value)} placeholder="الاسم" className={inputCls} />
-                      <input value={leadPhone} onChange={e => setLeadPhone(e.target.value)} placeholder="رقم الجوال" className={inputCls} dir="ltr" />
+                      <input value={leadName} onChange={e => setLeadName(e.target.value)} placeholder={t('form.name')} className={inputCls} />
+                      <input value={leadPhone} onChange={e => setLeadPhone(e.target.value)} placeholder={t('form.phone')} className={inputCls} dir="ltr" />
                     </div>
-                    <textarea value={leadMsg} onChange={e => setLeadMsg(e.target.value)} placeholder="رسالتك (اختياري) — مثال: أبحث عن شقة 3 غرف بالنرجس" rows={3} className={inputCls + ' resize-none'} />
+                    <textarea value={leadMsg} onChange={e => setLeadMsg(e.target.value)} placeholder={t('fin.msgPh')} rows={3} className={inputCls + ' resize-none'} />
                     {leadErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{leadErr}</div>}
                     <button onClick={submitLead} disabled={leadSending}
                       className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-2.5 rounded-xl font-bold text-sm shadow-md hover:opacity-95 transition-all disabled:opacity-50">
-                      {leadSending ? 'جارٍ الإرسال…' : 'إرسال'}
+                      {leadSending ? t('form.sending') : t('form.send')}
                     </button>
                   </div>
                 )}
@@ -1484,9 +1484,9 @@ export default function Home() {
           <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-8 text-center text-white relative">
             <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#F5F8FB] rounded-t-3xl" />
             <div className="relative z-10">
-              <span className="bg-white/20 text-white text-sm px-4 py-1.5 rounded-2xl border border-white/30 font-medium">التسجيل مجاناً لفترة محدودة</span>
-              <h1 className="text-2xl font-bold mt-4 mb-2">سجّل في مؤشر العقارية</h1>
-              <p className="text-white/85 text-sm max-w-sm mx-auto">اختر نوع حسابك للبدء</p>
+              <span className="bg-white/20 text-white text-sm px-4 py-1.5 rounded-2xl border border-white/30 font-medium">{t('reg.badge')}</span>
+              <h1 className="text-2xl font-bold mt-4 mb-2">{t('reg.title')}</h1>
+              <p className="text-white/85 text-sm max-w-sm mx-auto">{t('reg.sub')}</p>
             </div>
           </div>
           <div className="p-4 space-y-4">
@@ -1495,20 +1495,20 @@ export default function Home() {
             <div className="bg-white rounded-2xl p-5 border-2 border-blue-200 shadow-sm">
               {user ? (
                 <div className="text-center">
-                  <div className="font-bold text-[#0A3D62] mb-1">أنت مسجّل الدخول ✓</div>
+                  <div className="font-bold text-[#0A3D62] mb-1">{t('auth.loggedIn')}</div>
                   <div className="text-sm text-gray-600 mb-3">{user.email}</div>
                   <button onClick={() => setPage('office')} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
-                    دخول لوحة المكتب
+                    {t('auth.enterOfficePanel')}
                   </button>
                 </div>
               ) : forgotOpen ? (
                 <div>
                   {/* «نسيت كلمة المرور؟» — طلب بريد الحساب لإرسال رابط الاسترداد */}
-                  <div className="font-bold text-[#0A3D62] mb-1">إعادة تعيين كلمة المرور</div>
+                  <div className="font-bold text-[#0A3D62] mb-1">{t('auth.resetTitle')}</div>
                   <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-                    أدخل بريد حسابك (مكتب، باحث، أو مدير) وسنرسل لك رابطاً لتعيين كلمة مرور جديدة.
+                    {t('auth.resetDesc')}
                   </p>
-                  <label className="text-xs text-gray-700 font-semibold block mb-1">البريد الإلكتروني</label>
+                  <label className="text-xs text-gray-700 font-semibold block mb-1">{t('auth.email')}</label>
                   <input
                     type="email"
                     dir="ltr"
@@ -1523,7 +1523,7 @@ export default function Home() {
                     disabled={authBusy}
                     className="w-full mt-4 bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50"
                   >
-                    {authBusy ? 'جارٍ الإرسال…' : 'إرسال رابط إعادة التعيين'}
+                    {authBusy ? t('form.sending') : t('auth.sendResetLink')}
                   </button>
                   {authMsg && (
                     <div className={`mt-3 text-sm rounded-xl p-3 border ${authMsg.ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
@@ -1535,7 +1535,7 @@ export default function Home() {
                     onClick={() => { setForgotOpen(false); setAuthMsg(null); }}
                     className="w-full mt-3 text-xs text-gray-500 font-semibold hover:text-[#0A3D62] transition-colors"
                   >
-                    العودة لتسجيل الدخول
+                    {t('auth.backToLogin')}
                   </button>
                 </div>
               ) : (
@@ -1546,33 +1546,33 @@ export default function Home() {
                       onClick={() => { setAuthMode('login'); setAuthMsg(null); }}
                       className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${authMode === 'login' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                      تسجيل دخول
+                      {t('auth.tabLogin')}
                     </button>
                     <button
                       onClick={() => { setAuthMode('signup'); setAuthMsg(null); }}
                       className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${authMode === 'signup' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                      إنشاء حساب
+                      {t('auth.tabSignup')}
                     </button>
                   </div>
 
                   {authMode === 'signup' && (
                     <div className="mb-3">
-                      <label className="text-xs text-gray-700 font-semibold block mb-1">نوع الحساب</label>
+                      <label className="text-xs text-gray-700 font-semibold block mb-1">{t('auth.accountType')}</label>
                       <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
                         <button type="button" onClick={() => setAuthRole('seeker')}
                           className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${authRole === 'seeker' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}>
-                          باحث عن إيجار
+                          {t('auth.roleSeeker')}
                         </button>
                         <button type="button" onClick={() => setAuthRole('office')}
                           className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${authRole === 'office' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}>
-                          مكتب عقاري
+                          {t('auth.roleOffice')}
                         </button>
                       </div>
                     </div>
                   )}
 
-                  <label className="text-xs text-gray-700 font-semibold block mb-1">البريد الإلكتروني</label>
+                  <label className="text-xs text-gray-700 font-semibold block mb-1">{t('auth.email')}</label>
                   <input
                     type="email"
                     dir="ltr"
@@ -1582,7 +1582,7 @@ export default function Home() {
                     className="w-full mb-3 px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
                   />
 
-                  <label className="text-xs text-gray-700 font-semibold block mb-1">كلمة المرور</label>
+                  <label className="text-xs text-gray-700 font-semibold block mb-1">{t('auth.password')}</label>
                   <input
                     type="password"
                     dir="ltr"
@@ -1600,14 +1600,14 @@ export default function Home() {
                         onClick={() => { setForgotOpen(true); setAuthMsg(null); }}
                         className="text-xs text-[#1B6CA8] font-bold hover:underline"
                       >
-                        نسيت كلمة المرور؟
+                        {t('auth.forgot')}
                       </button>
                     </div>
                   )}
 
                   {authMode === 'signup' && (
                     <>
-                      <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">تأكيد كلمة المرور</label>
+                      <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">{t('auth.confirmPassword')}</label>
                       <input
                         type="password"
                         dir="ltr"
@@ -1619,15 +1619,15 @@ export default function Home() {
                       />
                       {authRole === 'office' && (
                         <>
-                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">اسم المكتب</label>
+                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">{t('auth.officeName')}</label>
                           <input
                             type="text"
                             value={authOfficeName}
                             onChange={(e) => setAuthOfficeName(e.target.value)}
-                            placeholder="مثال: مكتب الأفق العقاري"
+                            placeholder={t('auth.officeNamePh')}
                             className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
                           />
-                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">رقم جوال المكتب</label>
+                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">{t('auth.officePhone')}</label>
                           <input
                             type="tel"
                             dir="ltr"
@@ -1636,8 +1636,8 @@ export default function Home() {
                             placeholder="05XXXXXXXX"
                             className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-left outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
                           />
-                          <div className="text-[11px] text-gray-400 mt-1">يُستخدم لتواصل إدارة المنصة معك (واتساب) — رقم سعودي.</div>
-                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">رقم رخصة فال (اختياري)</label>
+                          <div className="text-[11px] text-gray-400 mt-1">{t('auth.officePhoneHint')}</div>
+                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">{t('auth.falOptional')}</label>
                           <input
                             type="text"
                             dir="ltr"
@@ -1650,12 +1650,12 @@ export default function Home() {
                       )}
                       {authRole === 'seeker' && (
                         <>
-                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">الاسم (اختياري)</label>
+                          <label className="text-xs text-gray-700 font-semibold block mb-1 mt-3">{t('auth.nameOptional')}</label>
                           <input
                             type="text"
                             value={authSeekerName}
                             onChange={(e) => setAuthSeekerName(e.target.value)}
-                            placeholder="اسمك"
+                            placeholder={t('auth.namePh')}
                             className="w-full px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder-gray-400"
                           />
                         </>
@@ -1668,7 +1668,7 @@ export default function Home() {
                     disabled={authBusy}
                     className="w-full mt-4 bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white py-2.5 rounded-xl font-bold text-sm shadow disabled:opacity-50"
                   >
-                    {authBusy ? 'جارٍ المعالجة…' : authMode === 'login' ? 'تسجيل دخول' : 'إنشاء حساب'}
+                    {authBusy ? t('auth.processing') : authMode === 'login' ? t('auth.tabLogin') : t('auth.tabSignup')}
                   </button>
 
                   {authMsg && (
@@ -1682,32 +1682,32 @@ export default function Home() {
 
             {[
               {
-                name: 'باحث عن إيجار',
-                desc: 'للأفراد الباحثين عن سكن مناسب بأسعار عادلة',
-                features: ['بحث غير محدود في كل الأحياء', 'مؤشر أسعار الحي لكل إعلان', '5 استشارات مع المساعد الذكي شهرياً', 'تنبيه واحد للإعلانات الجديدة'],
-                locked: ['تنبيهات غير محدودة', 'حفظ التفضيلات والمقارنة'],
+                name: t('reg.searcherName'),
+                desc: t('reg.searcherDesc'),
+                features: [t('reg.sf1'), t('reg.sf2'), t('reg.sf3'), t('reg.sf4')],
+                locked: [t('reg.sl1'), t('reg.sl2')],
                 popular: false,
-                cta: 'سجّل كباحث — مجاناً'
+                cta: t('reg.searcherCta')
               },
               {
-                name: 'مكتب عقاري',
-                desc: 'للمكاتب العقارية المرخصة بفال',
-                features: ['حتى 10 إعلانات نشطة', 'توثيق رخصة فال عبر مراجعة الإدارة', 'تقييم تلقائي بمؤشر أسعار الحي', 'لوحة تحكم إحصائية', 'الحاسبة الذكية للأسعار'],
-                locked: ['شارة المكتب الموثّق', 'AI لإدارة الردود تلقائياً'],
+                name: t('reg.officeNameLabel'),
+                desc: t('reg.officeDesc'),
+                features: [t('reg.of1'), t('reg.of2'), t('reg.of3'), t('reg.of4'), t('reg.of5')],
+                locked: [t('reg.ol1'), t('reg.ol2')],
                 popular: true,
-                cta: 'سجّل مكتبك — مجاناً'
+                cta: t('reg.officeCta')
               },
             ].map(plan => (
               <div key={plan.name} className={`bg-white rounded-2xl p-5 border-2 shadow-sm ${plan.popular ? 'border-green-400' : 'border-gray-200'}`}>
                 {plan.popular && (
                   <div className="bg-gradient-to-l from-green-600 to-green-500 text-white text-xs px-4 py-1 rounded-xl inline-block mb-3 font-bold">
-                    الأكثر طلباً
+                    {t('reg.popular')}
                   </div>
                 )}
                 <div className="font-bold text-lg text-[#0A3D62] mb-1">{plan.name}</div>
                 <div className="text-sm text-gray-600 mb-4">{plan.desc}</div>
-                <div className="bg-green-600 text-white text-lg font-bold px-5 py-2 rounded-xl inline-block mb-1">مجاناً</div>
-                <div className="text-xs text-gray-500 mb-4">لفترة محدودة</div>
+                <div className="bg-green-600 text-white text-lg font-bold px-5 py-2 rounded-xl inline-block mb-1">{t('reg.free')}</div>
+                <div className="text-xs text-gray-500 mb-4">{t('reg.limited')}</div>
                 <ul className="space-y-2 mb-2">
                   {plan.features.map(f => (
                     <li key={f} className="flex items-center gap-2 text-sm text-gray-800">
@@ -1741,11 +1741,11 @@ export default function Home() {
         ) : (
           <div className="max-w-md mx-auto px-5 py-12 text-center">
             <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
-              <div className="text-lg font-bold text-gray-900 mb-2">لوحة المكتب تتطلّب تسجيل الدخول</div>
-              <p className="text-sm text-gray-500 mb-5 leading-relaxed">سجّل دخولك بحساب مكتب، أو أنشئ حساب مكتب جديد، للوصول إلى لوحتك وإعلاناتك الحقيقية.</p>
+              <div className="text-lg font-bold text-gray-900 mb-2">{t('officeGate.title')}</div>
+              <p className="text-sm text-gray-500 mb-5 leading-relaxed">{t('officeGate.body')}</p>
               <button onClick={() => { setPage('pricing'); setAuthMode('login'); if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
-                تسجيل الدخول / إنشاء حساب
+                {t('officeGate.cta')}
               </button>
             </div>
           </div>
@@ -1859,12 +1859,12 @@ export default function Home() {
                       ? <img src={main.url} alt={main.label} />
                       : <div className="ld-main-ph">{msi('home_work')}</div>}
                     <div className="ld-pills">
-                      <span className="ld-pill"><span className="dot" />متاح</span>
+                      <span className="ld-pill"><span className="dot" />{t('detail.available')}</span>
                       <span className="ld-pill">{msi(isComm ? 'storefront' : 'home_work')}{typeLabel}</span>
                     </div>
                     {hasPhotos && (
-                      <button className="ld-zoom" onClick={(e) => { e.stopPropagation(); setLightbox({ shots, idx: mainIdx }); }} aria-label="تكبير الصور">
-                        {msi('zoom_in')}<span>عرض الصور{shots.length > 1 ? ` (${shots.length.toLocaleString('ar-SA')})` : ''}</span>
+                      <button className="ld-zoom" onClick={(e) => { e.stopPropagation(); setLightbox({ shots, idx: mainIdx }); }} aria-label={t('detail.viewPhotos')}>
+                        {msi('zoom_in')}<span>{t('detail.viewPhotos')}{shots.length > 1 ? ` (${nf(shots.length)})` : ''}</span>
                       </button>
                     )}
                     {main && <span className="ld-caption">{main.label}</span>}
@@ -1890,10 +1890,10 @@ export default function Home() {
                 <div className="ld-info">
                   <div className="ld-head">
                     <h2 className="ld-title">{l.title || `${typeLabel} — ${l.hood}`}</h2>
-                    <div className="ld-loc">{msi('location_on')}<span>{l.hood}، الرياض</span></div>
+                    <div className="ld-loc">{msi('location_on')}<span>{l.hood}{lang === 'en' ? ', ' : '، '}{t('card.city')}</span></div>
                     <div className="ld-price-row">
-                      <div className="ld-price">{l.adv.toLocaleString('ar-SA')}<span>ريال/سنة</span></div>
-                      <span className={`ld-cond ${l.cond}`}>{l.condLabel || 'الحالة غير محددة'}</span>
+                      <div className="ld-price">{nf(l.adv)}<span>{t('card.perYear')}</span></div>
+                      <span className={`ld-cond ${l.cond}`}>{l.condLabel || t('detail.condUnknown')}</span>
                     </div>
                   </div>
 
@@ -1978,7 +1978,7 @@ export default function Home() {
 
                   {amen.length > 0 && (
                     <div className="ld-card">
-                      <div className="ld-card-h">{msi('verified')}<span>المزايا</span></div>
+                      <div className="ld-card-h">{msi('verified')}<span>{t('detail.amenities')}</span></div>
                       <div className="ld-amen">
                         {amen.map((a) => (
                           <div key={a} className="ld-amen-item">{msi('check_circle')}<span>{a}</span></div>
@@ -1992,14 +1992,14 @@ export default function Home() {
                   {/* المكتب المعلِن — بيانات حقيقية من offices عبر office_id (يظهر ما توفّر فقط) */}
                   {(selectedOffice?.name || selectedOffice?.fal_license || l.fal) && (
                     <div className="ld-office">
-                      <div className="ld-office-l">المكتب المعلِن</div>
+                      <div className="ld-office-l">{t('detail.advertisingOffice')}</div>
                       {selectedOffice?.name && (
                         <div className="ld-office-name">{msi('apartment')}<span className="nm">{selectedOffice.name}</span>
-                          {selectedOffice.verified && <span className="vbadge">موثّق</span>}
+                          {selectedOffice.verified && <span className="vbadge">{t('detail.verified')}</span>}
                         </div>
                       )}
                       {(selectedOffice?.fal_license || l.fal) && (
-                        <div className="ld-office-fal">رخصة فال: <span dir="ltr">{selectedOffice?.fal_license || l.fal}</span></div>
+                        <div className="ld-office-fal">{t('detail.falLicense')} <span dir="ltr">{selectedOffice?.fal_license || l.fal}</span></div>
                       )}
                     </div>
                   )}
@@ -2007,27 +2007,27 @@ export default function Home() {
                   {/* أزرار التواصل الحقيقية — اتصال/واتساب من رقم المكتب، خرائط من موقع الوحدة (يظهر المتوفّر فقط) */}
                   {(oTel || oWa || maps) && (
                     <div className="ld-actions">
-                      {oTel && <a href={`tel:${oTel}`} className="ld-btn call">{msi('call')}اتصل الآن</a>}
-                      {oWa && <a href={`https://wa.me/${oWa}?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer" className="ld-btn wa">{msi('chat')}واتساب</a>}
-                      {maps && <a href={maps} target="_blank" rel="noopener noreferrer" className="ld-btn maps">{msi('location_on')}خرائط جوجل</a>}
+                      {oTel && <a href={`tel:${oTel}`} className="ld-btn call">{msi('call')}{t('detail.callNow')}</a>}
+                      {oWa && <a href={`https://wa.me/${oWa}?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer" className="ld-btn wa">{msi('chat')}{t('detail.whatsapp')}</a>}
+                      {maps && <a href={maps} target="_blank" rel="noopener noreferrer" className="ld-btn maps">{msi('location_on')}{t('detail.googleMaps')}</a>}
                     </div>
                   )}
 
                   {/* نموذج «تواصل بخصوص هذا الإعلان» — يُحفظ في leads مربوطاً بالمكتب (office_id) */}
                   {ctSent ? (
-                    <div className="ld-sent">تم إرسال طلبك — سيتواصل معك المكتب قريباً.</div>
+                    <div className="ld-sent">{t('detail.contactSent')}</div>
                   ) : ctOpen ? (
                     <div className="ld-inq">
                       <div className="ld-inq-row">
-                        <input value={ctName} onChange={e => setCtName(e.target.value)} placeholder="الاسم" className={inputCls} />
-                        <input value={ctPhone} onChange={e => setCtPhone(e.target.value)} placeholder="رقم الجوال" className={inputCls} dir="ltr" />
+                        <input value={ctName} onChange={e => setCtName(e.target.value)} placeholder={t('form.name')} className={inputCls} />
+                        <input value={ctPhone} onChange={e => setCtPhone(e.target.value)} placeholder={t('form.phone')} className={inputCls} dir="ltr" />
                       </div>
-                      <textarea value={ctMsg} onChange={e => setCtMsg(e.target.value)} placeholder="رسالتك (اختياري) — مثال: متى أقدر أعاين الوحدة؟" rows={2} className={inputCls + ' resize-none'} />
+                      <textarea value={ctMsg} onChange={e => setCtMsg(e.target.value)} placeholder={t('detail.contactMsgPh')} rows={2} className={inputCls + ' resize-none'} />
                       {ctErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{ctErr}</div>}
-                      <button onClick={submitListingContact} disabled={ctSending} className="ld-btn primary block">{ctSending ? 'جارٍ الإرسال…' : 'إرسال طلب التواصل'}</button>
+                      <button onClick={submitListingContact} disabled={ctSending} className="ld-btn primary block">{ctSending ? t('form.sending') : t('detail.sendContact')}</button>
                     </div>
                   ) : (
-                    <button onClick={() => { track('feature_use', null, { feature: 'contact' }); setCtOpen(true); }} className="ld-btn primary block">{msi('forum')}تواصل بخصوص هذا الإعلان</button>
+                    <button onClick={() => { track('feature_use', null, { feature: 'contact' }); setCtOpen(true); }} className="ld-btn primary block">{msi('forum')}{t('detail.contactAbout')}</button>
                   )}
                 </div>
               </div>
@@ -2035,7 +2035,7 @@ export default function Home() {
               {/* ── عقارات مشابهة في نفس الحي (حقيقية فقط — تُخفى إن لم توجد) ── */}
               {similar.length > 0 && (
                 <div className="ld-similar">
-                  <h3>عقارات مشابهة في {l.hood}</h3>
+                  <h3>{t('detail.similarIn')} {l.hood}</h3>
                   <div className="ld-sim-grid">
                     {similar.map((s) => {
                       const simg = s.imagesByCategory?.facade ?? (s.images && s.images.length ? s.images[0] : null);
@@ -2164,21 +2164,21 @@ export default function Home() {
           <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-8 text-center text-white relative">
             <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#EAF0F6] rounded-t-3xl" />
             <div className="relative z-10">
-              <h1 className="text-2xl font-bold mb-2">عن مؤشر العقارية</h1>
-              <p className="text-white/85 text-sm max-w-md mx-auto leading-relaxed">منصّة تجعل سوق الإيجار السكني في الرياض شفّافاً — تعرف مؤشر أسعار الحي قبل توقيع العقد.</p>
+              <h1 className="text-2xl font-bold mb-2">{t('about.title')}</h1>
+              <p className="text-white/85 text-sm max-w-md mx-auto leading-relaxed">{t('about.sub')}</p>
             </div>
           </div>
           <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
             <div className="bg-white rounded-2xl border border-[#cfd9e4] shadow-sm p-6 text-[#33414f] text-sm leading-relaxed space-y-4">
               <div>
-                <h2 className="font-bold text-[#0f1a28] text-base mb-1 sec-underline">فكرتنا</h2>
-                <p>نُساعد الباحث عن سكن والمكتب العقاري على اتخاذ قرار واثق، عبر «مؤشر أسعار الحي» الذي يقارن أي إيجار بمتوسط سوق الحي، وخريطة تفاعلية، ومساعد ذكي يفهم طلبك بكلامك.</p>
+                <h2 className="font-bold text-[#0f1a28] text-base mb-1 sec-underline">{t('about.ideaTitle')}</h2>
+                <p>{t('about.ideaBody')}</p>
               </div>
               <div className="grid sm:grid-cols-3 gap-3">
                 {[
-                  { t: 'مؤشر أسعار الحي', d: 'السعر المتوسط لعدد الصفقات المماثلة بنفس الحي.' },
-                  { t: 'خريطة شفافة', d: 'شاهد الأسعار وحالتها على الخريطة.' },
-                  { t: 'مساعد ذكي', d: 'اكتب رغبتك ونرتّب لك الأنسب.' },
+                  { t: t('about.p1t'), d: t('about.p1d') },
+                  { t: t('about.p2t'), d: t('about.p2d') },
+                  { t: t('about.p3t'), d: t('about.p3d') },
                 ].map((f) => (
                   <div key={f.t} className="bg-[#f7fafd] border border-[#dde5ee] rounded-xl p-4">
                     <div className="font-bold text-[#0A3D62] text-sm mb-1">{f.t}</div>
@@ -2187,9 +2187,9 @@ export default function Home() {
                 ))}
               </div>
               <div className="flex flex-wrap gap-3 pt-2">
-                <button onClick={() => go('search')} className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">ابدأ البحث</button>
-                <button onClick={() => { setPage('privacy'); if (typeof window !== 'undefined') window.scrollTo(0, 0); }} className="bg-white border border-[#cfd9e4] text-[#0A3D62] px-5 py-2.5 rounded-xl font-bold text-sm">سياسة الخصوصية</button>
-                <button onClick={() => { setPage('terms'); if (typeof window !== 'undefined') window.scrollTo(0, 0); }} className="bg-white border border-[#cfd9e4] text-[#0A3D62] px-5 py-2.5 rounded-xl font-bold text-sm">شروط الاستخدام</button>
+                <button onClick={() => go('search')} className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow">{t('about.ctaSearch')}</button>
+                <button onClick={() => { setPage('privacy'); if (typeof window !== 'undefined') window.scrollTo(0, 0); }} className="bg-white border border-[#cfd9e4] text-[#0A3D62] px-5 py-2.5 rounded-xl font-bold text-sm">{t('foot.privacy')}</button>
+                <button onClick={() => { setPage('terms'); if (typeof window !== 'undefined') window.scrollTo(0, 0); }} className="bg-white border border-[#cfd9e4] text-[#0A3D62] px-5 py-2.5 rounded-xl font-bold text-sm">{t('foot.terms')}</button>
               </div>
             </div>
           </div>
@@ -2202,48 +2202,48 @@ export default function Home() {
           <div className="bg-gradient-to-br from-[#0A3D62] to-[#1B6CA8] px-5 py-6 text-center text-white relative">
             <div className="absolute bottom-0 left-0 right-0 h-6 bg-[#F5F8FB] rounded-t-3xl" />
             <div className="relative z-10">
-              <h1 className="text-xl font-bold mb-1">الاستفسارات</h1>
-              <p className="text-white/85 text-sm">أرسل استفسارك وسيصل فريق المنصة ونتواصل معك</p>
+              <h1 className="text-xl font-bold mb-1">{t('inq.h1')}</h1>
+              <p className="text-white/85 text-sm">{t('inq.sub')}</p>
             </div>
           </div>
           <div className="px-4 pt-4 pb-6 max-w-xl mx-auto">
             <div className="bg-white rounded-2xl border border-[#cfd9e4] shadow-sm overflow-hidden">
               <div className="bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] px-4 py-3">
-                <div className="text-white font-bold text-sm">نموذج استفسار</div>
-                <div className="text-white/80 text-xs">اذكر الحي والنوع إن أردت استفساراً محدّداً</div>
+                <div className="text-white font-bold text-sm">{t('inq.cardTitle')}</div>
+                <div className="text-white/80 text-xs">{t('inq.cardSub')}</div>
               </div>
               <div className="p-4">
                 {inqSent ? (
                   <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl p-4 text-sm text-center font-medium">
-                    شكراً لك! وصلنا استفسارك وسنتواصل معك قريباً.
+                    {t('inq.success')}
                   </div>
                 ) : (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                      <input value={inqName} onChange={e => setInqName(e.target.value)} placeholder="الاسم" className={inputCls} />
-                      <input value={inqPhone} onChange={e => setInqPhone(e.target.value)} placeholder="رقم الجوال" className={inputCls} dir="ltr" />
+                      <input value={inqName} onChange={e => setInqName(e.target.value)} placeholder={t('form.name')} className={inputCls} />
+                      <input value={inqPhone} onChange={e => setInqPhone(e.target.value)} placeholder={t('form.phone')} className={inputCls} dir="ltr" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs text-gray-700 block mb-1 font-semibold">الحي (اختياري)</label>
+                        <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('inq.hoodOptional')}</label>
                         <select value={inqHood} onChange={e => setInqHood(e.target.value)} className={selectCls}>
-                          <option value="">— غير محدّد —</option>
+                          <option value="">{t('inq.unspecified')}</option>
                           {Object.keys(mktAvg).map(h => <option key={h} value={h}>{h}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-700 block mb-1 font-semibold">نوع الوحدة (اختياري)</label>
+                        <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('inq.typeOptional')}</label>
                         <select value={inqType} onChange={e => setInqType(e.target.value)} className={selectCls}>
-                          <option value="">— غير محدّد —</option>
-                          {['شقة', 'فيلا', 'دور', 'دوبلكس', 'استوديو'].map(t => <option key={t} value={t}>{t}</option>)}
+                          <option value="">{t('inq.unspecified')}</option>
+                          {['شقة', 'فيلا', 'دور', 'دوبلكس', 'استوديو'].map(ut => <option key={ut} value={ut}>{ut}</option>)}
                         </select>
                       </div>
                     </div>
-                    <textarea value={inqMsg} onChange={e => setInqMsg(e.target.value)} placeholder="نص الاستفسار — مثال: متى يتوفّر دوبلكس في حطين؟" rows={3} className={inputCls + ' resize-none'} />
+                    <textarea value={inqMsg} onChange={e => setInqMsg(e.target.value)} placeholder={t('inq.msgPh')} rows={3} className={inputCls + ' resize-none'} />
                     {inqErr && <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{inqErr}</div>}
                     <button onClick={submitInquiry} disabled={inqSending}
                       className="w-full bg-gradient-to-l from-[#1B6CA8] to-[#0A3D62] text-white py-2.5 rounded-xl font-bold text-sm shadow-md hover:opacity-95 transition-all disabled:opacity-50">
-                      {inqSending ? 'جارٍ الإرسال…' : 'إرسال الاستفسار'}
+                      {inqSending ? t('form.sending') : t('inq.send')}
                     </button>
                   </div>
                 )}
@@ -2604,7 +2604,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         setPfMsg({ ok: false, text: error.code === '42501' ? 'الحفظ محجوب بسياسة الحماية (RLS).' : 'تعذّر الحفظ: ' + error.message });
         setPfSaving(false); return;
       }
-      setPfMsg({ ok: true, text: 'تم حفظ بيانات المكتب ✓' });
+      setPfMsg({ ok: true, text: 'تم حفظ بيانات المكتب.' });
       await reloadOffice(); // إعادة قراءة القيم المحفوظة من القاعدة لتظهر بعد التحديث
     } catch {
       setPfMsg({ ok: false, text: 'تعذّر الحفظ حالياً — حاول لاحقاً.' });
@@ -2747,7 +2747,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       setPublishMsg({
         ok: true,
         text: (editingId
-          ? 'تم حفظ التعديلات ✓ — حالة الإعلان تبقى كما هي (التعديل لا يغيّر الاعتماد).'
+          ? 'تم حفظ التعديلات — حالة الإعلان تبقى كما هي (التعديل لا يغيّر الاعتماد).'
           : autoApproved
           ? 'تم نشر الإعلان — ظاهر الآن للباحثين مباشرة (مكتبك موثّق).'
           : 'تم إرسال الإعلان للمراجعة — يظهر للباحثين فور اعتماد الإدارة له.')
@@ -2809,7 +2809,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       <div className="max-w-md mx-auto px-5 py-12">
         <div className="bg-white rounded-2xl border border-gray-200 p-7 shadow-sm">
           <div className="text-lg font-bold text-gray-900 mb-1">أنشئ مكتبك العقاري</div>
-          <p className="text-sm text-gray-500 mb-5 leading-relaxed">حسابك جاهز — أكمل بيانات مكتبك مرة واحدة وتُفعّل لوحة المكتب وتقدر تنشر إعلاناتك مباشرة.</p>
+          <p className="text-sm text-gray-500 mb-5 leading-relaxed">أكمل بيانات مكتبك مرة واحدة، وتُفعّل لوحتك وتبدأ نشر إعلاناتك مباشرة.</p>
           <label className="text-xs text-gray-700 font-semibold block mb-1">اسم المكتب *</label>
           <input value={newOfficeName} onChange={(e) => setNewOfficeName(e.target.value)} placeholder="مثال: مكتب الأفق العقاري"
             className="w-full mb-3 px-3 py-2.5 border border-gray-300 rounded-xl bg-white text-gray-900 text-sm text-right outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
@@ -2865,12 +2865,12 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                 : !myOffice.active ? 'bg-gray-100 border-gray-300 text-gray-700'
                 : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
                 {(myOffice.status === 'approved' && myOffice.active)
-                  ? '✅ مكتبك معتمد ونشط — تقدر تنشر إعلانات بلا حدود.'
+                  ? 'مكتبك معتمد ونشط — تقدر تنشر إعلاناتك بلا حدود.'
                   : myOffice.status === 'rejected'
-                  ? '⛔ تم رفض حسابك من الإدارة — تواصل معها.'
+                  ? 'تم رفض حسابك من الإدارة — تواصل معها لمعرفة السبب.'
                   : !myOffice.active
-                  ? '⏸️ مكتبك موقوف حالياً من الإدارة — لا يمكنك النشر.'
-                  : '⏳ حسابك بانتظار موافقة الإدارة — لا يمكنك نشر إعلانات حتى الاعتماد.'}
+                  ? 'مكتبك موقوف حالياً من الإدارة — لا يمكنك النشر.'
+                  : 'حسابك بانتظار موافقة الإدارة — لا يمكنك النشر حتى الاعتماد.'}
               </div>
             )}
             <div className="grid grid-cols-3 gap-4 mb-5">
@@ -3126,7 +3126,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                         {!fMapsLink.trim()
                           ? 'افتح خرائط Google، ضع دبوساً على الوحدة، انسخ الرابط والصقه هنا.'
                           : parseMapsUrl(fMapsLink)
-                            ? `تم استخراج الإحداثيات ✓ (${fLat?.toFixed(5)}, ${fLng?.toFixed(5)}) — سيظهر دبوس الوحدة على خريطة البحث.`
+                            ? `تم استخراج الإحداثيات (${fLat?.toFixed(5)}, ${fLng?.toFixed(5)}) — سيظهر دبوس الوحدة على خريطة البحث.`
                             : isMapsUrl(fMapsLink)
                               ? 'رابط مختصر (goo.gl) لا يحوي إحداثيات — زر «الموقع على الخريطة» سيعمل، لكن لن يظهر دبوس على خريطة البحث. لإظهار الدبوس استخدم «حدّد على الخريطة» أعلاه، أو الصق الرابط الكامل من شريط عنوان خرائط Google (يحوي ‎@lat,lng‎).'
                               : 'هذا لا يبدو رابط خرائط Google — انسخه من تطبيق أو موقع الخرائط.'}
@@ -3139,7 +3139,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                       </div>
                       <div className={`text-[11px] mt-1.5 ${fLat != null ? 'text-green-700' : 'text-gray-400'}`}>
                         {fLat != null && fLng != null
-                          ? `الموقع المحدّد ✓ (${fLat.toFixed(5)}, ${fLng.toFixed(5)})`
+                          ? `الموقع المحدّد (${fLat.toFixed(5)}, ${fLng.toFixed(5)})`
                           : 'انقر على موقع الوحدة في الخريطة لوضع الدبوس.'}
                       </div>
                     </div>
@@ -3223,7 +3223,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                 <div className="font-bold text-gray-900 mb-1">{fSector === 'commercial' ? 'صور العقار التجاري' : 'صور الوحدة حسب الغرفة'}</div>
                 <div className="text-sm text-gray-500 mb-4">
-                  صورة الواجهة إلزامية؛ البقية اختيارية لكنها ترفع فرص تواصل الباحثين.
+                  صورة الواجهة إلزامية، والبقية اختيارية لكنها تزيد تواصل الباحثين معك.
                   {fSector === 'commercial'
                     ? ' أضف لقطات داخلية للعقار والمرافق.'
                     : ` خانات غرف النوم والحمامات تتبع ما اخترته في «بيانات العقار» (${fRooms} غرف · ${fBaths} دورات مياه).`}
@@ -3231,7 +3231,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                 {/* تنبيه إرشادي ودّي بجودة الصور (إعلامي فقط — بلا تحقّق أو تغيير على الصور) */}
                 <div className="flex items-start gap-2 bg-blue-50/70 border border-blue-200 rounded-xl p-3 mb-4 text-[13px] text-[#0A3D62] leading-relaxed">
                   <span className="material-symbols-outlined flex-shrink-0" style={{ fontSize: 20 }}>photo_camera</span>
-                  <span>يُفضّل رفع صور واضحة وعالية الجودة للعقار لإبراز إعلانك بشكل أفضل وزيادة فرص تواصل الباحثين.</span>
+                  <span>صور واضحة وبإضاءة جيدة تبرز إعلانك وتزيد تواصل الباحثين معك.</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
                   {(fSector === 'commercial' ? commercialPhotoSlots() : photoSlots(parseInt(fRooms) || 1, parseInt(fBaths) || 1)).map((s) => {
@@ -3431,7 +3431,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                   <div className="font-bold text-lg text-gray-900">{myOffice?.name || '— لا يوجد مكتب مرتبط —'}</div>
                   <div className="flex gap-2 mt-1">
                     {myOffice?.verified
-                      ? <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-lg border border-green-200 font-medium">موثّق بفال ✓</span>
+                      ? <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-lg border border-green-200 font-medium">موثّق بفال</span>
                       : <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-lg border border-amber-200 font-medium">غير موثّق بعد</span>}
                     <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-lg border border-gray-200">الرياض</span>
                   </div>
