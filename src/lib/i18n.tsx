@@ -303,6 +303,67 @@ export const STRINGS: Record<string, Entry> = {
   'detail.sendContact': { ar: 'إرسال طلب التواصل', en: 'Send request' },
   'detail.contactAbout': { ar: 'تواصل بخصوص هذا الإعلان', en: 'Contact about this listing' },
   'detail.similarIn': { ar: 'عقارات مشابهة في', en: 'Similar properties in' },
+
+  // ── صفحة البحث: تسميات الفلاتر والعدّادات (chrome مُترجَم؛ قيم الفلاتر تبقى عربية للمنطق) ──
+  'search.hood': { ar: 'الحي', en: 'Neighborhood' },
+  'search.allHoods': { ar: 'كل الأحياء', en: 'All neighborhoods' },
+  'search.propType': { ar: 'نوع العقار', en: 'Property type' },
+  'search.allTypes': { ar: 'كل الأنواع', en: 'All types' },
+  'search.budget': { ar: 'الميزانية السنوية', en: 'Annual budget' },
+  'search.budgetPh': { ar: 'مثال: 70000', en: 'e.g., 70000' },
+  'search.results': { ar: 'نتيجة', en: 'results' },
+  'search.onMapCount': { ar: 'على الخريطة', en: 'on map' },
+  'search.propOnMap': { ar: 'عقار على الخريطة', en: 'properties on the map' },
+  'search.clearFilters': { ar: 'مسح الفلاتر', en: 'Clear filters' },
+
+  // أنواع الوحدات (تسميات خيارات الفلتر — القيمة تبقى عربية؛ التسمية تُترجَم)
+  'type.floor': { ar: 'دور', en: 'Floor' },
+  'type.studio': { ar: 'استوديو', en: 'Studio' },
+  'type.duplex': { ar: 'دوبلكس', en: 'Duplex' },
+
+  // ── حذف الحساب (نافذة التأكيد المشتركة) ──
+  'del.title': { ar: 'حذف الحساب', en: 'Delete account' },
+  'del.permanent': {
+    ar: 'هذا الإجراء نهائي ولا يمكن التراجع عنه. سيُحذف حسابك وكل بياناتك الشخصية من المنصة فوراً.',
+    en: 'This is permanent and cannot be undone. Your account and all your personal data will be removed from the platform immediately.',
+  },
+  'del.itemSeeker1': { ar: 'حسابك وبيانات الدخول (لن تتمكّن من تسجيل الدخول بعدها).', en: 'Your account and sign-in (you won’t be able to sign in afterward).' },
+  'del.itemSeeker2': { ar: 'استفساراتك وطلباتك المرتبطة بحسابك.', en: 'Your inquiries and requests linked to your account.' },
+  'del.itemOffice1': { ar: 'حساب مكتبك وبيانات الدخول.', en: 'Your office account and sign-in.' },
+  'del.itemOffice2': { ar: 'كل إعلاناتك وصورها.', en: 'All your listings and their photos.' },
+  'del.itemOffice3': { ar: 'الاستفسارات التي وصلت إلى مكتبك.', en: 'The inquiries your office has received.' },
+  'del.typeToConfirm': { ar: 'للتأكيد، اكتب كلمة «حذف» في الحقل أدناه:', en: 'To confirm, type the word “DELETE” below:' },
+  'del.confirmWord': { ar: 'حذف', en: 'DELETE' },
+  'del.cancel': { ar: 'إلغاء', en: 'Cancel' },
+  'del.confirmBtn': { ar: 'حذف حسابي نهائياً', en: 'Permanently delete my account' },
+  'del.processing': { ar: 'جارٍ الحذف…', en: 'Deleting…' },
+  'del.adminErr': { ar: 'لا يمكن حذف حساب المدير من هنا.', en: 'Admin accounts cannot be deleted here.' },
+  'del.failErr': { ar: 'تعذّر حذف الحساب — حاول لاحقاً أو راسل الدعم.', en: 'Couldn’t delete the account — try again later or contact support.' },
+  'del.doneTitle': { ar: 'تم حذف حسابك', en: 'Your account was deleted' },
+  'del.doneBody': { ar: 'حُذف حسابك وكل بياناتك نهائياً. جارٍ تحويلك إلى الصفحة الرئيسية…', en: 'Your account and all your data were permanently deleted. Redirecting you home…' },
+  'del.openBtn': { ar: 'حذف الحساب', en: 'Delete account' },
+
+  // ── صفحة /delete-account العامة ──
+  'delpage.title': { ar: 'حذف الحساب', en: 'Delete your account' },
+  'delpage.intro': {
+    ar: 'يمكنك حذف حسابك في «مؤشر العقارية» وكل بياناتك الشخصية نهائياً. هذا الإجراء لا يمكن التراجع عنه.',
+    en: 'You can permanently delete your Mouasher account and all your personal data. This action cannot be undone.',
+  },
+  'delpage.whatTitle': { ar: 'ماذا يُحذف؟', en: 'What gets deleted?' },
+  'delpage.whatBody': {
+    ar: 'حسابك وبيانات الدخول، واستفساراتك المرتبطة بحسابك. وإن كنت مكتباً عقارياً: مكتبك وكل إعلاناتك وصورها والاستفسارات التي وصلتك.',
+    en: 'Your account and sign-in, and inquiries linked to your account. If you’re a real-estate office: your office, all your listings and their photos, and the inquiries you’ve received.',
+  },
+  'delpage.checking': { ar: 'جارٍ التحقق…', en: 'Checking…' },
+  'delpage.loggedInAs': { ar: 'أنت مسجّل الدخول بـ', en: 'You’re signed in as' },
+  'delpage.deleteNow': { ar: 'حذف حسابي نهائياً', en: 'Delete my account permanently' },
+  'delpage.signedOutTitle': { ar: 'لست مسجّل الدخول', en: 'You’re not signed in' },
+  'delpage.signedOutBody': {
+    ar: 'لحذف حسابك بنفسك: سجّل الدخول من الصفحة الرئيسية، ثم احذف الحساب من منطقة حسابك أو من هذه الصفحة. أو أرسل طلب حذف من بريدك المسجّل إلى البريد أدناه وسنحذف حسابك وبياناتك.',
+    en: 'To delete your account yourself: sign in from the home page, then delete it from your account area or this page. Or send a deletion request from your registered email to the address below, and we’ll delete your account and data.',
+  },
+  'delpage.signInCta': { ar: 'تسجيل الدخول', en: 'Sign in' },
+  'delpage.emailLabel': { ar: 'البريد لطلبات الحذف:', en: 'Email for deletion requests:' },
 };
 
 interface Ctx {

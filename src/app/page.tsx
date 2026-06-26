@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { SiteHeader, SiteFooter } from './components/SiteChrome';
 import ContactButtons, { isSaudiMobile, waNumber, telNumber } from './components/ContactButtons';
 import ReplyComposer from './components/ReplyComposer';
+import DeleteAccountModal from './components/DeleteAccountModal';
 import { parseMapsUrl, isMapsUrl, mapsHref } from '@/lib/mapsLocation';
 const MapComponent = dynamic(() => import('./components/Map'), { ssr: false });
 // منتقي موقع الوحدة في نموذج المكتب (Leaflet — عميل فقط مثل الخريطة الرئيسية)
@@ -201,6 +202,60 @@ function parseAiMaxPrice(qRaw: string): number | null {
   return best;
 }
 
+// ── دعم الإنجليزية للمساعد الذكي (إثراء الطلب بمكافئات عربية للتحليل المحلّي) ──
+// خرائط نقحرة أسماء الأحياء الإنجليزية الشائعة → الاسم العربي المخزَّن.
+const HOOD_EN_AR: Record<string, string> = {
+  'al olaya': 'العليا', 'olaya': 'العليا',
+  'al narjis': 'النرجس', 'narjis': 'النرجس',
+  'al malqa': 'الملقا', 'malqa': 'الملقا', 'al malga': 'الملقا',
+  'hittin': 'حطين', 'hitteen': 'حطين',
+  'al yasmin': 'الياسمين', 'yasmin': 'الياسمين', 'al yasmeen': 'الياسمين',
+  'al qirawan': 'القيروان', 'qirawan': 'القيروان', 'al qayrawan': 'القيروان',
+  'al nakheel': 'النخيل', 'nakheel': 'النخيل', 'al nakhil': 'النخيل',
+  'ishbiliyah': 'إشبيلية', 'ishbilia': 'إشبيلية', 'eshbilia': 'إشبيلية',
+  'al aqiq': 'العقيق', 'aqiq': 'العقيق', 'al aqeeq': 'العقيق', 'aqeeq': 'العقيق',
+};
+// الاسم العربي للحي → اسم إنجليزي للعرض في الردود الإنجليزية (للمعروف؛ غيره يبقى عربياً، لا فبركة).
+const HOOD_AR_EN: Record<string, string> = {
+  'العليا': 'Al-Olaya', 'النرجس': 'Al-Narjis', 'الملقا': 'Al-Malqa', 'حطين': 'Hittin',
+  'الياسمين': 'Al-Yasmin', 'القيروان': 'Al-Qirawan', 'النخيل': 'Al-Nakheel',
+  'إشبيلية': 'Ishbiliyah', 'العقيق': 'Al-Aqiq',
+};
+// كلمات الأنواع/القطاع/النيّة الإنجليزية → مكافئ عربي (لإثراء الطلب فقط).
+const EN_TOKENS_AR: [RegExp, string][] = [
+  [/\b(apartments?|flats?)\b/i, 'شقة'],
+  [/\bvillas?\b/i, 'فيلا'],
+  [/\bstudios?\b/i, 'استوديو'],
+  [/\bduplex(es)?\b/i, 'دوبلكس'],
+  [/\bfloors?\b/i, 'دور'],
+  [/\bshops?\b/i, 'محل'],
+  [/\bshowrooms?\b/i, 'معرض'],
+  [/\b(commercial offices?|office spaces?)\b/i, 'مكتب تجاري'],
+  [/\bcommercial\b/i, 'تجاري'],
+  [/\b(average|avg|mean)\b/i, 'متوسط'],
+  [/\b(compare|versus|vs)\b/i, 'قارن'],
+  [/\b(cheapest|lowest|cheap|affordable)\b/i, 'أرخص'],
+  [/\b(find|show|search|looking for|want|need)\b/i, 'ابحث'],
+];
+
+// هل يبدو الطلب إنجليزياً؟ (حرفان لاتينيان متتاليان على الأقل)
+function looksEnglish(q: string): boolean { return /[a-z]{2,}/i.test(q); }
+
+// إثراء الطلب الإنجليزي بمكافئات عربية حتى تكتشفه دوال التحليل المحلّية (العربية)
+// دون تغيير سلوك الطلبات العربية إطلاقاً (لا يُضاف شيء إلا لِما يطابق إنجليزياً).
+function enrichEnglishQuery(q: string, hoods: string[]): string {
+  const lower = ' ' + q.toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ') + ' ';
+  let extra = '';
+  for (const en of Object.keys(HOOD_EN_AR).sort((a, b) => b.length - a.length)) {
+    const ar = HOOD_EN_AR[en];
+    if (lower.includes(' ' + en + ' ') && hoods.includes(ar) && !extra.includes(ar)) extra += ' ' + ar;
+  }
+  for (const [re, ar] of EN_TOKENS_AR) if (re.test(q)) extra += ' ' + ar;
+  return extra ? q + ' ' + extra : q;
+}
+// اسم الحي للعرض حسب لغة الرد (إنجليزي معروف وإلا عربي)
+const hoodDisp = (ar: string | null, en: boolean): string => (ar ? (en ? (HOOD_AR_EN[ar] ?? ar) : ar) : '');
+
 // رسالة خطأ تشخيصية لإرسال الرسائل/الاستفسارات (تكشف حجب RLS بوضوح بدل نجاح صوري).
 function leadErrText(error: { code?: string; message?: string }): string {
   if (error.code === '42501')
@@ -352,15 +407,22 @@ export default function Home() {
   // حكم مؤشر الحي مُترجَماً (مرتفع/مناسب/فرصة)
   const verdictT = (st: string) => (st === 'hi' ? t('verdict.high') : st === 'lo' ? t('verdict.opp') : t('verdict.fair'));
 
-  // هل الحساب الحالي يملك مكتباً؟ ⇒ زر «لوحة المكتب» الذهبي في الدرج
+  // هل الحساب الحالي يملك مكتباً؟ ⇒ زر «لوحة المكتب» الذهبي في الدرج،
+  // ونحتفظ بمعرّف المكتب لحذف صوره عند حذف الحساب.
   const [hasOffice, setHasOffice] = useState(false);
+  const [myOfficeId, setMyOfficeId] = useState<string | null>(null);
+  // نافذة حذف الحساب (بطاقة حساب الباحث في صفحة التسجيل)
+  const [delOpen, setDelOpen] = useState(false);
   useEffect(() => {
-    if (!user || !isSupabaseConfigured()) { setHasOffice(false); return; }
+    if (!user || !isSupabaseConfigured()) { setHasOffice(false); setMyOfficeId(null); return; }
     let cancelled = false;
     (async () => {
       const sb = createClient();
       const { data } = await sb.from('offices').select('id').eq('owner_id', user.id).limit(1);
-      if (!cancelled) setHasOffice(!!(data && data.length));
+      if (!cancelled) {
+        setHasOffice(!!(data && data.length));
+        setMyOfficeId(data && data.length ? (data[0].id as string) : null);
+      }
     })();
     return () => { cancelled = true; };
   }, [user]);
@@ -495,6 +557,18 @@ export default function Home() {
     return pts;
   };
 
+  // إدراج صفّ leads مربوطاً بحساب الباحث المسجّل (user_id) إن وُجد — ليُحذف ضمن
+  // بيانات الباحث عند حذف حسابه. تدرّج آمن: إن لم يوجد العمود بعد (قبل تشغيل
+  // account_deletion.sql) نعيد المحاولة بلا user_id فلا تنكسر النماذج.
+  const insertLead = async (sb: ReturnType<typeof createClient>, row: Record<string, unknown>) => {
+    const withUid = user?.id ? { ...row, user_id: user.id } : row;
+    let res = await sb.from('leads').insert(withUid);
+    if (res.error && (res.error.code === 'PGRST204' || res.error.code === '42703') && user?.id) {
+      res = await sb.from('leads').insert(row);
+    }
+    return res;
+  };
+
   const submitLead = async () => {
     if (!leadName.trim() || !leadPhone.trim() || leadSending) return;
     setLeadSending(true); setLeadErr(null);
@@ -502,7 +576,7 @@ export default function Home() {
       if (isSupabaseConfigured()) {
         const sb = createClient();
         // نتحقّق من خطأ الإدراج فعلياً (بدل النجاح الصوري) — يكشف حجب RLS إن وُجد.
-        const { error } = await sb.from('leads').insert({ name: leadName.trim(), phone: leadPhone.trim(), message: leadMsg.trim() || null });
+        const { error } = await insertLead(sb, { name: leadName.trim(), phone: leadPhone.trim(), message: leadMsg.trim() || null });
         if (error) { setLeadErr(leadErrText(error)); setLeadSending(false); return; }
       }
       setLeadSent(true);
@@ -523,7 +597,7 @@ export default function Home() {
     try {
       if (isSupabaseConfigured()) {
         const sb = createClient();
-        const { error } = await sb.from('leads').insert({ name: inqName.trim(), phone: inqPhone.trim(), message });
+        const { error } = await insertLead(sb, { name: inqName.trim(), phone: inqPhone.trim(), message });
         if (error) { setInqErr(leadErrText(error)); setInqSending(false); return; }
       }
       setInqSent(true);
@@ -548,7 +622,7 @@ export default function Home() {
         const row: Record<string, unknown> = { name: ctName.trim(), phone: ctPhone.trim(), message };
         if (l.office_id) row.office_id = l.office_id;
         if (typeof l.id === 'string') row.listing_id = l.id; // uuid فقط (الإعلانات الحقيقية)
-        const { error } = await sb.from('leads').insert(row);
+        const { error } = await insertLead(sb, row);
         if (error) { setCtErr(leadErrText(error)); setCtSending(false); return; }
       }
       setCtSent(true);
@@ -694,10 +768,15 @@ export default function Home() {
     setTimeout(() => document.getElementById('listings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
 
   const runAI = (raw?: string) => {
-    const q = (raw ?? aiQuery).trim();
+    const qRaw = (raw ?? aiQuery).trim();
     if (raw !== undefined) setAiQuery(raw);
-    if (!q) return;
+    if (!qRaw) return;
     setAiShowAlts(false);
+
+    // دعم الإنجليزية: نردّ بالإنجليزية إن كانت الواجهة EN أو الطلب نفسه إنجليزياً،
+    // ونُثري الطلب الإنجليزي بمكافئات عربية ليكتشفه التحليل المحلّي. العربي يبقى كما هو.
+    const en = lang === 'en' || looksEnglish(qRaw);
+    const q = en ? enrichEnglishQuery(qRaw, Object.keys(mktAvg)) : qRaw;
 
     // ── معايير صريحة = فلاتر صارمة: نحترم ما طلبه الباحث ولا نستبدله أبداً ──
     const reqHood = parseAiHood(q, Object.keys(mktAvg));
@@ -719,8 +798,8 @@ export default function Home() {
     {
       const hoodsAll = parseAiHoodsAll(q, Object.keys(mktAvg));
       const nq = normalizeArabic(q);
-      // تسمية النوع السكني حسب اللغة (إنجليزي حين تكون الواجهة EN)
-      const tLabel = (ar: string) => (lang === 'en' ? (AR_TYPE_EN[ar] ?? ar) : ar);
+      // تسمية النوع السكني حسب لغة الرد (إنجليزي حين تكون الواجهة/الطلب EN)
+      const tLabel = (ar: string) => (en ? (AR_TYPE_EN[ar] ?? ar) : ar);
       // إشارات بحث الإعلانات (تمنع تفسير الطلب كسؤال متوسط)
       const hasBudget = reqMaxPrice != null;
       const searchVerb = /(ابحث|ابغى|ابغا|ابي|اريد|عايز|عاوز|دور لي|دورلي|لاقي|وفر|وريني|اعرض)/.test(nq);
@@ -773,7 +852,7 @@ export default function Home() {
           setAiMatchIds([]);
           setAiReply(null);
           setAiResult({ kind: 'market', mode: 'compare', sector: mktSector, rows: [], compareRows });
-          track('search', null, { source: 'ai', q: q.slice(0, 200), kind: 'market', sector: mktSector, hoods: hoodsAll.join('،'), matches: compareRows.reduce((n, cr) => n + cr.cells.filter((c) => c.value != null).length, 0) });
+          track('search', null, { source: 'ai', q: qRaw.slice(0, 200), kind: 'market', sector: mktSector, hoods: hoodsAll.join('،'), matches: compareRows.reduce((n, cr) => n + cr.cells.filter((c) => c.value != null).length, 0) });
           setSearched(true);
           scrollToListings();
           return;
@@ -810,7 +889,7 @@ export default function Home() {
         setAiMatchIds([]);
         setAiReply(null);
         setAiResult({ kind: 'market', mode: 'single', sector: mktSector, rows });
-        track('search', null, { source: 'ai', q: q.slice(0, 200), kind: 'market', sector: mktSector, hoods: hoodsAll.join('،'), matches: rows.filter((r) => r.value != null).length });
+        track('search', null, { source: 'ai', q: qRaw.slice(0, 200), kind: 'market', sector: mktSector, hoods: hoodsAll.join('،'), matches: rows.filter((r) => r.value != null).length });
         setSearched(true);
         scrollToListings();
         return;
@@ -832,7 +911,7 @@ export default function Home() {
     // تتبّع بحث المساعد الذكي: نص الطلب (مقتطع) + المعايير المستخرجة + عدد المطابقين الفعلي
     track('search', null, {
       source: 'ai',
-      q: q.slice(0, 200),
+      q: qRaw.slice(0, 200),
       hood: reqHood,
       type: reqTypeLabel,
       sector: reqSector,
@@ -850,16 +929,16 @@ export default function Home() {
         const field = RESIDENTIAL_AVG_TYPES.find((t) => t.type === reqType)?.field ?? 'avg';
         const avgVal = rec ? (rec[field] ?? 0) : 0;
         if (avgVal > 0) {
-          const tl = lang === 'en' ? (AR_TYPE_EN[reqType] ?? reqType) : reqType;
+          const tl = en ? (AR_TYPE_EN[reqType] ?? reqType) : reqType;
           setAiResult({
             kind: 'market', mode: 'single', sector: 'residential',
             rows: [{ hood: reqHood, typeLabel: tl, value: avgVal, sampleSize: null, unit: 'perYear' }],
-            note: lang === 'en'
-              ? `No matching listings right now — here’s the saved average for ${tl} in ${reqHood}.`
+            note: en
+              ? `No matching listings right now — here’s the saved average for ${tl} in ${hoodDisp(reqHood, en)}.`
               : `لا توجد إعلانات مطابقة حالياً — هذا متوسط ${reqType} المحفوظ في ${reqHood}.`,
           });
           setAiReply(null);
-          trackSearchWish({ neighborhood: reqHood, type: reqTypeLabel, maxPrice: reqMaxPrice, rawQuery: q });
+          trackSearchWish({ neighborhood: reqHood, type: reqTypeLabel, maxPrice: reqMaxPrice, rawQuery: qRaw });
           setSearched(true);
           scrollToListings();
           return;
@@ -870,16 +949,20 @@ export default function Home() {
         // صدق: لا نستبدل الحي ولا ندّعي تطابقاً — نعرض رسالة صريحة + تسجيل الطلب،
         // ونسجّل الرغبة غير المطابقة للمدير (fire-and-forget، لا تحجب ولا تكسر).
         // النوع المعروض يعكس القطاع (تجاري: محل/مكتب/معرض/عقار تجاري).
-        setAiResult({ kind: 'none', hood: reqHood, type: reqTypeLabel, maxPrice: reqMaxPrice, raw: q });
+        setAiResult({ kind: 'none', hood: reqHood, type: reqTypeLabel, maxPrice: reqMaxPrice, raw: qRaw });
         setAiReply(null); // اللوحة الصريحة أدناه تحمل الرسالة بدل صندوق الرد
-        trackSearchWish({ neighborhood: reqHood, type: reqTypeLabel, maxPrice: reqMaxPrice, rawQuery: q });
+        trackSearchWish({ neighborhood: reqHood, type: reqTypeLabel, maxPrice: reqMaxPrice, rawQuery: qRaw });
       } else {
         // بلا أي معيار صريح ولا نتيجة (مثلاً الكتالوج فارغ) — رسالة صادقة عامة
         setAiResult({ kind: 'matches', ids: [] });
         setAiReply(
-          listings.length === 0
-            ? 'لا توجد إعلانات متاحة حالياً — تُعرض هنا إعلانات المكاتب فور نشرها.'
-            : 'اذكر الحي أو النوع أو ميزانيتك لأبحث لك بدقّة بين الإعلانات المتاحة.'
+          en
+            ? (listings.length === 0
+                ? 'No listings available yet — office listings appear here as soon as they’re published.'
+                : 'Tell me the neighborhood, type, or budget and I’ll search the available listings precisely.')
+            : (listings.length === 0
+                ? 'لا توجد إعلانات متاحة حالياً — تُعرض هنا إعلانات المكاتب فور نشرها.'
+                : 'اذكر الحي أو النوع أو ميزانيتك لأبحث لك بدقّة بين الإعلانات المتاحة.')
         );
       }
       setSearched(true);
@@ -915,18 +998,30 @@ export default function Home() {
     if (cheapestIntent) {
       // تسمية صريحة تعكس السعر الأدنى الحقيقي لنفس النوع المطلوب (لا التباس بأنواع أخرى).
       const lowest = pool.reduce((a, b) => (b.adv < a.adv ? b : a));
-      const typeWord = reqTypeLabel || (lang === 'en' ? 'property' : 'عقار');
-      const inHood = reqHood ? (lang === 'en' ? ` in ${reqHood}` : ` في ${reqHood}`) : '';
+      const typeWord = reqSector === 'commercial'
+        ? (reqTypeLabel || (en ? 'commercial property' : 'عقار تجاري'))
+        : (reqType ? (en ? (AR_TYPE_EN[reqType] ?? reqType) : reqType) : (en ? 'property' : 'عقار'));
+      const inHood = reqHood ? (en ? ` in ${hoodDisp(reqHood, en)}` : ` في ${reqHood}`) : '';
       setAiReply(
-        lang === 'en'
+        en
           ? `Cheapest available ${typeWord}${inHood}: ${lowest.title} — ${nf(lowest.adv)} ${t('mkt.perYear')}.`
           : `أرخص ${typeWord}${inHood}: ${lowest.title} — ${nf(lowest.adv)} ريال/سنة.`
       );
     } else {
-      const crit = [reqHood, reqTypeLabel, reqMaxPrice ? `حتى ${nf(reqMaxPrice)} ريال` : null].filter(Boolean).join(' · ');
-      setAiReply(
-        `${pool.length === 1 ? 'إعلان واحد مطابق' : `${nf(pool.length)} إعلانات مطابقة`}${crit ? ` لطلبك (${crit})` : ' لطلبك'}. الأنسب: ${best.title} في ${best.hood} — ${nf(best.adv)} ريال.`
-      );
+      const typeDisp = reqSector === 'commercial'
+        ? reqTypeLabel
+        : (reqType ? (en ? (AR_TYPE_EN[reqType] ?? reqType) : reqType) : null);
+      if (en) {
+        const crit = [hoodDisp(reqHood, en) || null, typeDisp, reqMaxPrice ? `up to ${nf(reqMaxPrice)} SAR` : null].filter(Boolean).join(' · ');
+        setAiReply(
+          `${pool.length === 1 ? '1 matching listing' : `${nf(pool.length)} matching listings`}${crit ? ` for your search (${crit})` : ''}. Top pick: ${best.title} in ${hoodDisp(best.hood, en)} — ${nf(best.adv)} SAR.`
+        );
+      } else {
+        const crit = [reqHood, reqTypeLabel, reqMaxPrice ? `حتى ${nf(reqMaxPrice)} ريال` : null].filter(Boolean).join(' · ');
+        setAiReply(
+          `${pool.length === 1 ? 'إعلان واحد مطابق' : `${nf(pool.length)} إعلانات مطابقة`}${crit ? ` لطلبك (${crit})` : ' لطلبك'}. الأنسب: ${best.title} في ${best.hood} — ${nf(best.adv)} ريال.`
+        );
+      }
     }
     setSearched(true);
     scrollToListings();
@@ -1220,7 +1315,7 @@ export default function Home() {
 
                   // ── مقارنة الأحياء بحسب كل نوع (سكني/تجاري) ──
                   if (r.mode === 'compare' && r.compareRows) {
-                    const hoodsLabel = r.compareRows[0]?.cells.map((c) => c.hood).join(' · ') ?? '';
+                    const hoodsLabel = r.compareRows[0]?.cells.map((c) => hoodDisp(c.hood, lang === 'en')).join(' · ') ?? '';
                     return (
                       <div className="reveal in">
                         <div className="bg-white border border-[#cfd9e4] rounded-2xl p-5 shadow-sm">
@@ -1242,7 +1337,7 @@ export default function Home() {
                                     <div className="flex flex-wrap gap-x-5 gap-y-1.5">
                                       {cr.cells.map((c) => (
                                         <div key={c.hood} className="text-xs">
-                                          <span className="text-[#5b6b7a]">{c.hood}: </span>
+                                          <span className="text-[#5b6b7a]">{hoodDisp(c.hood, lang === 'en')}: </span>
                                           {c.value != null ? (
                                             <span className="font-extrabold text-[#0A3D62]">{nf(c.value)} <span className="text-[10px] font-medium text-[#5b6b7a]">{unitLabel(cr.unit)}</span></span>
                                           ) : (
@@ -1254,7 +1349,7 @@ export default function Home() {
                                     {cheaper && diff != null && diff > 0 && (
                                       <div className="text-xs font-semibold text-[#1f7a44] mt-1.5 flex items-center gap-1">
                                         {msi('trending_down')}
-                                        <span>{sorted.length > 2 ? `${cheaper} ${t('mkt.cheaperHood')}` : `${cheaper} ${t('mkt.cheaperBy')} ${nf(diff)} ${unitLabel(cr.unit)}`}</span>
+                                        <span>{sorted.length > 2 ? `${hoodDisp(cheaper, lang === 'en')} ${t('mkt.cheaperHood')}` : `${hoodDisp(cheaper, lang === 'en')} ${t('mkt.cheaperBy')} ${nf(diff)} ${unitLabel(cr.unit)}`}</span>
                                       </div>
                                     )}
                                   </div>
@@ -1274,7 +1369,7 @@ export default function Home() {
                     <div className="reveal in">
                       <div className="bg-white border border-[#cfd9e4] rounded-2xl p-5 shadow-sm">
                         <div className="flex items-center gap-2 font-bold text-[#0A3D62] mb-2">
-                          {msi('insights')}<span>{sameHood ? `${t('mkt.title')} — ${r.rows[0].hood}` : t('mkt.title')}</span>
+                          {msi('insights')}<span>{sameHood ? `${t('mkt.title')} — ${hoodDisp(r.rows[0].hood, lang === 'en')}` : t('mkt.title')}</span>
                         </div>
                         {r.note && (
                           <div className="mb-3 text-xs text-[#8a6d18] bg-[#f7f1df] border border-[#e6d9ad] rounded-lg px-3 py-2">{r.note}</div>
@@ -1282,7 +1377,7 @@ export default function Home() {
                         <div className="space-y-2.5">
                           {r.rows.map((x) => (
                             <div key={x.hood + x.typeLabel} className="flex items-center justify-between gap-3 border-b border-[#f0f4f8] pb-2.5 last:border-0 last:pb-0">
-                              <div className="text-sm font-bold text-[#0f1a28]">{sameHood ? x.typeLabel : <>{x.hood} <span className="text-xs font-medium text-[#5b6b7a]">· {x.typeLabel}</span></>}</div>
+                              <div className="text-sm font-bold text-[#0f1a28]">{sameHood ? x.typeLabel : <>{hoodDisp(x.hood, lang === 'en')} <span className="text-xs font-medium text-[#5b6b7a]">· {x.typeLabel}</span></>}</div>
                               {x.value != null ? (
                                 <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
                                   <div className="text-[15px] font-extrabold text-[#0A3D62]">{nf(x.value)} <span className="text-[11px] font-medium text-[#5b6b7a]">{unitLabel(x.unit)}</span></div>
@@ -1411,32 +1506,33 @@ export default function Home() {
               </div>
               <div className="p-4 grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-xs text-gray-700 block mb-1 font-semibold">الحي</label>
+                  <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('search.hood')}</label>
                   <select value={filterHood} onChange={e => setFilterHood(e.target.value)} className={selectCls}>
-                    <option value="">كل الأحياء</option>
+                    <option value="">{t('search.allHoods')}</option>
                     {Object.keys(mktAvg).map(h => <option key={h} value={h}>{h}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-700 block mb-1 font-semibold">نوع العقار</label>
+                  <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('search.propType')}</label>
                   <select value={filterType} onChange={e => setFilterType(e.target.value)} className={selectCls}>
-                    <option value="">كل الأنواع</option>
+                    <option value="">{t('search.allTypes')}</option>
+                    {/* القيمة تبقى عربية (تطابق l.type/commercial_type)؛ التسمية فقط تُترجَم */}
                     {(filterSector === 'commercial'
-                      ? COMMERCIAL_TYPES.map((c) => ({ v: c.key as string, lbl: c.label as string }))
-                      : RESIDENTIAL_FILTER_TYPES.map((rt) => ({ v: rt, lbl: rt }))
+                      ? COMMERCIAL_TYPES.map((c) => ({ v: c.key as string, lbl: commT(c.key) }))
+                      : RESIDENTIAL_FILTER_TYPES.map((rt) => ({ v: rt, lbl: lang === 'en' ? (AR_TYPE_EN[rt] ?? rt) : rt }))
                     ).map((o) => <option key={o.v} value={o.v}>{o.lbl}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-700 block mb-1 font-semibold">الميزانية السنوية</label>
+                  <label className="text-xs text-gray-700 block mb-1 font-semibold">{t('search.budget')}</label>
                   <input type="number" value={filterBudget} onChange={e => setFilterBudget(e.target.value)}
-                    placeholder="مثال: 70000" className={inputCls} />
+                    placeholder={t('search.budgetPh')} className={inputCls} />
                 </div>
               </div>
               <div className="px-4 pb-4 flex items-center justify-between">
-                <div className="text-xs text-[#33414f]">{filtered.length} نتيجة · {filteredMapPoints.length} على الخريطة</div>
+                <div className="text-xs text-[#33414f]">{filtered.length} {t('search.results')} · {filteredMapPoints.length} {t('search.onMapCount')}</div>
                 {(filterHood || filterType || filterBudget) && (
-                  <button onClick={clearFilters} className="text-xs text-[#0A3D62] border border-[#cfd9e4] px-3 py-1.5 rounded-lg hover:bg-[#f0f4f8] transition-colors">مسح الفلاتر</button>
+                  <button onClick={clearFilters} className="text-xs text-[#0A3D62] border border-[#cfd9e4] px-3 py-1.5 rounded-lg hover:bg-[#f0f4f8] transition-colors">{t('search.clearFilters')}</button>
                 )}
               </div>
             </div>
@@ -1448,7 +1544,7 @@ export default function Home() {
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
                 <span className="text-[#1B6CA8]">{Icons.map}</span>
                 <span className="font-bold text-sm text-gray-900">{t('search.mapTitle')}</span>
-                <span className="text-xs text-[#33414f] mr-auto">{filteredMapPoints.length} عقار على الخريطة</span>
+                <span className="text-xs text-[#33414f] mr-auto">{filteredMapPoints.length} {t('search.propOnMap')}</span>
               </div>
               {/* الخريطة تُعرض دائماً وتفاعلية (تحمّل Leaflet دائماً) — الإعلانات بلا
                   إحداثيات لا تضع دبوساً فقط، والخريطة تبقى تعمل (تصفّح/تكبير).
@@ -1470,7 +1566,7 @@ export default function Home() {
             <div>
               <div className="flex justify-between items-center mb-3 px-1">
                 <h2 className="font-bold text-[#0f1a28] text-lg sec-underline">{t('search.resultsTitle')}</h2>
-                <div className="text-xs text-[#33414f] flex items-center gap-1">{Icons.chart} {filtered.length} نتيجة</div>
+                <div className="text-xs text-[#33414f] flex items-center gap-1">{Icons.chart} {filtered.length} {t('search.results')}</div>
               </div>
               {filtered.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-[#cfd9e4] p-8 text-center text-[#33414f] text-sm">
@@ -1695,6 +1791,14 @@ export default function Home() {
                   <button onClick={() => setPage('office')} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
                     {t('auth.enterOfficePanel')}
                   </button>
+                  {/* حذف الحساب — متاح لكل مستخدم غير المدير (متطلب Google Play) */}
+                  {!isAdmin && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <button onClick={() => setDelOpen(true)} className="text-xs text-red-600 font-bold hover:underline">
+                        {t('del.title')}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : forgotOpen ? (
                 <div>
@@ -2448,6 +2552,9 @@ export default function Home() {
         </div>
       )}
 
+      {/* نافذة حذف الحساب (بطاقة حساب الباحث) */}
+      <DeleteAccountModal open={delOpen} onClose={() => setDelOpen(false)} isOffice={hasOffice} officeId={myOfficeId} />
+
       {/* التذييل المشترك — على كل الصفحات العامة (هوية موحّدة) */}
       <SiteFooter onNavigate={go} />
     </div>
@@ -2457,6 +2564,8 @@ export default function Home() {
 // ═══ لوحة تحكم المكتب الكاملة ═══
 function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [offPage, setOffPage] = useState<'dashboard'|'listings'|'add'|'calc'|'inquiries'|'support'|'profile'|'settings'>('dashboard');
+  // نافذة حذف الحساب (منطقة الخطر في الإعدادات)
+  const [offDelOpen, setOffDelOpen] = useState(false);
   const [addStep, setAddStep] = useState(1);
   // الحاسبة الذكية: الحي والنوع بالاسم — يُقرأ متوسطهما من /admin (mktAvg) لا من أرقام ثابتة.
   const [cHood, setCHood] = useState(() => Object.keys(mktAvg)[0] ?? 'النرجس');
@@ -3675,10 +3784,26 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
               <div className="text-2xl font-bold mb-1">الأساسية</div>
               <div className="text-sm opacity-85">مجاناً لفترة محدودة</div>
             </div>
+
+            {/* منطقة الخطر — حذف الحساب نهائياً (متطلب Google Play) */}
+            <div className="bg-white rounded-xl border border-red-200 p-5 shadow-sm mt-4">
+              <div className="font-bold text-red-700 mb-1">حذف الحساب</div>
+              <div className="text-sm text-gray-600 leading-relaxed mb-4">
+                حذف نهائي لحساب مكتبك وكل بياناتك: كل إعلاناتك وصورها، والاستفسارات
+                التي وصلتك، وبيانات الدخول. لا يمكن التراجع عن هذا الإجراء.
+              </div>
+              <button onClick={() => setOffDelOpen(true)}
+                className="px-4 py-2.5 rounded-xl border border-red-300 text-red-700 text-sm font-bold hover:bg-red-50 transition-colors">
+                حذف الحساب نهائياً
+              </button>
+            </div>
           </div>
         )}
 
       </div>
+
+      {/* نافذة تأكيد حذف الحساب (مكتب) */}
+      <DeleteAccountModal open={offDelOpen} onClose={() => setOffDelOpen(false)} isOffice={true} officeId={myOffice?.id ?? null} />
     </div>
   );
 }
