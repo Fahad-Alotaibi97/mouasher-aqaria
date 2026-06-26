@@ -330,6 +330,71 @@ const PAGES = ['home', 'search', 'indicator', 'finance', 'inquiries', 'pricing',
 type PageId = typeof PAGES[number];
 const isPageId = (s: string): s is PageId => (PAGES as readonly string[]).includes(s);
 
+// ── المحتوى القانوني ثنائي اللغة (الخصوصية + الشروط) — يُعرَض حسب اللغة الحالية ──
+// ترجمة أمينة 1:1 للنص العربي القائم؛ نفس الأقسام والمعنى، بلا بنود مُخترَعة.
+// قسم «الحقوق» في الخصوصية يذكر حذف الحساب و/delete-account بنفس الصيغة في اللغتين
+// (متّسق لمراجعة Google Play — الميزة موجودة فعلاً، ليست مُفبركة).
+type LegalSection = { h: string; p: string };
+type LegalDoc = { title: string; updated: string; intro: string; sections: LegalSection[] };
+
+const PRIVACY: Record<'ar' | 'en', LegalDoc> = {
+  ar: {
+    title: 'سياسة الخصوصية',
+    updated: 'آخر تحديث: 2026',
+    intro: 'تُوضّح هذه السياسة كيفية جمع منصة «مؤشر العقارية» للمعلومات الشخصية واستخدامها وحمايتها عند استخدامك للمنصة. باستخدامك المنصة فإنك توافق على ما ورد في هذه السياسة.',
+    sections: [
+      { h: '١. المعلومات التي نجمعها', p: 'قد نجمع: الاسم، رقم الجوال، البريد الإلكتروني، ومحتوى الرسائل التي ترسلها عبر نموذج التواصل. وبالنسبة للمكاتب العقارية: بيانات المكتب ورقم رخصة فال وبيانات الوحدات المعروضة.' },
+      { h: '٢. كيف نستخدم معلوماتك', p: 'نستخدم المعلومات للرد على استفساراتك، عرض الإعلانات، تحسين خدماتنا، والتواصل معك بخصوص طلباتك. لا نستخدم بياناتك لأغراض خارج نطاق الخدمة دون موافقتك.' },
+      { h: '٣. مشاركة المعلومات', p: 'لا نبيع بياناتك الشخصية لأي طرف ثالث. قد نشارك بيانات محدودة مع مزوّدي الخدمات التقنية (مثل الاستضافة وقواعد البيانات) بالقدر اللازم لتشغيل المنصة فقط، أو عند طلب الجهات النظامية المختصة.' },
+      { h: '٤. حماية البيانات', p: 'نتّخذ تدابير تقنية وتنظيمية معقولة لحماية بياناتك من الوصول غير المصرّح به أو التعديل أو الإفشاء.' },
+      { h: '٥. حقوقك وحذف الحساب', p: 'يحق لك طلب الاطلاع على بياناتك أو تصحيحها أو حذفها. ويمكنك حذف حسابك وكل بياناتك الشخصية بنفسك في أي وقت من صفحة «حذف الحساب» (الرابط: /delete-account) أو من إعدادات حسابك داخل المنصة، أو بالتواصل معنا عبر القنوات الرسمية وسننفّذ طلبك.' },
+      { h: '٦. التعديلات', p: 'قد نُحدّث هذه السياسة من وقت لآخر، وسيُنشر أي تحديث على هذه الصفحة مع تاريخ آخر تعديل.' },
+      { h: '٧. التواصل', p: 'لأي استفسار بخصوص الخصوصية، تواصل معنا عبر نموذج «اترك رسالة» في المنصة.' },
+    ],
+  },
+  en: {
+    title: 'Privacy Policy',
+    updated: 'Last updated: 2026',
+    intro: 'This policy explains how the Mouasher platform collects, uses, and protects your personal information when you use the platform. By using the platform, you agree to the terms set out in this policy.',
+    sections: [
+      { h: '1. Information we collect', p: 'We may collect: your name, mobile number, email address, and the content of messages you send through the contact form. For real-estate offices: the office details, the FAL license number, and the details of the units listed.' },
+      { h: '2. How we use your information', p: 'We use your information to respond to your inquiries, display listings, improve our services, and contact you regarding your requests. We do not use your data for purposes outside the scope of the service without your consent.' },
+      { h: '3. Sharing information', p: 'We do not sell your personal data to any third party. We may share limited data with technical service providers (such as hosting and database providers), only to the extent necessary to operate the platform, or when required by the competent regulatory authorities.' },
+      { h: '4. Data protection', p: 'We take reasonable technical and organizational measures to protect your data from unauthorized access, alteration, or disclosure.' },
+      { h: '5. Your rights and account deletion', p: 'You have the right to request access to, correction of, or deletion of your data. You can delete your account and all your personal data yourself at any time from the “Delete account” page (link: /delete-account) or from your account settings within the platform, or by contacting us through our official channels, and we will carry out your request.' },
+      { h: '6. Changes', p: 'We may update this policy from time to time, and any update will be posted on this page together with the date of the last revision.' },
+      { h: '7. Contact', p: 'For any privacy-related question, contact us through the “Leave a message” form on the platform.' },
+    ],
+  },
+};
+
+const TERMS: Record<'ar' | 'en', LegalDoc> = {
+  ar: {
+    title: 'شروط الاستخدام',
+    updated: 'آخر تحديث: 2026',
+    intro: 'باستخدامك منصة «مؤشر العقارية» فإنك توافق على الالتزام بهذه الشروط.',
+    sections: [
+      { h: '١. طبيعة الخدمة', p: 'توفّر المنصة أداة استرشادية لمقارنة أسعار الإيجار بمتوسطات السوق، إضافةً لعرض إعلانات عقارية. «مؤشر أسعار الحي» (السعر المتوسط لعدد الصفقات المماثلة بنفس الحي) تقديري للاسترشاد فقط ولا يُعدّ تقييماً رسمياً مُلزِماً.' },
+      { h: '٢. مسؤولية المحتوى', p: 'المكاتب والمعلنون مسؤولون عن دقة بيانات إعلاناتهم وصحّة تراخيصهم. لا تتحمل المنصة مسؤولية أي اتفاق يتم خارجها بين الأطراف.' },
+      { h: '٣. الاستخدام المقبول', p: 'يُمنع استخدام المنصة لأي غرض غير نظامي أو لنشر بيانات مضلّلة أو إعلانات وهمية.' },
+      { h: '٤. حدود المسؤولية', p: 'تُقدَّم الخدمة «كما هي»، ولا تضمن المنصة خلوّها من الأخطاء أو دقّة كل البيانات المعروضة بشكل مطلق.' },
+      { h: '٥. التعديلات', p: 'يحق للمنصة تحديث هذه الشروط، ويسري التحديث فور نشره على هذه الصفحة.' },
+    ],
+  },
+  en: {
+    title: 'Terms of Use',
+    updated: 'Last updated: 2026',
+    intro: 'By using the Mouasher platform, you agree to abide by these terms.',
+    sections: [
+      { h: '1. Nature of the service', p: 'The platform provides a guidance tool for comparing rent prices against market averages, in addition to displaying real-estate listings. The “Neighborhood Price Index” (the average price across comparable deals in the same neighborhood) is an estimate for guidance only and does not constitute an official, binding valuation.' },
+      { h: '2. Content responsibility', p: 'Offices and advertisers are responsible for the accuracy of their listing data and the validity of their licenses. The platform bears no responsibility for any agreement reached between the parties outside of it.' },
+      { h: '3. Acceptable use', p: 'The platform may not be used for any unlawful purpose, or to publish misleading data or fake listings.' },
+      { h: '4. Limitation of liability', p: 'The service is provided “as is,” and the platform does not guarantee that it is free of errors or that all displayed data is absolutely accurate.' },
+      { h: '5. Changes', p: 'The platform reserves the right to update these terms, and the update takes effect as soon as it is published on this page.' },
+    ],
+  },
+};
+
 export default function Home() {
   const [page, setPage] = useState<PageId>('home');
   // المساعد الذكي — منطق محلّي بالكلمات المفتاحية (بدون أي استدعاء API)
@@ -1120,6 +1185,8 @@ export default function Home() {
                 <span>{msi('square_foot')} {l.area ?? '—'} {t('card.area')}</span>
               </>
             )}
+            {/* عمر العقار — يظهر فقط عند وجود قيمة (سكني/تجاري)، لا قيمة افتراضية */}
+            {l.propertyAge != null && <span>{msi('calendar_today')} {nf(l.propertyAge)} {t('spec.years')}</span>}
           </div>
           <div className="foot">
             <div className="price">{nf(l.adv)} <span>{t('card.perYearShort')}</span></div>
@@ -1175,12 +1242,14 @@ export default function Home() {
                 <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> {t('card.area')}</span>
                 {l.frontageCount != null && <span><b className="text-[#0f1a28]">{nf(l.frontageCount)}</b> {t('card.frontages')}</span>}
                 {l.parking != null && <span><b className="text-[#0f1a28]">{nf(l.parking)}</b> {t('card.parkings')}</span>}
+                {l.propertyAge != null && <span><b className="text-[#0f1a28]">{nf(l.propertyAge)}</b> {t('spec.years')}</span>}
               </div>
             ) : (
               <div className="flex items-center gap-4 mt-2.5 pt-2.5 border-t border-[#f0f4f8] text-[11px] text-[#33414f]">
                 <span><b className="text-[#0f1a28]">{l.rooms ?? '—'}</b> {t('card.rooms')}</span>
                 <span><b className="text-[#0f1a28]">{l.area ?? '—'}</b> {t('card.area')}</span>
                 <span><b className="text-[#0f1a28]">{l.baths ?? '—'}</b> {t('card.bath')}</span>
+                {l.propertyAge != null && <span><b className="text-[#0f1a28]">{nf(l.propertyAge)}</b> {t('spec.years')}</span>}
               </div>
             )}
             {chips.length > 0 && (
@@ -2108,6 +2177,8 @@ export default function Home() {
           if (l.rooms != null) keys.push({ icon: 'bed', val: l.rooms, label: 'غرف' });
           if (l.baths != null) keys.push({ icon: 'bathtub', val: l.baths, label: 'دورات المياه' });
         }
+        // عمر العقار (سكني/تجاري) — يظهر فقط عند وجود قيمة؛ التسمية تُترجَم لـ EN
+        if (l.propertyAge != null) keys.push({ icon: 'calendar_today', val: l.propertyAge, label: t('spec.years') });
 
         // المزايا — حقول منظّمة حقيقية فقط (المتوفّرة = true). لا مزايا مُفبركة.
         // التجاري: دورة مياه + مواقف (الحقول السكنية لا تُعرض للتجاري).
@@ -2430,30 +2501,23 @@ export default function Home() {
       {/* ═══ سياسة الخصوصية ═══ */}
       {(page === 'privacy' || page === 'terms') && (
         <div className="max-w-2xl mx-auto px-5 py-8">
-          <button onClick={() => setPage('search')} className="text-blue-600 text-sm font-medium mb-4 hover:underline">→ العودة للرئيسية</button>
-          {page === 'privacy' ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 text-gray-700 leading-relaxed text-sm space-y-4">
-              <h1 className="text-xl font-bold text-gray-900">سياسة الخصوصية</h1>
-              <p className="text-xs text-gray-400">آخر تحديث: 2026</p>
-              <p>تُوضّح هذه السياسة كيفية جمع منصة «مؤشر العقارية» للمعلومات الشخصية واستخدامها وحمايتها عند استخدامك للمنصة. باستخدامك المنصة فإنك توافق على ما ورد في هذه السياسة.</p>
-              <div><h2 className="font-bold text-gray-900 mb-1">١. المعلومات التي نجمعها</h2><p>قد نجمع: الاسم، رقم الجوال، البريد الإلكتروني، ومحتوى الرسائل التي ترسلها عبر نموذج التواصل. وبالنسبة للمكاتب العقارية: بيانات المكتب ورقم رخصة فال وبيانات الوحدات المعروضة.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٢. كيف نستخدم معلوماتك</h2><p>نستخدم المعلومات للرد على استفساراتك، عرض الإعلانات، تحسين خدماتنا، والتواصل معك بخصوص طلباتك. لا نستخدم بياناتك لأغراض خارج نطاق الخدمة دون موافقتك.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٣. مشاركة المعلومات</h2><p>لا نبيع بياناتك الشخصية لأي طرف ثالث. قد نشارك بيانات محدودة مع مزوّدي الخدمات التقنية (مثل الاستضافة وقواعد البيانات) بالقدر اللازم لتشغيل المنصة فقط، أو عند طلب الجهات النظامية المختصة.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٤. حماية البيانات</h2><p>نتّخذ تدابير تقنية وتنظيمية معقولة لحماية بياناتك من الوصول غير المصرّح به أو التعديل أو الإفشاء.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٥. حقوقك</h2><p>يحق لك طلب الاطلاع على بياناتك أو تصحيحها أو حذفها، وذلك بالتواصل معنا عبر القنوات الرسمية للمنصة.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٦. التعديلات</h2><p>قد نُحدّث هذه السياسة من وقت لآخر، وسيُنشر أي تحديث على هذه الصفحة مع تاريخ آخر تعديل.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٧. التواصل</h2><p>لأي استفسار بخصوص الخصوصية، تواصل معنا عبر نموذج «اترك رسالة» في المنصة.</p></div>            </div>
-          ) : (
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 text-gray-700 leading-relaxed text-sm space-y-4">
-              <h1 className="text-xl font-bold text-gray-900">شروط الاستخدام</h1>
-              <p className="text-xs text-gray-400">آخر تحديث: 2026</p>
-              <p>باستخدامك منصة «مؤشر العقارية» فإنك توافق على الالتزام بهذه الشروط.</p>
-              <div><h2 className="font-bold text-gray-900 mb-1">١. طبيعة الخدمة</h2><p>توفّر المنصة أداة استرشادية لمقارنة أسعار الإيجار بمتوسطات السوق، إضافةً لعرض إعلانات عقارية. «مؤشر أسعار الحي» (السعر المتوسط لعدد الصفقات المماثلة بنفس الحي) تقديري للاسترشاد فقط ولا يُعدّ تقييماً رسمياً مُلزِماً.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٢. مسؤولية المحتوى</h2><p>المكاتب والمعلنون مسؤولون عن دقة بيانات إعلاناتهم وصحّة تراخيصهم. لا تتحمل المنصة مسؤولية أي اتفاق يتم خارجها بين الأطراف.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٣. الاستخدام المقبول</h2><p>يُمنع استخدام المنصة لأي غرض غير نظامي أو لنشر بيانات مضلّلة أو إعلانات وهمية.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٤. حدود المسؤولية</h2><p>تُقدَّم الخدمة «كما هي»، ولا تضمن المنصة خلوّها من الأخطاء أو دقّة كل البيانات المعروضة بشكل مطلق.</p></div>
-              <div><h2 className="font-bold text-gray-900 mb-1">٥. التعديلات</h2><p>يحق للمنصة تحديث هذه الشروط، ويسري التحديث فور نشره على هذه الصفحة.</p></div>            </div>
-          )}
+          <button onClick={() => setPage('search')} className="text-blue-600 text-sm font-medium mb-4 hover:underline">
+            {lang === 'en' ? '← Back to home' : '→ العودة للرئيسية'}
+          </button>
+          {(() => {
+            // عرض حسب اللغة الحالية: عربي (افتراضي) أو إنجليزي — الاتجاه يرثه من <html>
+            const doc = (page === 'privacy' ? PRIVACY : TERMS)[lang];
+            return (
+              <div className="bg-white rounded-2xl border border-gray-200 p-6 text-gray-700 leading-relaxed text-sm space-y-4">
+                <h1 className="text-xl font-bold text-gray-900">{doc.title}</h1>
+                <p className="text-xs text-gray-400">{doc.updated}</p>
+                <p>{doc.intro}</p>
+                {doc.sections.map((s) => (
+                  <div key={s.h}><h2 className="font-bold text-gray-900 mb-1">{s.h}</h2><p>{s.p}</p></div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -2589,6 +2653,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   const [fHood, setFHood] = useState('النرجس');
   const [fRent, setFRent] = useState('');
   const [fArea, setFArea] = useState('');
+  const [fAge, setFAge] = useState(''); // عمر العقار بالسنوات (اختياري، 0..100)
   const [fRooms, setFRooms] = useState('2');
   const [fBaths, setFBaths] = useState('1');
   const [fCond, setFCond] = useState('حالة جيدة');
@@ -2691,7 +2756,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
 
   // تفريغ نموذج الإعلان (يُستدعى عند فتح «إضافة إعلان» حتى لا تبقى قيم تعديل سابق)
   const resetListingForm = () => {
-    setFType('شقة'); setFHood('النرجس'); setFRent(''); setFArea('');
+    setFType('شقة'); setFHood('النرجس'); setFRent(''); setFArea(''); setFAge('');
     setFRooms('2'); setFBaths('1'); setFCond('حالة جيدة');
     setFFurniture(''); setFKitchen(''); setFAc(''); setFParking(''); setFDesc('');
     setFSector('residential'); setFCommType('shop'); setFFrontage(''); setFFrontageWidth('');
@@ -2722,7 +2787,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     const sb = createClient();
     // نتدرّج كقراءة useAppData: مع الأعمدة الاختيارية أولاً ثم الأساسية إن غابت
     let r = await sb.from('listings')
-      .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,kitchen,ac,parking,description,images,images_by_category,lat,lng,maps_url,sector,commercial_type,frontage_count,frontage_width,allowed_activity,has_bathroom,floor_info')
+      .select('id,type,hood,advertised,area,rooms,baths,condition,cond_label,furnished,kitchen,ac,parking,description,images,images_by_category,lat,lng,maps_url,sector,commercial_type,frontage_count,frontage_width,allowed_activity,has_bathroom,floor_info,property_age')
       .eq('id', id).single();
     if (r.error) {
       r = await sb.from('listings')
@@ -2757,6 +2822,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
     setFHood((d.hood as string) || 'النرجس');
     setFRent(d.advertised != null ? String(d.advertised) : '');
     setFArea(d.area != null ? String(d.area) : '');
+    setFAge(d.property_age != null ? String(d.property_age) : '');
     setFRooms(d.rooms != null ? String(d.rooms) : '2');
     setFBaths(d.baths != null ? String(d.baths) : '1');
     setFCond((d.cond_label as string) || 'حالة جيدة');
@@ -3001,9 +3067,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       // خصائص اختيارية ('' ⇒ null) — أعمدتها تُضاف عبر ترحيلات (listing_attributes / commercial_sector).
       // كل الأعمدة الجديدة (sector/commercial_*) داخل attrs ليُسقطها مسار التراجع الآمن
       // (PGRST204/42703) إن لم تُنشأ بعد، فلا ينكسر النشر السكني قبل تشغيل commercial_sector.sql.
+      // عمر العقار: اختياري؛ قصّ آمن إلى 0..100 (لا يخالف قيد القاعدة)، '' أو غير رقمي ⇒ null
+      const ageParsed = parseInt(fAge);
+      const ageVal = fAge.trim() === '' || Number.isNaN(ageParsed) ? null : Math.max(0, Math.min(100, ageParsed));
       const attrs: Record<string, unknown> = {
         parking: fParking === '' ? null : parseInt(fParking),
         description: fDesc.trim() || null,
+        // عمر العقار بالسنوات — داخل attrs ليُسقطه التراجع الآمن قبل تشغيل listing_property_age.sql
+        property_age: ageVal,
         // القطاع + النوع التجاري (سكني افتراضي) — قابلة للإسقاط الآمن قبل الترحيل
         sector: fSector,
         commercial_type: isComm ? fCommType : null,
@@ -3058,7 +3129,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
           + (photoFails.length ? ` (تعذّر رفع صور: ${photoFails.join('، ')})` : '')
           + (dropped.length ? ` (لم تُحفظ خصائص: ${dropped.join('، ')} — شغّل supabase/storage_listing_images.sql)` : ''),
       });
-      setFRent(''); setFArea(''); setFDesc('');
+      setFRent(''); setFArea(''); setFAge(''); setFDesc('');
       Object.values(fPhotos).forEach((p) => { if (p) URL.revokeObjectURL(p.preview); });
       setFPhotos({});
       setEditingId(null); setExistingPhotos(null);
@@ -3339,11 +3410,14 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                       {Object.keys(mktAvg).map((h) => <option key={h} value={h}>{h}</option>)}
                     </select></div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="grid grid-cols-3 gap-3 mb-3">
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">الإيجار السنوي (ريال)</label>
                     <input type="number" value={fRent} onChange={e=>setFRent(e.target.value)} placeholder="65000" className={inputCls} /></div>
                   <div><label className="text-xs text-gray-700 font-semibold block mb-1">المساحة م²</label>
                     <input type="number" value={fArea} onChange={e=>setFArea(e.target.value)} placeholder="120" className={inputCls} /></div>
+                  {/* عمر العقار — اختياري، سكني وتجاري. عمود property_age (listing_property_age.sql) */}
+                  <div><label className="text-xs text-gray-700 font-semibold block mb-1">عمر العقار (سنوات)</label>
+                    <input type="number" min={0} max={100} value={fAge} onChange={e=>setFAge(e.target.value)} placeholder="اختياري — مثال: 5" className={inputCls} /></div>
                 </div>
                 {fSector === 'commercial' ? (
                   // ── حقول تجارية (لا غرف/دورات مياه كعدد سكني) ──

@@ -90,6 +90,9 @@ export const STRINGS: Record<string, Entry> = {
   'card.perYear': { ar: 'ريال/سنة', en: 'SAR/yr' },
   'card.perYearShort': { ar: 'ر.س/سنوياً', en: 'SAR/yr' },
   'card.priceIndex': { ar: 'مؤشر أسعار الحي', en: 'Neighborhood index' },
+  // عمر العقار (تسمية العرض على البطاقة/التفاصيل — تُترجَم؛ تظهر فقط عند وجود قيمة)
+  'spec.age': { ar: 'عمر العقار', en: 'Property age' },
+  'spec.years': { ar: 'سنة', en: 'yrs' },
   'card.city': { ar: 'الرياض', en: 'Riyadh' },
   'card.sar': { ar: 'ريال', en: 'SAR' },
   // شارات الخصائص على بطاقة البحث (chrome مُترجَم؛ القيمة مشتقّة من حقول حقيقية)

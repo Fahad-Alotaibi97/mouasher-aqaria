@@ -30,6 +30,7 @@ export interface UIListing {
   kitchen?: boolean | null;   // المطبخ راكب
   ac?: boolean | null;        // مكيّفة
   parking?: number | null;    // عدد المواقف
+  propertyAge?: number | null; // عمر العقار بالسنوات (اختياري؛ null = غير محدّد)
   cond: string;
   condLabel: string;
   description?: string;
@@ -102,11 +103,16 @@ export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) 
         // مع حقول القطاع التجاري (بعد تشغيل commercial_sector.sql) — تُجرَّب أولاً وترجع
         // لـ FULL3 بأمان قبل الترحيل فلا تنكسر القراءة (السكني يبقى افتراضياً).
         const FULL4 = FULL3 + ', sector, commercial_type, frontage_count, frontage_width, allowed_activity, has_bathroom, floor_info';
+        // مع عمر العقار (بعد تشغيل listing_property_age.sql) — تُجرَّب أولاً وترجع
+        // لـ FULL4 بأمان قبل الترحيل فلا تنكسر القراءة.
+        const FULL5 = FULL4 + ', property_age';
         const attempts: { sel: string; status: boolean }[] = [
+          { sel: FULL5, status: true },
           { sel: FULL4, status: true },
           { sel: FULL3, status: true },
           { sel: FULL2, status: true },
           { sel: FULL, status: true },
+          { sel: FULL5, status: false },
           { sel: FULL4, status: false },
           { sel: FULL3, status: false },
           { sel: FULL2, status: false },
@@ -137,6 +143,7 @@ export function useAppData(defaultMktAvg: MktAvg, defaultListings: UIListing[]) 
               kitchen: (r.kitchen as boolean) ?? null,
               ac: (r.ac as boolean) ?? null,
               parking: (r.parking as number) ?? null,
+              propertyAge: (r.property_age as number) ?? null,
               cond: (r.condition as string) || 'good',
               condLabel: (r.cond_label as string) || '',
               description: (r.description as string) || '',
