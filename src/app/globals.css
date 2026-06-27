@@ -60,7 +60,7 @@ body {
   --adm-outline: rgba(19,27,46,.10);            /* حدّ شعري خفيف */
   --adm-outline-strong: rgba(19,27,46,.20);
   --adm-primary: #006c49;     /* الأخضر — لون الإبراز (نص/أيقونة/شريط نشط) */
-  --adm-primary-container: #131b2e; /* شبه أسود — خلفيات صلبة (الصورة الرمزية) */
+  --adm-primary-container: #14224a; /* كحلي عميق — خلفيات صلبة (الصورة الرمزية/الأزرار) */
   --adm-on-primary: #ffffff;  /* نص فوق الأخضر/الأسود */
   --adm-secondary: #8a6d18;   /* ذهبي مقروء — تحذيرات/إحصاءات ثانوية */
   --adm-error: #b42318;       /* أحمر مقروء على الفاتح */
@@ -110,7 +110,7 @@ body {
 /* الأزرار الأساسية (التدرّج الكحلي→أزرق) → تدرّج شبه أسود (هوية primary مطابقة
    لـ .site) بنص فاتح. أشرطة RankList في التحليلات تُلوّن خضراء في الـ JSX. */
 .admin-shell .bg-gradient-to-l.from-\[\#1B6CA8\] {
-  background-image: linear-gradient(to left, #131b2e, #05070d);
+  background-image: linear-gradient(to left, #14224a, #0a1430);
 }
 
 /* حقول الإدخال على السطح الفاتح (الأسعار/التعديل): أبيض + نص داكن + حدّ شعري */
@@ -153,7 +153,7 @@ body {
 .stitch-home {
   --surface:#f6fafe; --surface-card:#ffffff; --surface-container:#eaeef2; --surface-dim:#d6dade;
   --surface-container-high:#e5e8ec; --surface-container-lowest:#ffffff; --surface-low:#f0f4f8;
-  --primary:#000000; --primary-container:#131b2e; --on-primary:#ffffff;
+  --primary:#14224a; --primary-container:#0e1b3a; --on-primary:#ffffff;
   --secondary:#006c49; --status-positive:#10B981; --status-negative:#EF4444; --gold:#C9A84C;
   --on-surface:#171c1f; --on-surface-variant:#45464d; --slate:#334155; --outline:#76777d; --outline-variant:#c6c6cd;
   --r-xl:0.75rem; --r-lg:0.5rem; --ease:cubic-bezier(.4,0,.2,1);
@@ -310,7 +310,8 @@ body {
 .site {
   --surface:#f6fafe; --surface-card:#ffffff; --surface-container:#eaeef2; --surface-dim:#d6dade;
   --surface-container-high:#e5e8ec; --surface-container-lowest:#ffffff; --surface-low:#f0f4f8;
-  --primary:#000000; --primary-container:#131b2e; --on-primary:#ffffff;
+  /* الهوية الأساسية: كحلي عميق دافئ (ثقة) — أزرار/أشرطة/حالات نشطة/تمييزات نصية */
+  --primary:#14224a; --primary-container:#0e1b3a; --on-primary:#ffffff;
   --secondary:#006c49; --status-positive:#10B981; --status-negative:#EF4444; --gold:#C9A84C;
   --on-surface:#171c1f; --on-surface-variant:#45464d; --slate:#334155; --outline:#76777d; --outline-variant:#c6c6cd;
   --r-xl:0.75rem; --r-lg:0.5rem; --ease:cubic-bezier(.4,0,.2,1);
@@ -436,10 +437,10 @@ body {
 .site .hover\:border-blue-300:hover{border-color:var(--gold);}
 .site .hover\:border-\[\#1B6CA8\]:hover{border-color:var(--gold);}
 .site .focus\:border-blue-500:focus{border-color:var(--primary-container);}
-/* التدرّجات الكحلية → تدرّج داكن (الهوية الأساسية) */
-.site .bg-gradient-to-br.from-\[\#0A3D62\]{background-image:linear-gradient(135deg,#131b2e,#05070d);}
-.site .bg-gradient-to-l.from-\[\#0A3D62\]{background-image:linear-gradient(to left,#05070d,#131b2e);}
-.site .bg-gradient-to-l.from-\[\#1B6CA8\]{background-image:linear-gradient(to left,#131b2e,#05070d);}
+/* التدرّجات الكحلية → كحلي عميق (الهوية الأساسية الجديدة) */
+.site .bg-gradient-to-br.from-\[\#0A3D62\]{background-image:linear-gradient(135deg,#14224a,#0a1430);}
+.site .bg-gradient-to-l.from-\[\#0A3D62\]{background-image:linear-gradient(to left,#0a1430,#14224a);}
+.site .bg-gradient-to-l.from-\[\#1B6CA8\]{background-image:linear-gradient(to left,#14224a,#0a1430);}
 .site .bg-gradient-to-br.from-blue-50{background-image:linear-gradient(135deg,var(--surface-container),var(--surface-card));}
 .site .bg-gradient-to-l.from-green-600{background-image:linear-gradient(to left,#0a8f63,#006c49);}
 /* الأزرار الذهبية تبقى ذهبية (الإبراز) — لا تُعاد تلوينها */

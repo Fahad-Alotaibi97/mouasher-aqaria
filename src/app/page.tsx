@@ -285,9 +285,9 @@ function photoSlots(rooms: number, baths: number): PhotoSlot[] {
 function commercialPhotoSlots(): PhotoSlot[] {
   return [
     { key: 'facade', label: 'الواجهة', req: true },
-    { key: 'c1', label: 'من الداخل ١' },
-    { key: 'c2', label: 'من الداخل ٢' },
-    { key: 'c3', label: 'من الداخل ٣' },
+    { key: 'c1', label: 'من الداخل 1' },
+    { key: 'c2', label: 'من الداخل 2' },
+    { key: 'c3', label: 'من الداخل 3' },
     { key: 'c4', label: 'دورة المياه / المرافق' },
   ];
 }
@@ -345,13 +345,13 @@ const PRIVACY: Record<'ar' | 'en', LegalDoc> = {
     updated: 'آخر تحديث: 2026',
     intro: 'تُوضّح هذه السياسة كيفية جمع منصة «مؤشر العقارية» للمعلومات الشخصية واستخدامها وحمايتها عند استخدامك للمنصة. باستخدامك المنصة فإنك توافق على ما ورد في هذه السياسة.',
     sections: [
-      { h: '١. المعلومات التي نجمعها', p: 'قد نجمع: الاسم، رقم الجوال، البريد الإلكتروني، ومحتوى الرسائل التي ترسلها عبر نموذج التواصل. وبالنسبة للمكاتب العقارية: بيانات المكتب ورقم رخصة فال وبيانات الوحدات المعروضة.' },
-      { h: '٢. كيف نستخدم معلوماتك', p: 'نستخدم المعلومات للرد على استفساراتك، عرض الإعلانات، تحسين خدماتنا، والتواصل معك بخصوص طلباتك. لا نستخدم بياناتك لأغراض خارج نطاق الخدمة دون موافقتك.' },
-      { h: '٣. مشاركة المعلومات', p: 'لا نبيع بياناتك الشخصية لأي طرف ثالث. قد نشارك بيانات محدودة مع مزوّدي الخدمات التقنية (مثل الاستضافة وقواعد البيانات) بالقدر اللازم لتشغيل المنصة فقط، أو عند طلب الجهات النظامية المختصة.' },
-      { h: '٤. حماية البيانات', p: 'نتّخذ تدابير تقنية وتنظيمية معقولة لحماية بياناتك من الوصول غير المصرّح به أو التعديل أو الإفشاء.' },
-      { h: '٥. حقوقك وحذف الحساب', p: 'يحق لك طلب الاطلاع على بياناتك أو تصحيحها أو حذفها. ويمكنك حذف حسابك وكل بياناتك الشخصية بنفسك في أي وقت من صفحة «حذف الحساب» (الرابط: /delete-account) أو من إعدادات حسابك داخل المنصة، أو بالتواصل معنا عبر القنوات الرسمية وسننفّذ طلبك.' },
-      { h: '٦. التعديلات', p: 'قد نُحدّث هذه السياسة من وقت لآخر، وسيُنشر أي تحديث على هذه الصفحة مع تاريخ آخر تعديل.' },
-      { h: '٧. التواصل', p: 'لأي استفسار بخصوص الخصوصية، تواصل معنا عبر نموذج «اترك رسالة» في المنصة.' },
+      { h: '1. المعلومات التي نجمعها', p: 'قد نجمع: الاسم، رقم الجوال، البريد الإلكتروني، ومحتوى الرسائل التي ترسلها عبر نموذج التواصل. وبالنسبة للمكاتب العقارية: بيانات المكتب ورقم رخصة فال وبيانات الوحدات المعروضة.' },
+      { h: '2. كيف نستخدم معلوماتك', p: 'نستخدم المعلومات للرد على استفساراتك، عرض الإعلانات، تحسين خدماتنا، والتواصل معك بخصوص طلباتك. لا نستخدم بياناتك لأغراض خارج نطاق الخدمة دون موافقتك.' },
+      { h: '3. مشاركة المعلومات', p: 'لا نبيع بياناتك الشخصية لأي طرف ثالث. قد نشارك بيانات محدودة مع مزوّدي الخدمات التقنية (مثل الاستضافة وقواعد البيانات) بالقدر اللازم لتشغيل المنصة فقط، أو عند طلب الجهات النظامية المختصة.' },
+      { h: '4. حماية البيانات', p: 'نتّخذ تدابير تقنية وتنظيمية معقولة لحماية بياناتك من الوصول غير المصرّح به أو التعديل أو الإفشاء.' },
+      { h: '5. حقوقك وحذف الحساب', p: 'يحق لك طلب الاطلاع على بياناتك أو تصحيحها أو حذفها. ويمكنك حذف حسابك وكل بياناتك الشخصية بنفسك في أي وقت من صفحة «حذف الحساب» (الرابط: /delete-account) أو من إعدادات حسابك داخل المنصة، أو بالتواصل معنا عبر القنوات الرسمية وسننفّذ طلبك.' },
+      { h: '6. التعديلات', p: 'قد نُحدّث هذه السياسة من وقت لآخر، وسيُنشر أي تحديث على هذه الصفحة مع تاريخ آخر تعديل.' },
+      { h: '7. التواصل', p: 'لأي استفسار بخصوص الخصوصية، تواصل معنا عبر نموذج «اترك رسالة» في المنصة.' },
     ],
   },
   en: {
@@ -376,11 +376,11 @@ const TERMS: Record<'ar' | 'en', LegalDoc> = {
     updated: 'آخر تحديث: 2026',
     intro: 'باستخدامك منصة «مؤشر العقارية» فإنك توافق على الالتزام بهذه الشروط.',
     sections: [
-      { h: '١. طبيعة الخدمة', p: 'توفّر المنصة أداة استرشادية لمقارنة أسعار الإيجار بمتوسطات السوق، إضافةً لعرض إعلانات عقارية. «مؤشر أسعار الحي» (السعر المتوسط لعدد الصفقات المماثلة بنفس الحي) تقديري للاسترشاد فقط ولا يُعدّ تقييماً رسمياً مُلزِماً.' },
-      { h: '٢. مسؤولية المحتوى', p: 'المكاتب والمعلنون مسؤولون عن دقة بيانات إعلاناتهم وصحّة تراخيصهم. لا تتحمل المنصة مسؤولية أي اتفاق يتم خارجها بين الأطراف.' },
-      { h: '٣. الاستخدام المقبول', p: 'يُمنع استخدام المنصة لأي غرض غير نظامي أو لنشر بيانات مضلّلة أو إعلانات وهمية.' },
-      { h: '٤. حدود المسؤولية', p: 'تُقدَّم الخدمة «كما هي»، ولا تضمن المنصة خلوّها من الأخطاء أو دقّة كل البيانات المعروضة بشكل مطلق.' },
-      { h: '٥. التعديلات', p: 'يحق للمنصة تحديث هذه الشروط، ويسري التحديث فور نشره على هذه الصفحة.' },
+      { h: '1. طبيعة الخدمة', p: 'توفّر المنصة أداة استرشادية لمقارنة أسعار الإيجار بمتوسطات السوق، إضافةً لعرض إعلانات عقارية. «مؤشر أسعار الحي» (السعر المتوسط لعدد الصفقات المماثلة بنفس الحي) تقديري للاسترشاد فقط ولا يُعدّ تقييماً رسمياً مُلزِماً.' },
+      { h: '2. مسؤولية المحتوى', p: 'المكاتب والمعلنون مسؤولون عن دقة بيانات إعلاناتهم وصحّة تراخيصهم. لا تتحمل المنصة مسؤولية أي اتفاق يتم خارجها بين الأطراف.' },
+      { h: '3. الاستخدام المقبول', p: 'يُمنع استخدام المنصة لأي غرض غير نظامي أو لنشر بيانات مضلّلة أو إعلانات وهمية.' },
+      { h: '4. حدود المسؤولية', p: 'تُقدَّم الخدمة «كما هي»، ولا تضمن المنصة خلوّها من الأخطاء أو دقّة كل البيانات المعروضة بشكل مطلق.' },
+      { h: '5. التعديلات', p: 'يحق للمنصة تحديث هذه الشروط، ويسري التحديث فور نشره على هذه الصفحة.' },
     ],
   },
   en: {
@@ -468,7 +468,8 @@ export default function Home() {
   // اللغة/الاتجاه (i18n) — عربي افتراضي (RTL)، إنجليزي اختياري (LTR)
   const { t, dir, lang } = useLang();
   // تنسيق رقمي يتبع اللغة: أرقام عربية-هندية بالعربي، لاتينية بالإنجليزي (تجنّب chrome نصف-عربي)
-  const nf = (n: number) => n.toLocaleString(lang === 'en' ? 'en-US' : 'ar-SA');
+  // الأرقام دائماً بالأرقام الغربية (0-9) وبفاصلة آلاف نظيفة في الوضعين (عربي/إنجليزي).
+  const nf = (n: number) => n.toLocaleString('en-US');
   // تسمية النوع التجاري حسب اللغة (الإنجليزية من قاموس commType.*)
   const commT = (k?: string | null) => (lang === 'en' ? t(`commType.${k || 'shop'}`) : commLabel(k));
   // حكم مؤشر الحي مُترجَماً (مرتفع/مناسب/فرصة)
@@ -700,7 +701,7 @@ export default function Home() {
     const l = selectedListing;
     if (!l || !ctName.trim() || !ctPhone.trim() || ctSending) return;
     setCtSending(true); setCtErr(null);
-    const head = `بخصوص الإعلان: ${l.title || l.type} · ${l.type} · ${l.hood} · ${l.adv.toLocaleString('ar-SA')} ريال/سنة`;
+    const head = `بخصوص الإعلان: ${l.title || l.type} · ${l.type} · ${l.hood} · ${l.adv.toLocaleString('en-US')} ريال/سنة`;
     const message = [head, ctMsg.trim()].filter(Boolean).join('\n') || null;
     try {
       if (isSupabaseConfigured()) {
@@ -731,9 +732,9 @@ export default function Home() {
     const ref = `متوسط ${siType} في ${zoneName}`;
     if (!avg) return { type: 'none', icon: Icons.chart, title: t('ind.noAvg'), detail: '', color: 'bg-gray-50 border-gray-200' };
     if (!price) return { type: 'none', icon: Icons.chart, title: t('ind.prompt'), detail: '', color: 'bg-gray-50 border-gray-200' };
-    if (price > avg * 1.12) return { type: 'hi', icon: Icons.warning, title: t('ind.vHiTitle'), detail: `أعلى بـ ${(price - avg).toLocaleString('ar-SA')} ريال من ${ref}`, color: 'bg-orange-50 border-orange-300' };
-    if (price < avg * 0.85) return { type: 'lo', icon: Icons.target, title: t('ind.vLoTitle'), detail: `أقل بـ ${(avg - price).toLocaleString('ar-SA')} ريال من ${ref}`, color: 'bg-green-50 border-green-300' };
-    return { type: 'ok', icon: Icons.okCircle, title: t('ind.vOkTitle'), detail: `${ref} حوالي ${avg.toLocaleString('ar-SA')} ريال سنوياً`, color: 'bg-blue-50 border-blue-200' };
+    if (price > avg * 1.12) return { type: 'hi', icon: Icons.warning, title: t('ind.vHiTitle'), detail: `أعلى بـ ${(price - avg).toLocaleString('en-US')} ريال من ${ref}`, color: 'bg-orange-50 border-orange-300' };
+    if (price < avg * 0.85) return { type: 'lo', icon: Icons.target, title: t('ind.vLoTitle'), detail: `أقل بـ ${(avg - price).toLocaleString('en-US')} ريال من ${ref}`, color: 'bg-green-50 border-green-300' };
+    return { type: 'ok', icon: Icons.okCircle, title: t('ind.vOkTitle'), detail: `${ref} حوالي ${avg.toLocaleString('en-US')} ريال سنوياً`, color: 'bg-blue-50 border-blue-200' };
   };
 
   const indicator = checkPrice();
@@ -1119,7 +1120,7 @@ export default function Home() {
     if (aiResult?.kind !== 'none') return;
     if (aiResult.hood) setInqHood(aiResult.hood);
     if (aiResult.type) setInqType(aiResult.type);
-    const wish = `أبحث عن ${aiResult.type || 'وحدة'}${aiResult.hood ? ` في ${aiResult.hood}` : ''}${aiResult.maxPrice ? ` بسعر حتى ${aiResult.maxPrice.toLocaleString('ar-SA')} ريال` : ''} ولم أجد إعلاناً مطابقاً حالياً.`;
+    const wish = `أبحث عن ${aiResult.type || 'وحدة'}${aiResult.hood ? ` في ${aiResult.hood}` : ''}${aiResult.maxPrice ? ` بسعر حتى ${aiResult.maxPrice.toLocaleString('en-US')} ريال` : ''} ولم أجد إعلاناً مطابقاً حالياً.`;
     setInqMsg((prev) => prev || wish);
     go('inquiries');
   };
@@ -1491,7 +1492,7 @@ export default function Home() {
                   const crit = [
                     aiResult.hood ? `في ${aiResult.hood}` : null,
                     aiResult.type ? `من نوع ${aiResult.type}` : null,
-                    aiResult.maxPrice ? `بسعر حتى ${aiResult.maxPrice.toLocaleString('ar-SA')} ريال` : null,
+                    aiResult.maxPrice ? `بسعر حتى ${aiResult.maxPrice.toLocaleString('en-US')} ريال` : null,
                   ].filter(Boolean).join(' · ');
                   return (
                     <div className="reveal in">
@@ -1711,8 +1712,8 @@ export default function Home() {
                   const cSample = commIndex[`${siZone}|${siCommType}`]?.sampleSize ?? null;
                   const cPrice = parseInt(siPrice) || 0;
                   // عدد الصفقات (sample_size) يُعرَض بجانب المتوسط — مصداقية المؤشر التجاري
-                  const dealsTxt = cSample != null && cSample > 0 ? ` · عدد الصفقات: ${cSample.toLocaleString('ar-SA')}` : '';
-                  const avgTxt = cAvg != null ? `متوسط ${commLabel(siCommType)} في ${siZone}: ${cAvg.toLocaleString('ar-SA')} ريال/م² سنوياً${dealsTxt}` : '';
+                  const dealsTxt = cSample != null && cSample > 0 ? ` · عدد الصفقات: ${cSample.toLocaleString('en-US')}` : '';
+                  const avgTxt = cAvg != null ? `متوسط ${commLabel(siCommType)} في ${siZone}: ${cAvg.toLocaleString('en-US')} ريال/م² سنوياً${dealsTxt}` : '';
                   return (
                     <>
                       <div className="grid grid-cols-2 gap-3 mb-3">
@@ -1747,7 +1748,7 @@ export default function Home() {
                             const hi = cPrice > cAvg * 1.12, lo = cPrice < cAvg * 0.85;
                             const cls = hi ? 'bg-orange-50 border-orange-300 text-orange-700' : lo ? 'bg-green-50 border-green-300 text-green-700' : 'bg-blue-50 border-blue-200 text-blue-800';
                             const ttl = hi ? t('ind.commHi') : lo ? t('ind.commLo') : t('ind.commOk');
-                            return <div className={`p-3 rounded-xl border ${cls}`}><div className="font-bold text-sm">{ttl}</div><div className="text-xs mt-0.5 text-gray-600">{avgTxt} · الفرق {Math.abs(cPrice - cAvg).toLocaleString('ar-SA')} ريال/م².</div></div>;
+                            return <div className={`p-3 rounded-xl border ${cls}`}><div className="font-bold text-sm">{ttl}</div><div className="text-xs mt-0.5 text-gray-600">{avgTxt} · الفرق {Math.abs(cPrice - cAvg).toLocaleString('en-US')} ريال/م².</div></div>;
                           })()}
                         </>
                       )}
@@ -2237,18 +2238,18 @@ export default function Home() {
         const amen: string[] = [];
         if (isComm) {
           if (l.hasBathroom) amen.push('دورة مياه');
-          if (l.parking && l.parking >= 1) amen.push(l.parking > 1 ? `${l.parking.toLocaleString('ar-SA')} مواقف` : 'موقف سيارة');
+          if (l.parking && l.parking >= 1) amen.push(l.parking > 1 ? `${l.parking.toLocaleString('en-US')} مواقف` : 'موقف سيارة');
         } else {
           if (l.furnished) amen.push('مفروشة');
           if (l.kitchen) amen.push('مطبخ راكب');
           if (l.ac) amen.push('مكيّفة');
-          if (l.parking && l.parking >= 1) amen.push(l.parking > 1 ? `${l.parking.toLocaleString('ar-SA')} مواقف` : 'موقف سيارة');
+          if (l.parking && l.parking >= 1) amen.push(l.parking > 1 ? `${l.parking.toLocaleString('en-US')} مواقف` : 'موقف سيارة');
         }
         // تفاصيل تجارية نصّية إضافية (تظهر فقط إن وُجدت قيمتها الحقيقية)
         const commRows: { label: string; val: string }[] = [];
         if (isComm) {
           if (l.activity) commRows.push({ label: 'النشاط المسموح', val: l.activity });
-          if (l.frontageWidth != null) commRows.push({ label: 'عرض الواجهة', val: `${l.frontageWidth.toLocaleString('ar-SA')} م` });
+          if (l.frontageWidth != null) commRows.push({ label: 'عرض الواجهة', val: `${l.frontageWidth.toLocaleString('en-US')} م` });
           if (l.floorInfo) commRows.push({ label: 'الدور/الوحدة', val: l.floorInfo });
         }
 
@@ -2300,7 +2301,7 @@ export default function Home() {
                             onClick={() => (isMore ? setLightbox({ shots, idx: i }) : setDetailShot(i))} aria-label={s.label}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={s.url} alt={s.label} />
-                            {isMore && <span className="more">+{(overflow + 1).toLocaleString('ar-SA')}</span>}
+                            {isMore && <span className="more">+{(overflow + 1).toLocaleString('en-US')}</span>}
                           </button>
                         );
                       })}
@@ -2329,13 +2330,13 @@ export default function Home() {
                         {commCmp && <PriceGauge ratio={commRatio} color={commColor} />}
                         {commCmp && <div className="ld-verdict" style={{ color: commColor }}>{rl(commSt)}</div>}
                         <div className="ld-gauge-rows">
-                          <div className="row"><span>متوسط الحي التجاري ({commLabel(l.commercialType)})</span><b>{commAvg!.toLocaleString('ar-SA')} ريال/م²</b></div>
-                          {commSample != null && commSample > 0 && <div className="row"><span>عدد الصفقات</span><b>{commSample.toLocaleString('ar-SA')}</b></div>}
-                          {listPerM2 != null && <div className="row"><span>سعر متر هذا الإعلان</span><b>{listPerM2.toLocaleString('ar-SA')} ريال/م²</b></div>}
+                          <div className="row"><span>متوسط الحي التجاري ({commLabel(l.commercialType)})</span><b>{commAvg!.toLocaleString('en-US')} ريال/م²</b></div>
+                          {commSample != null && commSample > 0 && <div className="row"><span>عدد الصفقات</span><b>{commSample.toLocaleString('en-US')}</b></div>}
+                          {listPerM2 != null && <div className="row"><span>سعر متر هذا الإعلان</span><b>{listPerM2.toLocaleString('en-US')} ريال/م²</b></div>}
                           {commCmp && (
                             <div className="row cmp" style={{ color: commColor }}>
-                              {listPerM2! > commAvg! ? `أعلى من متوسط الحي بـ ${commDiff.toLocaleString('ar-SA')} ريال/م²`
-                                : listPerM2! < commAvg! ? `أقل من متوسط الحي بـ ${commDiff.toLocaleString('ar-SA')} ريال/م²`
+                              {listPerM2! > commAvg! ? `أعلى من متوسط الحي بـ ${commDiff.toLocaleString('en-US')} ريال/م²`
+                                : listPerM2! < commAvg! ? `أقل من متوسط الحي بـ ${commDiff.toLocaleString('en-US')} ريال/م²`
                                   : 'مطابق لمتوسط الحي'}
                             </div>
                           )}
@@ -2363,11 +2364,11 @@ export default function Home() {
                       <PriceGauge ratio={ratio} color={vColor} />
                       <div className="ld-verdict" style={{ color: vColor }}>{rl(st)}</div>
                       <div className="ld-gauge-rows">
-                        <div className="row"><span>متوسط الحي ({l.type})</span><b>{fair.toLocaleString('ar-SA')} ريال</b></div>
-                        <div className="row"><span>هذا الإعلان</span><b>{l.adv.toLocaleString('ar-SA')} ريال</b></div>
+                        <div className="row"><span>متوسط الحي ({l.type})</span><b>{fair.toLocaleString('en-US')} ريال</b></div>
+                        <div className="row"><span>هذا الإعلان</span><b>{l.adv.toLocaleString('en-US')} ريال</b></div>
                         <div className="row cmp" style={{ color: vColor }}>
-                          {l.adv > fair ? `أعلى من متوسط الحي بـ ${diff.toLocaleString('ar-SA')} ريال`
-                            : l.adv < fair ? `أقل من متوسط الحي بـ ${diff.toLocaleString('ar-SA')} ريال`
+                          {l.adv > fair ? `أعلى من متوسط الحي بـ ${diff.toLocaleString('en-US')} ريال`
+                            : l.adv < fair ? `أقل من متوسط الحي بـ ${diff.toLocaleString('en-US')} ريال`
                               : 'مطابق لمتوسط الحي'}
                         </div>
                       </div>
@@ -2380,7 +2381,7 @@ export default function Home() {
                       {keys.map((k) => (
                         <div key={k.label} className="ld-key">
                           {msi(k.icon)}
-                          <b>{k.val.toLocaleString('ar-SA')}</b>
+                          <b>{k.val.toLocaleString('en-US')}</b>
                           <span>{k.label}</span>
                         </div>
                       ))}
@@ -2468,13 +2469,13 @@ export default function Home() {
                               // eslint-disable-next-line @next/next/no-img-element
                               ? <img src={simg} alt={s.title} />
                               : <div className="ph">{msi('home_work')}</div>}
-                            <span className="ld-sim-price">{s.adv.toLocaleString('ar-SA')} ريال</span>
+                            <span className="ld-sim-price">{s.adv.toLocaleString('en-US')} ريال</span>
                           </div>
                           <div className="ld-sim-body">
                             <div className="ld-sim-title">{s.title || `${s.type} — ${s.hood}`}</div>
                             <div className="ld-sim-specs">
-                              {s.rooms != null && <span>{msi('bed')}{s.rooms.toLocaleString('ar-SA')} غرف</span>}
-                              {s.area != null && <span>{msi('square_foot')}{s.area.toLocaleString('ar-SA')} م²</span>}
+                              {s.rooms != null && <span>{msi('bed')}{s.rooms.toLocaleString('en-US')} غرف</span>}
+                              {s.area != null && <span>{msi('square_foot')}{s.area.toLocaleString('en-US')} م²</span>}
                             </div>
                           </div>
                         </button>
@@ -2511,7 +2512,7 @@ export default function Home() {
             <div className="absolute top-0 inset-x-0 flex items-center justify-between px-4 py-3 text-white" onClick={(e) => e.stopPropagation()}>
               <div className="text-sm font-bold flex items-center gap-2">
                 <span>{cur.label}</span>
-                {many && <span className="text-white/70 text-xs">{(idx + 1).toLocaleString('ar-SA')} / {shots.length.toLocaleString('ar-SA')}</span>}
+                {many && <span className="text-white/70 text-xs">{(idx + 1).toLocaleString('en-US')} / {shots.length.toLocaleString('en-US')}</span>}
               </div>
               <button onClick={() => setLightbox(null)} aria-label="إغلاق"
                 className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-2xl leading-none flex items-center justify-center transition-colors">×</button>
@@ -3284,7 +3285,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
             {/* شارة العدد الحقيقي لاستفسارات العملاء غير المعالجة — لا أرقام ثابتة */}
             {s.id==='inquiries' && (() => {
               const n = myLeads.filter((l) => !l.handled).length;
-              return n > 0 ? <span className="float-left bg-red-500 text-white text-xs min-w-4 h-4 px-1 rounded-full flex items-center justify-center">{n.toLocaleString('ar-SA')}</span> : null;
+              return n > 0 ? <span className="float-left bg-red-500 text-white text-xs min-w-4 h-4 px-1 rounded-full flex items-center justify-center">{n.toLocaleString('en-US')}</span> : null;
             })()}
           </button>
         ))}
@@ -3342,7 +3343,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
               <button onClick={() => setOffPage('inquiries')}
                 className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm hover:border-blue-300 transition-all">
                 <div className="text-lg font-bold text-gray-900 mb-1">الردود</div>
-                <div className="text-xs text-gray-500">{myLeads.length > 0 ? `${myLeads.length.toLocaleString('ar-SA')} استفسار وصلك` : 'لا استفسارات بعد'}</div>
+                <div className="text-xs text-gray-500">{myLeads.length > 0 ? `${myLeads.length.toLocaleString('en-US')} استفسار وصلك` : 'لا استفسارات بعد'}</div>
               </button>
             </div>
           </div>
@@ -3375,7 +3376,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                   <div className="flex justify-between items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-gray-900 mb-1 truncate">{l.title}</div>
-                      <div className="text-sm text-gray-600">{l.advertised.toLocaleString('ar-SA')} ريال/سنة</div>
+                      <div className="text-sm text-gray-600">{l.advertised.toLocaleString('en-US')} ريال/سنة</div>
                     </div>
                     <span className={`text-xs px-2.5 py-1 rounded-xl font-bold whitespace-nowrap ${m.cls}`}>{m.label}</span>
                   </div>
@@ -3640,10 +3641,10 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                     <div className="text-sm font-bold text-gray-700 mb-3">النتيجة الذكية</div>
                     <div className="space-y-2">
                       {[
-                        { label:'مؤشر أسعار الحي', val:`${fair.toLocaleString('ar-SA')} ريال`, color:'text-[#0A3D62]', big:true },
-                        { label:'السعر التنافسي (-5%)', val:`${Math.round(fair*0.95).toLocaleString('ar-SA')} ريال`, color:'text-gray-700' },
-                        { label:'الحد الأدنى الآمن', val:`${minSafe.toLocaleString('ar-SA')} ريال`, color:'text-orange-600' },
-                        { label:'ربحك المتوقع', val:`${profit > 0 ? '+' : ''}${profit.toLocaleString('ar-SA')} ريال`, color: profit > 0 ? 'text-green-600' : 'text-red-600', big:true },
+                        { label:'مؤشر أسعار الحي', val:`${fair.toLocaleString('en-US')} ريال`, color:'text-[#0A3D62]', big:true },
+                        { label:'السعر التنافسي (-5%)', val:`${Math.round(fair*0.95).toLocaleString('en-US')} ريال`, color:'text-gray-700' },
+                        { label:'الحد الأدنى الآمن', val:`${minSafe.toLocaleString('en-US')} ريال`, color:'text-orange-600' },
+                        { label:'ربحك المتوقع', val:`${profit > 0 ? '+' : ''}${profit.toLocaleString('en-US')} ريال`, color: profit > 0 ? 'text-green-600' : 'text-red-600', big:true },
                       ].map(r => (
                         <div key={r.label} className="flex justify-between items-center py-2 border-b border-blue-100 last:border-0">
                           <span className="text-xs text-gray-500">{r.label}</span>
@@ -3755,10 +3756,10 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                 <div className="font-bold text-gray-800 mb-4">النتيجة</div>
                 <div className="space-y-3">
                   {[
-                    { label:'مؤشر أسعار الحي', val:`${fair.toLocaleString('ar-SA')} ريال`, color:'text-[#0A3D62]', big:true },
-                    { label:'السعر التنافسي (-5%)', val:`${Math.round(fair*0.95).toLocaleString('ar-SA')} ريال`, color:'text-gray-700' },
-                    { label:'الحد الأدنى الآمن', val:`${minSafe.toLocaleString('ar-SA')} ريال`, color:'text-orange-600' },
-                    { label:'الربح المتوقع سنوياً', val:`${profit > 0 ? '+' : ''}${profit.toLocaleString('ar-SA')} ريال`, color: profit > 0 ? 'text-green-600' : 'text-red-600', big:true },
+                    { label:'مؤشر أسعار الحي', val:`${fair.toLocaleString('en-US')} ريال`, color:'text-[#0A3D62]', big:true },
+                    { label:'السعر التنافسي (-5%)', val:`${Math.round(fair*0.95).toLocaleString('en-US')} ريال`, color:'text-gray-700' },
+                    { label:'الحد الأدنى الآمن', val:`${minSafe.toLocaleString('en-US')} ريال`, color:'text-orange-600' },
+                    { label:'الربح المتوقع سنوياً', val:`${profit > 0 ? '+' : ''}${profit.toLocaleString('en-US')} ريال`, color: profit > 0 ? 'text-green-600' : 'text-red-600', big:true },
                   ].map(r => (
                     <div key={r.label} className="flex justify-between items-center py-2.5 border-b border-blue-100 last:border-0">
                       <span className="text-sm text-gray-500">{r.label}</span>
@@ -3779,7 +3780,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
         {offPage === 'inquiries' && (
           <div>
             <div className="text-xl font-bold text-gray-900 mb-1">الاستفسارات</div>
-            <div className="text-sm text-gray-500 mb-5">{myLeads.length > 0 ? `${myLeads.length.toLocaleString('ar-SA')} استفسار وصلك` : 'استفسارات الباحثين على إعلاناتك تظهر هنا'}</div>
+            <div className="text-sm text-gray-500 mb-5">{myLeads.length > 0 ? `${myLeads.length.toLocaleString('en-US')} استفسار وصلك` : 'استفسارات الباحثين على إعلاناتك تظهر هنا'}</div>
             {myLeads.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
                 <div className="text-gray-400 text-sm">لا توجد استفسارات بعد. عندما يتواصل باحث بخصوص أحد إعلاناتك، يظهر طلبه هنا مباشرة.</div>
@@ -3788,7 +3789,7 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
               <div className="space-y-3">
                 {myLeads.map((inq) => {
                   const t = new Date(inq.created_at);
-                  const when = isNaN(t.getTime()) ? '' : t.toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' });
+                  const when = isNaN(t.getTime()) ? '' : t.toLocaleString('ar-SA-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' });
                   return (
                     <div key={inq.id} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-all">
                       <div className="flex gap-3">

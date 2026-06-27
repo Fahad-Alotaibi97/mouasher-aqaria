@@ -39,7 +39,7 @@ export const STRINGS: Record<string, Entry> = {
   // البطل (Hero) — العنوان يحمل القيمة الأساسية: سعر تثق به قبل التوقيع
   'hero.h1': { ar: 'إيجارك في الرياض، بسعر تطمئن له', en: 'Your next rental in Riyadh — at a price you can trust' },
   'hero.sub': { ar: 'قارن أي إيجار بمتوسط أسعار حيّه قبل التوقيع، وتصفّح عروض المكاتب على الخريطة.', en: 'Compare any rent to its neighborhood average before you sign, and browse office listings on the map.' },
-  'hero.placeholder': { ar: 'اكتب طلبك بكلامك — مثال: شقة ٣ غرف في النرجس تحت ٧٠ ألف', en: 'Describe what you want — e.g., a 3-bed apartment in Al-Narjis under 70k' },
+  'hero.placeholder': { ar: 'اكتب طلبك بكلامك — مثال: شقة 3 غرف في النرجس تحت 70 ألف', en: 'Describe what you want — e.g., a 3-bed apartment in Al-Narjis under 70k' },
   'hero.searchBtn': { ar: 'ابحث الآن', en: 'Search' },
   'hero.aiLabel': { ar: 'المساعد الذكي:', en: 'Smart assistant:' },
 

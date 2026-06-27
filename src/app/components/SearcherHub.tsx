@@ -29,7 +29,7 @@ export default function SearcherHub({ userId, onUnreadChange }: { userId: string
 
   const fmtDate = (s: string) => {
     const d = new Date(s);
-    return isNaN(d.getTime()) ? '' : d.toLocaleString(lang === 'en' ? 'en-US' : 'ar-SA', { dateStyle: 'medium', timeStyle: 'short' });
+    return isNaN(d.getTime()) ? '' : d.toLocaleString(lang === 'en' ? 'en-US' : 'ar-SA-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' });
   };
 
   const load = useCallback(async () => {

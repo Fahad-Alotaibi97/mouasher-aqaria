@@ -16,20 +16,24 @@ interface PgErr { code?: string; message?: string }
 function errHint(e: PgErr | null | undefined): string {
   if (!e) return '';
   if (e.code === '42703')
-    return 'الأعمدة الجديدة غير موجودة بعد — شغّل ملف supabase/admin_dashboard.sql في Supabase ثم أعد المحاولة.';
+    return 'بعض ميزات هذا القسم قيد الإعداد — ستظهر بياناته الكاملة قريباً.';
   if (e.code === '42P17' || /infinite recursion/i.test(e.message || ''))
-    return 'سياسة RLS متكرّرة (recursion) على profiles — شغّل supabase/admin_clients.sql بنسخته الآمنة (is_admin_user) لإزالة السياسة القديمة المتكرّرة.';
+    return 'تعذّر تحميل البيانات مؤقتاً — حاول مرة أخرى لاحقاً.';
   if (e.code === '42501' || /permission|policy|rls|denied/i.test(e.message || ''))
-    return 'صلاحية مرفوضة — تأكّد من تسجيل الدخول بحساب المدير ومن تطبيق سياسات RLS (admin_dashboard.sql).';
-  return e.message || 'حدث خطأ غير متوقع.';
+    return 'صلاحية غير كافية — تأكّد من تسجيل الدخول بحساب المدير.';
+  return 'تعذّر تحميل البيانات — حاول مرة أخرى لاحقاً.';
 }
 
 const fmtDate = (s?: string | null) => {
   if (!s) return '—';
-  try { return new Date(s).toLocaleDateString('ar-SA', { year: 'numeric', month: 'short', day: 'numeric' }); }
+  // أشهر عربية + أرقام غربية (ar-SA-u-nu-latn) — لا أرقام عربية-هندية.
+  try { return new Date(s).toLocaleDateString('ar-SA-u-nu-latn', { year: 'numeric', month: 'short', day: 'numeric' }); }
   catch { return '—'; }
 };
-const fmtNum = (n: number) => n.toLocaleString('ar-SA');
+const fmtNum = (n: number) => n.toLocaleString('en-US');
+
+// تأكيد قبل الإجراءات المصيرية/النشر العام (اعتماد/توثيق/تفعيل) — يمنع النشر بنقرة واحدة بالخطأ.
+const confirmAction = (msg: string) => typeof window === 'undefined' || window.confirm(msg);
 
 const card = 'bg-white rounded-2xl border border-[#cfd9e4] shadow-sm';
 
@@ -426,8 +430,8 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
       {err && <ErrBox e={err} />}
       {eventsMissing && (
         <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-sm mb-3 leading-relaxed">
-          جدول التتبّع <b>analytics_events</b> غير منشأ بعد — شغّل ملف <b>supabase/analytics_events.sql</b> في Supabase → SQL Editor
-          ليبدأ تسجيل نقرات الإعلانات والبحث واستخدام المؤشر. بقية الأرقام أدناه (الإعلانات/المكاتب/الاستفسارات) حقيقية وتعمل الآن.
+          تتبّع الاستخدام (نقرات الإعلانات والبحث واستخدام المؤشر) قيد الإعداد وسيبدأ التسجيل قريباً.
+          بقية الأرقام أدناه (الإعلانات/المكاتب/الاستفسارات) حقيقية وتعمل الآن.
         </div>
       )}
       {loading ? <Loading /> : !err && (
@@ -456,9 +460,9 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
             <SubCard title="المؤشر التجاري" hint="مؤشر أسعار تجاري منفصل تماماً عن السكني" icon="chart" tone="gold" accent="secondary">
               <div className="text-xs text-[#5b6b7a] leading-relaxed">
                 {commPricesCount === null ? (
-                  <>بانتظار البيانات — جدول <b>commercial_prices</b> غير منشأ بعد. شغّل <b>supabase/commercial_index.sql</b> مرة واحدة، ثم يُملأ لاحقاً (حي + نوع تجاري + سعر المتر²).</>
+                  <>المؤشر التجاري قيد الإعداد — سيُفعَّل ويُملأ لاحقاً (حي + نوع تجاري + سعر المتر²).</>
                 ) : commPricesCount === 0 ? (
-                  <>بانتظار البيانات — جدول <b>commercial_prices</b> فارغ حالياً (٠ صف). يُملأ لاحقاً فيظهر المؤشر التجاري للعامة. لا متوسطات مُفبركة.</>
+                  <>المؤشر التجاري فارغ حالياً (0 صف). يُملأ لاحقاً فيظهر للعامة. لا متوسطات مُفبركة.</>
                 ) : (
                   <>عدد صفوف المؤشر التجاري: <b>{fmtNum(commPricesCount)}</b> (حي + نوع تجاري + سعر المتر²).</>
                 )}
@@ -488,7 +492,7 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
               {profilesIncomplete && (
                 <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-sm mb-2 leading-relaxed">
                   أرقام المسجّلين ناقصة ({fmtNum(registered.total)} ملفاً مقابل {fmtNum(offices.length)} مكتباً) —
-                  شغّل <b>supabase/admin_clients.sql</b> (سياسة profiles_admin_read الآمنة) ثم «تحديث».
+                  قائمة المستخدمين قيد الإعداد؛ اضغط «تحديث» بعد قليل.
                 </div>
               )}
             </>
@@ -524,7 +528,7 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
 
               {/* أكثر الميزات استخداماً */}
               {eventsMissing ? (
-                <Empty text="يتطلّب تفعيل التتبّع — شغّل supabase/analytics_events.sql ثم analytics_page_view.sql." />
+                <Empty text="تتبّع الاستخدام قيد الإعداد — ستتجمّع هذه البيانات قريباً مع استخدام الزوار." />
               ) : (
                 <SubCard title="أكثر الميزات استخداماً" hint="أعداد دقيقة (COUNT) من أحداث التتبّع — كل الأنواع منذ تفعيل تتبّع كلٍّ منها" icon="star" tone="steel">
                   {!anyFeatureUse ? (
@@ -566,7 +570,7 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
 
               {/* سلوك الباحثين */}
               {eventsMissing ? (
-                <Empty text="يتطلّب هذا القسم تفعيل التتبّع — شغّل supabase/analytics_events.sql ثم ستتجمّع البيانات مع استخدام الزوار." />
+                <Empty text="تتبّع الاستخدام قيد الإعداد — ستتجمّع بيانات هذا القسم قريباً مع استخدام الزوار." />
               ) : (
                 <div className="grid md:grid-cols-2 gap-3">
                   <SubCard title="الأحياء الأكثر طلباً" hint="من بحث الفلاتر والمساعد الذكي" icon="pin" tone="navy">
@@ -619,7 +623,7 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
               {/* رغبات الباحثين غير المطابقة */}
               {wishesMissing ? (
                 <SubCard title="رغبات الباحثين غير المطابقة" icon="search" tone="gold" accent="secondary">
-                  <MiniEmpty text="شغّل supabase/search_wishes.sql ليبدأ تسجيل كل بحث لم يجد عرضاً مطابقاً." />
+                  <MiniEmpty text="تسجيل الطلبات غير المطابقة قيد الإعداد — سيظهر هنا كل بحث لم يجد عرضاً مطابقاً." />
                 </SubCard>
               ) : (
                 <SubCard title="رغبات الباحثين غير المطابقة" hint={`طلبات بلا عرض مطابق: ${fmtNum(wishes.length)} — أين الطلب بلا معروض`} icon="search" tone="gold" accent="secondary">
@@ -643,7 +647,7 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
               {/* استخدام مؤشر أسعار الحي */}
               {eventsMissing ? (
                 <SubCard title="استخدام مؤشر أسعار الحي" icon="chart" tone="gold" accent="primary">
-                  <MiniEmpty text="يتطلّب تفعيل التتبّع — شغّل supabase/analytics_events.sql." />
+                  <MiniEmpty text="تتبّع الاستخدام قيد الإعداد — ستظهر هذه البيانات قريباً." />
                 </SubCard>
               ) : (
                 <SubCard title="استخدام مؤشر أسعار الحي" hint={`إجمالي الاستخدام: ${fmtNum(indicatorUses.length)} مرة`} icon="chart" tone="gold" accent="primary">
@@ -653,7 +657,7 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                         <div key={v.key}>
                           <div className="flex items-center justify-between text-xs mb-0.5">
                             <span className={`font-bold ${v.txt}`}>{v.label}</span>
-                            <span className="text-[#0f1a28] font-bold">{fmtNum(v.count)} ({fmtNum(Math.round((v.count / indicatorUses.length) * 100))}٪)</span>
+                            <span className="text-[#0f1a28] font-bold">{fmtNum(v.count)} ({fmtNum(Math.round((v.count / indicatorUses.length) * 100))}%)</span>
                           </div>
                           <div className="h-2 bg-[#f0f4f8] rounded-full overflow-hidden">
                             <div className={`h-full bg-gradient-to-l ${v.cls} rounded-full`} style={{ width: `${Math.max(2, (v.count / indicatorUses.length) * 100)}%` }} />
@@ -678,7 +682,7 @@ export function StatsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                   </div>
                   <div className="flex items-center justify-between border-t border-[#f0f4f8] pt-2">
                     <span className="text-[#33414f]">التحويل: نقرات ← استفسارات</span>
-                    <span className="font-bold text-[#0f1a28]">{conversion === null ? '—' : `${fmtNum(conversion)}٪`}</span>
+                    <span className="font-bold text-[#0f1a28]">{conversion === null ? '—' : `${fmtNum(conversion)}%`}</span>
                   </div>
                   <div className="text-[11px] text-[#5b6b7a] leading-relaxed">
                     {conversion === null
@@ -850,7 +854,7 @@ export function ListingsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
                     )}
                     <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[#f0f4f8]">
                       {l.status !== 'approved' && (
-                        <button onClick={() => patch(l.id, { status: 'approved', rejection_note: null })} disabled={busy === l.id}
+                        <button onClick={() => { if (confirmAction('هل أنت متأكد من اعتماد ونشر هذا الإعلان للعامة؟')) patch(l.id, { status: 'approved', rejection_note: null }); }} disabled={busy === l.id}
                           className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-green-700 disabled:opacity-50">اعتماد</button>
                       )}
                       {l.status !== 'rejected' && (
@@ -954,18 +958,19 @@ export function OfficesSection({ sessionAdmin }: { sessionAdmin: boolean }) {
               </div>
               <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-[#f0f4f8]">
                 {o.status !== 'approved' && (
-                  <button onClick={() => patch(o.id, { status: 'approved', rejection_note: null })} disabled={busy === o.id}
+                  <button onClick={() => { if (confirmAction('هل أنت متأكد من اعتماد هذا المكتب؟')) patch(o.id, { status: 'approved', rejection_note: null }); }} disabled={busy === o.id}
                     className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-green-700 disabled:opacity-50">اعتماد</button>
                 )}
                 {o.status !== 'rejected' && (
                   <button onClick={() => rejectOffice(o.id)} disabled={busy === o.id}
                     className="text-xs bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1.5 rounded-lg font-bold hover:bg-orange-200 disabled:opacity-50">رفض بملاحظات</button>
                 )}
-                <button onClick={() => patch(o.id, { verified: !o.verified })} disabled={busy === o.id}
+                {/* التوثيق ينشر إعلانات المكتب مباشرة للعامة ⇒ تأكيد عند التفعيل */}
+                <button onClick={() => { if (o.verified || confirmAction('توثيق هذا المكتب؟ ستُنشر إعلاناته مباشرة للعامة دون مراجعة كل إعلان على حدة.')) patch(o.id, { verified: !o.verified }); }} disabled={busy === o.id}
                   className="text-xs bg-white border border-[#cfd9e4] text-[#0A3D62] px-3 py-1.5 rounded-lg font-bold hover:bg-[#f0f4f8] disabled:opacity-50">
                   {o.verified ? 'إلغاء التوثيق' : 'توثيق ✓'}
                 </button>
-                <button onClick={() => patch(o.id, { active: !o.active })} disabled={busy === o.id}
+                <button onClick={() => { if (o.active || confirmAction('تفعيل هذا المكتب؟ ستظهر إعلاناته المعتمدة للعامة.')) patch(o.id, { active: !o.active }); }} disabled={busy === o.id}
                   className={`text-xs px-3 py-1.5 rounded-lg font-bold border disabled:opacity-50 ${o.active ? 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200' : 'bg-[rgba(0,108,73,.10)] text-[var(--adm-primary)] border-[rgba(0,108,73,.28)] hover:bg-[rgba(0,108,73,.16)]'}`}>
                   {o.active ? 'إيقاف' : 'تفعيل'}
                 </button>
@@ -1173,8 +1178,8 @@ export function ClientsSection({ sessionAdmin }: { sessionAdmin: boolean }) {
       {err && <ErrBox e={err} />}
       {!err && !loading && rows.length < officesCount && (
         <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 text-sm mb-3 leading-relaxed">
-          القائمة ناقصة: يظهر {fmtNum(rows.length)} ملفاً بينما المكاتب وحدها {fmtNum(officesCount)} — سياسة قراءة المدير غير مفعّلة بعد.
-          شغّل <b>supabase/admin_clients.sql</b> (النسخة الآمنة عبر is_admin_user — بلا recursion) ثم اضغط «تحديث».
+          القائمة ناقصة: يظهر {fmtNum(rows.length)} ملفاً بينما المكاتب وحدها {fmtNum(officesCount)} — قائمة المستخدمين الكاملة قيد الإعداد.
+          اضغط «تحديث» بعد قليل.
         </div>
       )}
       <div className="flex gap-2 mb-3">
@@ -1236,14 +1241,22 @@ const SIDEBAR_ICONS: Record<AdminSection, React.ReactNode> = {
   leads: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>),
 };
 
-export function AdminSidebar({ section, setSection, userEmail, onExit, exitLabel }: {
+export function AdminSidebar({ section, setSection, userEmail, onExit, exitLabel, mobileOpen, onClose }: {
   section: AdminSection; setSection: (s: AdminSection) => void;
   userEmail: string | null; onExit: () => void; exitLabel: string;
+  mobileOpen?: boolean; onClose?: () => void;
 }) {
+  // اختيار قسم: على الجوال يغلق الدرج أيضاً
+  const pick = (s: AdminSection) => { setSection(s); onClose?.(); };
   return (
-    <aside className="w-full md:w-[260px] flex-shrink-0 md:sticky md:top-0 md:h-screen bg-[var(--adm-card)] md:border-l border-[var(--adm-outline)] flex flex-col">
-      {/* العلامة */}
-      <div className="px-5 pt-6 pb-5">
+    <>
+      {/* تغطية الجوال (خلف الدرج) */}
+      <div className={`md:hidden fixed inset-0 z-[55] bg-black/45 transition-opacity duration-300 ${mobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
+      <aside className={`bg-[var(--adm-card)] flex flex-col flex-shrink-0 overflow-y-auto
+        fixed top-0 right-0 h-full w-[280px] max-w-[85vw] z-[60] shadow-2xl transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}
+        md:static md:translate-x-0 md:shadow-none md:w-[260px] md:h-screen md:sticky md:top-0 md:z-auto md:border-l border-[var(--adm-outline)]`}>
+      {/* العلامة + زر إغلاق (جوال) */}
+      <div className="px-5 pt-6 pb-5 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <span className="w-9 h-9 rounded-xl bg-[rgba(0,108,73,.10)] border border-[rgba(0,108,73,.22)] flex items-center justify-center text-[var(--adm-primary)] flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 21h18M9 21V7l6-4v18M9 7H3v14" /><path d="M13 11h2M13 15h2M5 11h2M5 15h2" /></svg>
@@ -1253,6 +1266,9 @@ export function AdminSidebar({ section, setSection, userEmail, onExit, exitLabel
             <div className="text-[11px] text-[var(--adm-on-variant)] mt-0.5">لوحة الإدارة</div>
           </div>
         </div>
+        <button onClick={onClose} aria-label="إغلاق" className="md:hidden w-9 h-9 rounded-lg border border-[var(--adm-outline)] flex items-center justify-center text-[var(--adm-on-variant)]">
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+        </button>
       </div>
 
       {/* عناصر التنقّل — أيقونة + نص، مسافات مريحة، النشط بحبّة زمرّدية + شريط حافة */}
@@ -1260,7 +1276,7 @@ export function AdminSidebar({ section, setSection, userEmail, onExit, exitLabel
         {SIDEBAR_ITEMS.map((it) => {
           const isActive = section === it.id;
           return (
-            <button key={it.id} onClick={() => setSection(it.id)}
+            <button key={it.id} onClick={() => pick(it.id)}
               className={`w-full flex items-center gap-3 text-right px-4 py-3 rounded-xl text-sm mb-1 font-medium border-r-[3px] transition-colors ${isActive ? 'bg-[rgba(0,108,73,.10)] text-[var(--adm-primary)] font-bold border-[var(--adm-primary)]' : 'text-[var(--adm-on-variant)] border-transparent hover:bg-[var(--adm-high)] hover:text-[var(--adm-on)]'}`}>
               <span className="w-[18px] h-[18px] flex-shrink-0">{SIDEBAR_ICONS[it.id]}</span>
               {it.label}
@@ -1288,5 +1304,6 @@ export function AdminSidebar({ section, setSection, userEmail, onExit, exitLabel
         </button>
       </div>
     </aside>
+    </>
   );
 }

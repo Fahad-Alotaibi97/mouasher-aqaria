@@ -81,11 +81,13 @@ function approvedAvg(slots: (number | null)[]): number | null {
   return Math.round(filled.reduce((a, b) => a + b, 0) / filled.length);
 }
 
+// المتوسط الفارغ أو 0 = «لا بيانات» بصدق (لا نعرض «0 ريال») — لأن avg_rent غير nullable
+// فالصفر هو قيمة «بلا متوسط محفوظ».
 const fmt = (n: number | null | undefined) =>
-  n == null ? '—' : `${n.toLocaleString('ar-SA')} ريال`;
-// تنسيق المتوسط التجاري — ريال لكل متر² سنوياً (فارغ = شرطة، بلا رقم مُفبرك)
+  n == null || n <= 0 ? '—' : `${n.toLocaleString('en-US')} ريال`;
+// تنسيق المتوسط التجاري — ريال لكل متر² سنوياً (فارغ/صفر = شرطة، بلا رقم مُفبرك)
 const fmtM2 = (n: number | null | undefined) =>
-  n == null ? '—' : `${n.toLocaleString('ar-SA')} ريال/م²`;
+  n == null || n <= 0 ? '—' : `${n.toLocaleString('en-US')} ريال/م²`;
 // الأنواع التجارية الثلاثة (مفتاح القاعدة + التسمية العربية) — نفس ترتيب العام
 const COMM_TYPES: { key: 'shop' | 'office' | 'showroom'; label: string }[] = [
   { key: 'shop', label: 'محل' },
@@ -105,6 +107,8 @@ export default function AdminPage() {
 
   // القسم المعروض في الشريط الجانبي (الإحصائيات هي صفحة الهبوط بعد الدخول).
   const [section, setSection] = useState<AdminSection>('stats');
+  // درج التنقّل على الجوال (الشريط الجانبي يصبح درجاً منزلقاً تحت md).
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // عدّاد الرسائل غير المعالَجة لشارة الجرس في الشريط العلوي (رقم حقيقي من leads —
   // قراءة COUNT خفيفة، لا تمسّ المصادقة، تُحدَّث مع كل تبديل قسم). null = تعذّر/غير متاح.
@@ -336,8 +340,8 @@ export default function AdminPage() {
           const cErr = await saveCommercial();
           setMsg({
             ok: true,
-            text: 'تم حفظ المتوسطات الأساسية ✓ (لكن تفصيل الغرف و/أو الدور/الدوبلكس لم تُحفظ — شغّل supabase/admin_neighborhoods_v2.sql و supabase/add_floor_duplex.sql مرة واحدة).'
-              + (cErr ? ` — وتعذّر حفظ المتوسطات التجارية: ${cErr}` : ' والمتوسطات التجارية حُفظت.'),
+            text: 'تم حفظ المتوسطات الأساسية ✓ (تفصيل الغرف و/أو الدور/الدوبلكس قيد الإعداد ولم يُحفظ بعد).'
+              + (cErr ? ' — وتعذّر حفظ المتوسطات التجارية مؤقتاً.' : ' والمتوسطات التجارية حُفظت.'),
           });
           setSaving(false);
           return;
@@ -425,15 +429,24 @@ export default function AdminPage() {
           userEmail={user?.email ?? null}
           onExit={exitSession}
           exitLabel="تسجيل الخروج"
+          mobileOpen={mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
         />
 
         {/* عمود المحتوى */}
         <div className="flex-1 min-w-0 flex flex-col">
           {/* ── الشريط العلوي: عنوان القسم + جرس (عدّاد رسائل حقيقي) + هوية المدير ── */}
           <div className="sticky top-0 z-30 bg-[rgba(246,250,254,.85)] backdrop-blur border-b border-[var(--adm-outline)] px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-base font-extrabold text-[var(--adm-on)] truncate">{SECTION_TITLES[section]}</div>
-              <div className="text-[11px] text-[var(--adm-on-variant)]">مؤشر العقارية — لوحة الإدارة</div>
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* زر القائمة (جوال) — يفتح درج الأقسام */}
+              <button onClick={() => setMobileNavOpen(true)} aria-label="القائمة"
+                className="md:hidden w-10 h-10 rounded-xl bg-[var(--adm-card)] border border-[var(--adm-outline)] flex items-center justify-center text-[var(--adm-on)] flex-shrink-0">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+              </button>
+              <div className="min-w-0">
+                <div className="text-base font-extrabold text-[var(--adm-on)] truncate">{SECTION_TITLES[section]}</div>
+                <div className="text-[11px] text-[var(--adm-on-variant)]">مؤشر العقارية — لوحة الإدارة</div>
+              </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {/* جرس = اختصار حقيقي للرسائل + عدّاد الرسائل غير المعالَجة (رقم حقيقي) */}
@@ -446,7 +459,7 @@ export default function AdminPage() {
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></svg>
                 {!!unhandledLeads && unhandledLeads > 0 && (
                   <span className="absolute -top-1 -left-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--adm-secondary)] text-[#3a2a00] text-[10px] font-extrabold flex items-center justify-center">
-                    {unhandledLeads > 99 ? '99+' : unhandledLeads.toLocaleString('ar-SA')}
+                    {unhandledLeads > 99 ? '99+' : unhandledLeads.toLocaleString('en-US')}
                   </span>
                 )}
               </button>

@@ -104,15 +104,15 @@ export default function MapComponent({ points = [], onSelect }: { points?: MapPo
           '<div style="background:#E6F1FB;border-radius:8px;padding:9px;margin-bottom:7px">' +
             '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">' +
               '<span style="color:#6b7a8a">سعر المُعلن</span>' +
-              '<strong>' + l.adv.toLocaleString('ar-SA') + ' ريال</strong>' +
+              '<strong>' + l.adv.toLocaleString('en-US') + ' ريال</strong>' +
             '</div>' +
             '<div style="display:flex;justify-content:space-between;font-size:12px;border-top:1px dashed #B5D4F4;padding-top:4px">' +
               '<span style="color:#6b7a8a">مؤشر أسعار الحي</span>' +
-              '<strong style="color:#1B6CA8">' + l.fair.toLocaleString('ar-SA') + ' ريال</strong>' +
+              '<strong style="color:#1B6CA8">' + l.fair.toLocaleString('en-US') + ' ريال</strong>' +
             '</div>' +
           '</div>' +
           '<div style="text-align:center;margin-bottom:8px"><span style="background:' + color + '22;color:' + color + ';font-size:11px;padding:3px 10px;border-radius:8px;font-weight:700">' + (labels[l.st] || '') + '</span></div>' +
-          '<button class="ms-detail-btn" style="width:100%;background:#0A3D62;color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;font-family:\'IBM Plex Sans Arabic\',sans-serif;cursor:pointer">عرض التفاصيل</button>' +
+          '<button class="ms-detail-btn" style="width:100%;background:#14224a;color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;font-family:\'IBM Plex Sans Arabic\',sans-serif;cursor:pointer">عرض التفاصيل</button>' +
         '</div>';
       const marker = L.marker([l.lat, l.lng], { icon }).bindPopup(popup, { maxWidth: 240 });
       // زر «عرض التفاصيل» داخل النافذة المنبثقة ⇒ يفتح بطاقة التفاصيل الكاملة (Aqar-style).

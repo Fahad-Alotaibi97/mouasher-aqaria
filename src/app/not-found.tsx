@@ -35,7 +35,7 @@ export default function NotFound() {
             padding: '40px 28px',
           }}
         >
-          <div style={{ fontSize: 64, fontWeight: 800, lineHeight: 1, color: '#131b2e', letterSpacing: '-.02em' }}>٤٠٤</div>
+          <div style={{ fontSize: 64, fontWeight: 800, lineHeight: 1, color: '#14224a', letterSpacing: '-.02em' }}>404</div>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginTop: 16, marginBottom: 8, color: '#171c1f' }}>
             الصفحة غير موجودة
           </h1>
