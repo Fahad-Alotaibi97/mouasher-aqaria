@@ -388,6 +388,17 @@ export const STRINGS: Record<string, Entry> = {
   'hub.gateTitle': { ar: 'حسابك يتطلّب تسجيل الدخول', en: 'Your account requires sign-in' },
   'hub.gateBody': { ar: 'سجّل دخولك لرؤية استفساراتك وردود المكاتب وإشعاراتك.', en: 'Sign in to see your inquiries, office replies, and notifications.' },
 
+  // ── المرحلة 2: المفضّلة + تنبيهات الطلبات ──
+  'hub.tabFavorites': { ar: 'المفضّلة', en: 'Saved' },
+  'hub.tabWishes': { ar: 'تنبيهات الطلبات', en: 'My alerts' },
+  'hub.favEmpty': { ar: 'لم تحفظ أي إعلان بعد. اضغط أيقونة الحفظ على أي إعلان ليظهر هنا.', en: 'You haven’t saved any listings yet. Tap the bookmark on any listing to save it here.' },
+  'hub.unsave': { ar: 'إزالة', en: 'Remove' },
+  'hub.wishEmpty': { ar: 'لا توجد طلبات محفوظة بعد. حين يبحث المساعد ولا يجد تطابقاً، يُحفظ طلبك هنا وننبّهك عند توفّر ما يناسبه.', en: 'No saved searches yet. When the assistant finds no match, your request is saved here and we’ll alert you when something fits.' },
+  'hub.wishHint': { ar: 'نُنبّهك في الجرس عند اعتماد إعلان جديد يطابق طلبك.', en: 'We’ll notify you (bell) when a newly-approved listing matches your request.' },
+  'hub.wishBudget': { ar: 'الميزانية', en: 'Budget' },
+  'hub.wishAny': { ar: 'طلب عام', en: 'General request' },
+  'hub.wishDelete': { ar: 'حذف', en: 'Delete' },
+
   // ── الرد داخل المنصة (مشترك: مكتب/باحث) ──
   'reply.platformBtn': { ar: 'رد عبر المنصة', en: 'Reply on platform' },
   'reply.platformTitle': { ar: 'ردّك داخل المنصة', en: 'Your in-platform reply' },

@@ -485,8 +485,10 @@ export default function Home() {
   const [notifUnread, setNotifUnread] = useState(0);
   // نافذة حذف الحساب (بطاقة حساب الباحث في صفحة التسجيل)
   const [delOpen, setDelOpen] = useState(false);
+  // المفضّلة: معرّفات الإعلانات المحفوظة للمستخدم الحالي (favorites) — تغذّي زر الحفظ في البطاقات/التفاصيل.
+  const [favIds, setFavIds] = useState<Set<string>>(new Set());
   useEffect(() => {
-    if (!user || !isSupabaseConfigured()) { setHasOffice(false); setMyOfficeId(null); setAccountType(null); setNotifUnread(0); return; }
+    if (!user || !isSupabaseConfigured()) { setHasOffice(false); setMyOfficeId(null); setAccountType(null); setNotifUnread(0); setFavIds(new Set()); return; }
     let cancelled = false;
     (async () => {
       const sb = createClient();
@@ -504,15 +506,43 @@ export default function Home() {
         const { count } = await sb.from('notifications').select('id', { count: 'exact', head: true }).eq('read', false);
         unread = count ?? 0;
       } catch { /* تجاهل */ }
+      // المفضّلة (owner-only RLS) — غير قاتل إن غاب الجدول قبل searcher_part2.sql
+      let favs = new Set<string>();
+      try {
+        const { data: fv } = await sb.from('favorites').select('listing_id');
+        favs = new Set((fv ?? []).map((r) => r.listing_id as string));
+      } catch { /* تجاهل */ }
       if (!cancelled) {
         setHasOffice(office);
         setMyOfficeId(office ? (data![0].id as string) : null);
         setAccountType(role === 'office' || office ? 'office' : 'searcher');
         setNotifUnread(unread);
+        setFavIds(favs);
       }
     })();
     return () => { cancelled = true; };
   }, [user]);
+
+  // حفظ/إزالة إعلان من المفضّلة. غير مسجّل ⇒ توجيه لتسجيل الدخول (لا حفظ وهمي).
+  // الإعلانات الحقيقية فقط (uuid). تفاؤلي مع تراجع عند الفشل.
+  const toggleFav = async (id: string | number) => {
+    if (!user) {
+      setPage('pricing'); setAuthMode('login');
+      if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (typeof id !== 'string') return; // المفضّلة للإعلانات الحقيقية (uuid) فقط
+    if (!isSupabaseConfigured()) return;
+    const has = favIds.has(id);
+    setFavIds((prev) => { const n = new Set(prev); if (has) n.delete(id); else n.add(id); return n; });
+    try {
+      const sb = createClient();
+      if (has) await sb.from('favorites').delete().eq('listing_id', id);
+      else await sb.from('favorites').insert({ user_id: user.id, listing_id: id });
+    } catch {
+      setFavIds((prev) => { const n = new Set(prev); if (has) n.add(id); else n.delete(id); return n; });
+    }
+  };
 
   // عند فتح تفاصيل إعلان: جلب بيانات مكتبه المعلِن (اسم/رخصة/توثيق) من offices عبر
   // office_id — قراءة عامة (سياسة offices_read)، وبيانات حقيقية فقط؛ ما لا يوجد يُخفى.
@@ -1212,7 +1242,9 @@ export default function Home() {
           </div>
           <div className="foot">
             <div className="price">{nf(l.adv)} <span>{t('card.perYearShort')}</span></div>
-            <button className="save" aria-label={lang === 'en' ? 'Save' : 'حفظ'} onClick={(e) => e.stopPropagation()}>{msi('bookmark_border')}</button>
+            <button className="save" aria-label={favIds.has(String(l.id)) ? (lang === 'en' ? 'Saved' : 'محفوظ') : (lang === 'en' ? 'Save' : 'حفظ')}
+              onClick={(e) => { e.stopPropagation(); toggleFav(l.id); }}
+              style={favIds.has(String(l.id)) ? { color: '#14224a', borderColor: '#14224a' } : undefined}>{msi(favIds.has(String(l.id)) ? 'bookmark' : 'bookmark_border')}</button>
           </div>
         </div>
       </div>
@@ -1246,6 +1278,13 @@ export default function Home() {
             {isMatch && (
               <span className="absolute top-0 right-0 bg-[#C9A84C] text-[#0A3D62] text-[10px] font-bold px-2.5 py-1 rounded-bl-xl shadow">{t('card.bestMatch')}</span>
             )}
+            {/* زر الحفظ (المفضّلة) — غير المسجّل يُوجَّه لتسجيل الدخول */}
+            <button onClick={(e) => { e.stopPropagation(); toggleFav(l.id); }}
+              aria-label={favIds.has(String(l.id)) ? (lang === 'en' ? 'Saved' : 'محفوظ') : (lang === 'en' ? 'Save' : 'حفظ')}
+              className="absolute top-2 left-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-sm hover:bg-white transition-colors"
+              style={{ color: favIds.has(String(l.id)) ? '#14224a' : '#5b6b7a' }}>
+              {msi(favIds.has(String(l.id)) ? 'bookmark' : 'bookmark_border')}
+            </button>
           </div>
           {/* المعلومات (يسار) */}
           <div className="flex-1 min-w-0 p-3.5">
@@ -2139,7 +2178,7 @@ export default function Home() {
             <OfficeDashboard mktAvg={mktAvg} />
           ) : (
             // الباحث (أو قبل تحديد النوع) لا يرى إعداد/لوحة المكتب إطلاقاً — يُعرض حسابه
-            <SearcherHub userId={user.id} onUnreadChange={setNotifUnread} />
+            <SearcherHub userId={user.id} onUnreadChange={setNotifUnread} listings={listings} favIds={favIds} onToggleFav={toggleFav} onOpenListing={openListing} />
           )
         ) : (
           <div className="max-w-md mx-auto px-5 py-12 text-center">
@@ -2158,7 +2197,7 @@ export default function Home() {
       {/* ═══ SEARCHER HUB — حساب الباحث (استفساراتي + الردود + الإشعارات) ═══ */}
       {page === 'account' && (
         user ? (
-          <SearcherHub userId={user.id} onUnreadChange={setNotifUnread} />
+          <SearcherHub userId={user.id} onUnreadChange={setNotifUnread} listings={listings} favIds={favIds} onToggleFav={toggleFav} onOpenListing={openListing} />
         ) : (
           <div className="max-w-md mx-auto px-5 py-12 text-center">
             <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
@@ -2318,6 +2357,13 @@ export default function Home() {
                       <div className="ld-price">{nf(l.adv)}<span>{t('card.perYear')}</span></div>
                       <span className={`ld-cond ${l.cond}`}>{l.condLabel || t('detail.condUnknown')}</span>
                     </div>
+                    {/* حفظ الإعلان في المفضّلة — غير المسجّل يُوجَّه لتسجيل الدخول */}
+                    <button onClick={() => toggleFav(l.id)}
+                      className="inline-flex items-center gap-1.5 self-start text-xs font-bold px-3.5 py-2 rounded-lg border transition-colors mt-1"
+                      style={favIds.has(String(l.id)) ? { background: '#14224a', color: '#fff', borderColor: '#14224a' } : { background: '#fff', color: '#14224a', borderColor: '#cfd9e4' }}>
+                      {msi(favIds.has(String(l.id)) ? 'bookmark' : 'bookmark_border')}
+                      {favIds.has(String(l.id)) ? (lang === 'en' ? 'Saved' : 'محفوظ') : (lang === 'en' ? 'Save' : 'حفظ')}
+                    </button>
                   </div>
 
                   {/* مؤشر الحي — السكني: مقياس نصف دائري بالحكم الحقيقي + متوسط الحي + الفرق.

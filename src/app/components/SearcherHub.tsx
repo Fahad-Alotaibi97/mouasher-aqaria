@@ -13,19 +13,32 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useLang } from '@/lib/i18n';
+import type { UIListing } from '@/lib/useAppData';
 import PlatformReplyComposer from './PlatformReplyComposer';
 
 interface Lead { id: string; message: string | null; created_at: string; office_id: string | null }
 interface Reply { id: string; lead_id: string; sender: 'office' | 'client'; body: string; created_at: string }
 interface Notif { id: string; type: string; lead_id: string | null; listing_id: string | null; body: string | null; read: boolean; created_at: string }
+interface Wish { id: number; neighborhood: string | null; type: string | null; max_price: number | null; raw_query: string | null; created_at: string }
 
-export default function SearcherHub({ userId, onUnreadChange }: { userId: string; onUnreadChange?: (n: number) => void }) {
+type HubTab = 'inquiries' | 'notifications' | 'favorites' | 'wishes';
+
+export default function SearcherHub({ userId, onUnreadChange, listings, favIds, onToggleFav, onOpenListing }: {
+  userId: string;
+  onUnreadChange?: (n: number) => void;
+  listings?: UIListing[];
+  favIds?: Set<string>;
+  onToggleFav?: (id: string | number) => void;
+  onOpenListing?: (l: UIListing) => void;
+}) {
   const { t, lang, dir } = useLang();
-  const [tab, setTab] = useState<'inquiries' | 'notifications'>('inquiries');
+  const [tab, setTab] = useState<HubTab>('inquiries');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [replies, setReplies] = useState<Record<string, Reply[]>>({});
   const [notifs, setNotifs] = useState<Notif[]>([]);
+  const [wishes, setWishes] = useState<Wish[]>([]);
   const [loading, setLoading] = useState(true);
+  const nf = (n: number) => n.toLocaleString('en-US');
 
   const fmtDate = (s: string) => {
     const d = new Date(s);
@@ -51,16 +64,23 @@ export default function SearcherHub({ userId, onUnreadChange }: { userId: string
       } catch { /* تجاهل */ }
     }
     // الإشعارات
-    let nf: Notif[] = [];
+    let nfs: Notif[] = [];
     try {
       const { data } = await sb.from('notifications').select('id,type,lead_id,listing_id,body,read,created_at').order('created_at', { ascending: false }).limit(50);
-      nf = (data ?? []) as Notif[];
+      nfs = (data ?? []) as Notif[];
+    } catch { /* تجاهل */ }
+    // الرغبات/التنبيهات (owner-only RLS — تُرجع رغبات هذا الباحث فقط؛ [] إن غاب العمود قبل searcher_part2.sql)
+    let wshs: Wish[] = [];
+    try {
+      const { data } = await sb.from('search_wishes').select('id,neighborhood,type,max_price,raw_query,created_at').order('created_at', { ascending: false }).limit(50);
+      wshs = (data ?? []) as Wish[];
     } catch { /* تجاهل */ }
     setLeads(lds);
     setReplies(repMap);
-    setNotifs(nf);
+    setNotifs(nfs);
+    setWishes(wshs);
     setLoading(false);
-    onUnreadChange?.(nf.filter((n) => !n.read).length);
+    onUnreadChange?.(nfs.filter((n) => !n.read).length);
   }, [userId, onUnreadChange]);
 
   useEffect(() => { load(); }, [load]);
@@ -81,24 +101,35 @@ export default function SearcherHub({ userId, onUnreadChange }: { userId: string
     onUnreadChange?.(0);
   };
 
+  const deleteWish = async (id: number) => {
+    const sb = createClient();
+    try { await sb.from('search_wishes').delete().eq('id', id); } catch { /* تجاهل */ }
+    setWishes((prev) => prev.filter((w) => w.id !== id));
+  };
+
   const unread = notifs.filter((n) => !n.read).length;
+  // الإعلانات المحفوظة الظاهرة الآن = المتاحة للعامة من قائمة الإعلانات مطابقةً للمعرّفات المحفوظة.
+  const savedListings = (listings ?? []).filter((l) => favIds?.has(String(l.id)));
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6" dir={dir}>
       <h1 className="text-xl font-bold text-gray-900 mb-1">{t('hub.title')}</h1>
       <p className="text-sm text-gray-500 mb-4">{t('hub.subtitle')}</p>
 
-      {/* تبويبات */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
-        <button onClick={() => setTab('inquiries')}
-          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'inquiries' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}>
-          {t('hub.tabInquiries')}
-        </button>
-        <button onClick={() => setTab('notifications')}
-          className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all relative ${tab === 'notifications' ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}>
-          {t('hub.tabNotifications')}
-          {unread > 0 && <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 ml-1 align-middle bg-red-500 text-white text-[10px] rounded-full">{unread}</span>}
-        </button>
+      {/* تبويبات — شريط قابل للتمرير أفقياً (يتّسع لمزيد من الأقسام في المرحلة B) */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4 overflow-x-auto">
+        {([
+          ['inquiries', t('hub.tabInquiries')],
+          ['notifications', t('hub.tabNotifications')],
+          ['favorites', t('hub.tabFavorites')],
+          ['wishes', t('hub.tabWishes')],
+        ] as [HubTab, string][]).map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap relative ${tab === id ? 'bg-white text-[#0A3D62] shadow' : 'text-gray-500 hover:text-gray-700'}`}>
+            {label}
+            {id === 'notifications' && unread > 0 && <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 ml-1 align-middle bg-red-500 text-white text-[10px] rounded-full">{unread}</span>}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -142,7 +173,7 @@ export default function SearcherHub({ userId, onUnreadChange }: { userId: string
             })}
           </div>
         )
-      ) : (
+      ) : tab === 'notifications' ? (
         notifs.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm">{t('hub.notifEmpty')}</div>
         ) : (
@@ -167,6 +198,53 @@ export default function SearcherHub({ userId, onUnreadChange }: { userId: string
                 </button>
               ))}
             </div>
+          </div>
+        )
+      ) : tab === 'favorites' ? (
+        // ── المفضّلة ──
+        savedListings.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm">{t('hub.favEmpty')}</div>
+        ) : (
+          <div className="space-y-3">
+            {savedListings.map((l) => (
+              <div key={String(l.id)} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-3">
+                <button onClick={() => onOpenListing?.(l)} className="min-w-0 text-start flex-1">
+                  <div className="font-bold text-sm text-gray-900 truncate">{l.title}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{l.type} · {l.hood}</div>
+                  <div className="text-sm font-extrabold text-[#0A3D62] mt-1">{nf(l.adv)} <span className="text-[11px] font-medium text-gray-500">{t('card.perYearShort')}</span></div>
+                </button>
+                <button onClick={() => onToggleFav?.(l.id)} aria-label={t('hub.unsave')}
+                  className="flex-shrink-0 text-xs font-bold text-red-600 border border-red-200 bg-red-50 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors">
+                  {t('hub.unsave')}
+                </button>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        // ── تنبيهات الطلبات (الرغبات) ──
+        wishes.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 text-sm">{t('hub.wishEmpty')}</div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-400 mb-1">{t('hub.wishHint')}</p>
+            {wishes.map((w) => (
+              <div key={w.id} className="bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between gap-3">
+                <div className="min-w-0 text-sm text-gray-700">
+                  <div className="font-semibold text-gray-900">
+                    {[w.type, w.neighborhood].filter(Boolean).join(' · ') || t('hub.wishAny')}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {w.max_price ? `${t('hub.wishBudget')}: ${nf(w.max_price)} ${t('card.sar')}` : null}
+                    {w.max_price ? ' · ' : ''}{fmtDate(w.created_at)}
+                  </div>
+                </div>
+                <button onClick={() => deleteWish(w.id)} aria-label={t('hub.wishDelete')}
+                  className="flex-shrink-0 text-xs font-bold text-red-600 border border-red-200 bg-red-50 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors">
+                  {t('hub.wishDelete')}
+                </button>
+              </div>
+            ))}
           </div>
         )
       )}
