@@ -23,6 +23,8 @@ interface SiteHeaderProps {
   user?: SiteNavUser | null;
   isAdmin?: boolean;
   isOffice?: boolean;
+  isSearcher?: boolean;
+  notifCount?: number;
   onSignOut?: () => void;
 }
 
@@ -47,7 +49,7 @@ const SECONDARY: { id: string; key: string; icon: string }[] = [
 // hash-route على الصفحة الواحدة («/#search»…) يقرؤها page.tsx عند التحميل.
 const hrefFor = (id: string) => (id === 'home' ? '/' : '/#' + id);
 
-export function SiteHeader({ active, onNavigate, user, isAdmin, isOffice, onSignOut }: SiteHeaderProps) {
+export function SiteHeader({ active, onNavigate, user, isAdmin, isOffice, isSearcher, notifCount, onSignOut }: SiteHeaderProps) {
   const [open, setOpen] = useState(false);
   const { t, lang, dir, setLang } = useLang();
 
@@ -82,6 +84,13 @@ export function SiteHeader({ active, onNavigate, user, isAdmin, isOffice, onSign
         ) : isOffice ? (
           <button className={variant === 'bar' ? 'login-btn' : 'drawer-cta'} onClick={() => go('office')}>
             {msi('store')} {t('nav.office')}
+          </button>
+        ) : isSearcher ? (
+          <button className={variant === 'bar' ? 'login-btn' : 'drawer-cta'} onClick={() => go('account')}>
+            {msi('person')} {t('nav.account')}
+            {!!notifCount && notifCount > 0 && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 16, height: 16, padding: '0 4px', marginInlineStart: 6, background: '#ef4444', color: '#fff', fontSize: 10, borderRadius: 9999 }}>{notifCount}</span>
+            )}
           </button>
         ) : null}
         {onSignOut && (

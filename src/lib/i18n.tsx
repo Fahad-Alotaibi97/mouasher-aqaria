@@ -367,6 +367,36 @@ export const STRINGS: Record<string, Entry> = {
   },
   'delpage.signInCta': { ar: 'تسجيل الدخول', en: 'Sign in' },
   'delpage.emailLabel': { ar: 'البريد لطلبات الحذف:', en: 'Email for deletion requests:' },
+
+  // ── حساب الباحث (الـ Searcher Hub) + الإشعارات ──
+  'nav.account': { ar: 'حسابي', en: 'My account' },
+  'hub.title': { ar: 'حسابي', en: 'My account' },
+  'hub.subtitle': { ar: 'استفساراتك، وردود المكاتب، وإشعاراتك', en: 'Your inquiries, office replies, and notifications' },
+  'hub.enter': { ar: 'حسابي', en: 'My account' },
+  'hub.tabInquiries': { ar: 'استفساراتي', en: 'My inquiries' },
+  'hub.tabNotifications': { ar: 'الإشعارات', en: 'Notifications' },
+  'hub.inqEmpty': { ar: 'لم ترسل أي استفسار بعد. عندما تتواصل مع مكتب بخصوص إعلان، يظهر استفسارك هنا مع ردود المكتب.', en: 'You haven’t sent any inquiries yet. When you contact an office about a listing, your inquiry appears here with the office’s replies.' },
+  'hub.notifEmpty': { ar: 'لا توجد إشعارات بعد.', en: 'No notifications yet.' },
+  'hub.statusAwaiting': { ar: 'بانتظار رد المكتب', en: 'Awaiting reply' },
+  'hub.statusReplied': { ar: 'تم الرد', en: 'Replied' },
+  'hub.officeLabel': { ar: 'المكتب', en: 'Office' },
+  'hub.youLabel': { ar: 'أنت', en: 'You' },
+  'hub.markAllRead': { ar: 'تعليم الكل مقروءاً', en: 'Mark all read' },
+  'hub.notifReply': { ar: 'رد جديد من المكتب على استفسارك', en: 'New office reply to your inquiry' },
+  'hub.notifWishMatch': { ar: 'إعلان جديد يطابق طلبك', en: 'A new listing matches your request' },
+  'hub.loading': { ar: 'جارٍ التحميل…', en: 'Loading…' },
+  'hub.gateTitle': { ar: 'حسابك يتطلّب تسجيل الدخول', en: 'Your account requires sign-in' },
+  'hub.gateBody': { ar: 'سجّل دخولك لرؤية استفساراتك وردود المكاتب وإشعاراتك.', en: 'Sign in to see your inquiries, office replies, and notifications.' },
+
+  // ── الرد داخل المنصة (مشترك: مكتب/باحث) ──
+  'reply.platformBtn': { ar: 'رد عبر المنصة', en: 'Reply on platform' },
+  'reply.platformTitle': { ar: 'ردّك داخل المنصة', en: 'Your in-platform reply' },
+  'reply.placeholder': { ar: 'اكتب ردّك هنا…', en: 'Write your reply here…' },
+  'reply.send': { ar: 'إرسال', en: 'Send' },
+  'reply.sending': { ar: 'جارٍ الإرسال…', en: 'Sending…' },
+  'reply.cancel': { ar: 'إلغاء', en: 'Cancel' },
+  'reply.notReady': { ar: 'الرد داخل المنصة غير مفعّل بعد — استخدم واتساب مؤقتاً.', en: 'In-platform replies aren’t enabled yet — use WhatsApp for now.' },
+  'reply.failed': { ar: 'تعذّر إرسال الرد — حاول لاحقاً.', en: 'Couldn’t send the reply — try again.' },
 };
 
 interface Ctx {

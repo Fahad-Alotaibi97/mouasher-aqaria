@@ -13,6 +13,8 @@ import { SiteHeader, SiteFooter } from './components/SiteChrome';
 import ContactButtons, { isSaudiMobile, waNumber, telNumber } from './components/ContactButtons';
 import ReplyComposer from './components/ReplyComposer';
 import DeleteAccountModal from './components/DeleteAccountModal';
+import SearcherHub from './components/SearcherHub';
+import PlatformReplyComposer from './components/PlatformReplyComposer';
 import { parseMapsUrl, isMapsUrl, mapsHref } from '@/lib/mapsLocation';
 const MapComponent = dynamic(() => import('./components/Map'), { ssr: false });
 // منتقي موقع الوحدة في نموذج المكتب (Leaflet — عميل فقط مثل الخريطة الرئيسية)
@@ -326,7 +328,7 @@ const HousePlaceholder = (
 );
 
 // وجهات الصفحة الواحدة الصالحة كـ hash-route (لعناوين قابلة للمشاركة + حارس قيمة)
-const PAGES = ['home', 'search', 'indicator', 'finance', 'inquiries', 'pricing', 'office', 'privacy', 'terms', 'about'] as const;
+const PAGES = ['home', 'search', 'indicator', 'finance', 'inquiries', 'pricing', 'office', 'account', 'privacy', 'terms', 'about'] as const;
 type PageId = typeof PAGES[number];
 const isPageId = (s: string): s is PageId => (PAGES as readonly string[]).includes(s);
 
@@ -476,17 +478,36 @@ export default function Home() {
   // ونحتفظ بمعرّف المكتب لحذف صوره عند حذف الحساب.
   const [hasOffice, setHasOffice] = useState(false);
   const [myOfficeId, setMyOfficeId] = useState<string | null>(null);
+  // نوع الحساب (من profiles.role؛ ومن يملك مكتباً ⇒ office) — يفصل تجربة الباحث عن المكتب.
+  const [accountType, setAccountType] = useState<'office' | 'searcher' | null>(null);
+  // عدّاد الإشعارات غير المقروءة (جرس الباحث) — قراءة غير قاتلة قبل تشغيل searcher_part1.sql
+  const [notifUnread, setNotifUnread] = useState(0);
   // نافذة حذف الحساب (بطاقة حساب الباحث في صفحة التسجيل)
   const [delOpen, setDelOpen] = useState(false);
   useEffect(() => {
-    if (!user || !isSupabaseConfigured()) { setHasOffice(false); setMyOfficeId(null); return; }
+    if (!user || !isSupabaseConfigured()) { setHasOffice(false); setMyOfficeId(null); setAccountType(null); setNotifUnread(0); return; }
     let cancelled = false;
     (async () => {
       const sb = createClient();
       const { data } = await sb.from('offices').select('id').eq('owner_id', user.id).limit(1);
+      const office = !!(data && data.length);
+      // الدور من profiles (المصدر المعتمد لنوع الحساب)؛ ومن يملك مكتباً يُعدّ مكتباً.
+      let role: string | null = null;
+      try {
+        const { data: prof } = await sb.from('profiles').select('role').eq('id', user.id).maybeSingle();
+        role = (prof?.role as string) ?? null;
+      } catch { /* تجاهل — نعتمد على ملكية المكتب */ }
+      // عدّ الإشعارات غير المقروءة (غير قاتل إن غاب الجدول)
+      let unread = 0;
+      try {
+        const { count } = await sb.from('notifications').select('id', { count: 'exact', head: true }).eq('read', false);
+        unread = count ?? 0;
+      } catch { /* تجاهل */ }
       if (!cancelled) {
-        setHasOffice(!!(data && data.length));
-        setMyOfficeId(data && data.length ? (data[0].id as string) : null);
+        setHasOffice(office);
+        setMyOfficeId(office ? (data![0].id as string) : null);
+        setAccountType(role === 'office' || office ? 'office' : 'searcher');
+        setNotifUnread(unread);
       }
     })();
     return () => { cancelled = true; };
@@ -1285,7 +1306,7 @@ export default function Home() {
     <div className="min-h-screen site" dir={dir} style={{ fontFamily: "'IBM Plex Sans Arabic', sans-serif" }}>
 
       {/* الشريط العلوي الزجاجي المشترك — على كل الصفحات العامة (هوية موحّدة) */}
-      <SiteHeader active={page} onNavigate={go} user={user} isAdmin={isAdmin} isOffice={hasOffice} onSignOut={signOut} />
+      <SiteHeader active={page} onNavigate={go} user={user} isAdmin={isAdmin} isOffice={hasOffice} isSearcher={accountType === 'searcher'} notifCount={notifUnread} onSignOut={signOut} />
 
       {/* ═══ HOME — تصميم Stitch الرسمي (واجهة فاتحة) موصول ببياناتي الحقيقية ═══ */}
       {page === 'home' && (
@@ -1857,9 +1878,16 @@ export default function Home() {
                 <div className="text-center">
                   <div className="font-bold text-[#0A3D62] mb-1">{t('auth.loggedIn')}</div>
                   <div className="text-sm text-gray-600 mb-3">{user.email}</div>
-                  <button onClick={() => setPage('office')} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
-                    {t('auth.enterOfficePanel')}
-                  </button>
+                  {/* توجيه حسب نوع الحساب: المكتب ⇒ لوحة المكتب، الباحث ⇒ حسابه (لا يرى أبداً إعداد المكتب) */}
+                  {accountType === 'office' ? (
+                    <button onClick={() => setPage('office')} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
+                      {t('auth.enterOfficePanel')}
+                    </button>
+                  ) : (
+                    <button onClick={() => setPage('account')} className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
+                      {t('hub.enter')}{notifUnread > 0 && <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 ml-1.5 align-middle bg-red-500 text-white text-[10px] rounded-full">{notifUnread}</span>}
+                    </button>
+                  )}
                   {/* حذف الحساب — متاح لكل مستخدم غير المدير (متطلب Google Play) */}
                   {!isAdmin && (
                     <div className="mt-4 pt-4 border-t border-gray-100">
@@ -2103,14 +2131,38 @@ export default function Home() {
       )}
 
       {/* ═══ OFFICE DASHBOARD — يتطلّب تسجيل دخول حقيقي ═══ */}
+      {/* الباحث لا يرى لوحة/إعداد المكتب أبداً — يُحوَّل لحسابه (الإصلاح المطلوب). */}
       {page === 'office' && (
         user ? (
-          <OfficeDashboard mktAvg={mktAvg} />
+          accountType === 'office' ? (
+            <OfficeDashboard mktAvg={mktAvg} />
+          ) : (
+            // الباحث (أو قبل تحديد النوع) لا يرى إعداد/لوحة المكتب إطلاقاً — يُعرض حسابه
+            <SearcherHub userId={user.id} onUnreadChange={setNotifUnread} />
+          )
         ) : (
           <div className="max-w-md mx-auto px-5 py-12 text-center">
             <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
               <div className="text-lg font-bold text-gray-900 mb-2">{t('officeGate.title')}</div>
               <p className="text-sm text-gray-500 mb-5 leading-relaxed">{t('officeGate.body')}</p>
+              <button onClick={() => { setPage('pricing'); setAuthMode('login'); if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
+                {t('officeGate.cta')}
+              </button>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* ═══ SEARCHER HUB — حساب الباحث (استفساراتي + الردود + الإشعارات) ═══ */}
+      {page === 'account' && (
+        user ? (
+          <SearcherHub userId={user.id} onUnreadChange={setNotifUnread} />
+        ) : (
+          <div className="max-w-md mx-auto px-5 py-12 text-center">
+            <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
+              <div className="text-lg font-bold text-gray-900 mb-2">{t('hub.gateTitle')}</div>
+              <p className="text-sm text-gray-500 mb-5 leading-relaxed">{t('hub.gateBody')}</p>
               <button onClick={() => { setPage('pricing'); setAuthMode('login'); if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className="bg-gradient-to-l from-[#0A3D62] to-[#1B6CA8] text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow">
                 {t('officeGate.cta')}
@@ -2689,7 +2741,9 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
   // ── بيانات المكتب الحقيقية (مربوطة بالحساب الحالي عبر owner_id) ──
   const [myOffice, setMyOffice] = useState<{ id: string; name: string; fal_license: string | null; phone: string | null; email: string | null; bio: string | null; verified: boolean; status: string | null; active: boolean } | null>(null);
   const [myListings, setMyListings] = useState<{ id: string; title: string; advertised: number; status: string; rejection_note: string | null }[]>([]);
-  const [myLeads, setMyLeads] = useState<{ id: string; name: string; phone: string; message: string | null; created_at: string; handled?: boolean | null; kind?: string | null }[]>([]);
+  const [myLeads, setMyLeads] = useState<{ id: string; name: string; phone: string; message: string | null; created_at: string; handled?: boolean | null; kind?: string | null; user_id?: string | null }[]>([]);
+  // خيوط الردود داخل المنصة لكل استفسار (lead_id ⇒ ردود) — قراءة غير قاتلة قبل searcher_part1.sql
+  const [leadReplies, setLeadReplies] = useState<Record<string, { id: string; sender: string; body: string; created_at: string }[]>>({});
   const [offLoaded, setOffLoaded] = useState(false);
   // «تواصل مع المنصة» — رسالة دعم من المكتب لإدارة المنصة (تُحفظ في leads بنوع support)
   const [supSubject, setSupSubject] = useState('');
@@ -2741,15 +2795,28 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
       const { data: ls } = await sb.from('listings').select('id,title,advertised,status,rejection_note').eq('office_id', off.id).order('created_at', { ascending: false });
       setMyListings((ls ?? []) as typeof myListings);
       // الاستفسارات الحقيقية الموجّهة لهذا المكتب (تتطلب سياسة leads_office_read)
-      // نحاول مع عمودي handled/kind، وإن غابا (قبل SQL) نرجع للأساسيات.
+      // نحاول مع handled/kind/user_id، وإن غابت أعمدة (قبل SQL) نرجع للأساسيات.
       let lds: { data: unknown; error: { code?: string } | null } =
-        await sb.from('leads').select('id,name,phone,message,created_at,handled,kind').eq('office_id', off.id).order('created_at', { ascending: false });
+        await sb.from('leads').select('id,name,phone,message,created_at,handled,kind,user_id').eq('office_id', off.id).order('created_at', { ascending: false });
+      if (lds.error) lds = await sb.from('leads').select('id,name,phone,message,created_at,handled,kind').eq('office_id', off.id).order('created_at', { ascending: false });
       if (lds.error) lds = await sb.from('leads').select('id,name,phone,message,created_at').eq('office_id', off.id).order('created_at', { ascending: false });
       // رسائل الدعم الموجّهة للمنصة لا تُعرض ضمن استفسارات العملاء
-      setMyLeads(((lds.data ?? []) as typeof myLeads).filter((l) => l.kind !== 'support'));
+      const officeLeads = ((lds.data ?? []) as typeof myLeads).filter((l) => l.kind !== 'support');
+      setMyLeads(officeLeads);
+      // خيوط الردود داخل المنصة لاستفسارات هذا المكتب (قراءة غير قاتلة إن غاب الجدول)
+      const repMap: Record<string, { id: string; sender: string; body: string; created_at: string }[]> = {};
+      const ids = officeLeads.map((l) => l.id);
+      if (ids.length) {
+        try {
+          const { data: reps } = await sb.from('lead_replies').select('id,lead_id,sender,body,created_at').in('lead_id', ids).order('created_at', { ascending: true });
+          for (const r of (reps ?? []) as { id: string; lead_id: string; sender: string; body: string; created_at: string }[]) (repMap[r.lead_id] ||= []).push(r);
+        } catch { /* تجاهل — الجدول قد لا يكون موجوداً بعد */ }
+      }
+      setLeadReplies(repMap);
     } else {
       setMyListings([]);
       setMyLeads([]);
+      setLeadReplies({});
     }
     setOffLoaded(true);
   };
@@ -3735,12 +3802,29 @@ function OfficeDashboard({ mktAvg }: { mktAvg: MktAvg }) {
                           </div>
                           <a href={`tel:${inq.phone}`} className="text-xs text-blue-600 font-medium mb-1 inline-block" dir="ltr">{inq.phone}</a>
                           {inq.message && <div className="text-sm text-gray-600 whitespace-pre-line mt-1">{inq.message}</div>}
-                          {/* رد مباشر على الباحث بجوّاله المحفوظ — اتصال/إيميل + منشئ رد عبر واتساب.
-                              ملاحظة: لا نعلّم الاستفسار «معالَجاً» هنا لأن المكتب لا يملك سياسة UPDATE
-                              على leads (الصلاحية للمدير فقط) — يحتاج سياسة leads_office_update لو رُغب لاحقاً. */}
+                          {/* خيط الردود داخل المنصة (إن وُجد) — رد المكتب يميناً، ردّ الباحث يساراً */}
+                          {(leadReplies[inq.id]?.length ?? 0) > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+                              {leadReplies[inq.id].map((r) => (
+                                <div key={r.id} className={`flex ${r.sender === 'office' ? 'justify-end' : 'justify-start'}`}>
+                                  <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${r.sender === 'office' ? 'bg-[#e6f1fb] text-[#0A3D62]' : 'bg-gray-100 text-gray-800'}`}>
+                                    <div className="text-[10px] font-bold opacity-70 mb-0.5">{r.sender === 'office' ? 'مكتبك' : (inq.name || 'الباحث')}</div>
+                                    <div className="whitespace-pre-line">{r.body}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {/* رد عبر واتساب (قائم) + رد داخل المنصة (جديد، للباحث المسجّل فقط).
+                              ملاحظة: لا نعلّم الاستفسار «معالَجاً» هنا لأن المكتب لا يملك سياسة UPDATE على leads. */}
                           <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
                             <ContactButtons contact={inq.phone} />
                             <ReplyComposer phone={inq.phone} />
+                            {inq.user_id ? (
+                              <PlatformReplyComposer leadId={inq.id} sender="office" onSent={reloadOffice} />
+                            ) : (
+                              <span className="text-[11px] text-gray-400 self-center">باحث غير مسجّل — الرد عبر واتساب فقط</span>
+                            )}
                           </div>
                         </div>
                       </div>
